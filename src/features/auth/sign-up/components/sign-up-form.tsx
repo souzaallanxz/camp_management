@@ -1,6 +1,7 @@
 import { HTMLAttributes, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
+import { useNavigate } from '@tanstack/react-router'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { IconBrandFacebook, IconBrandGithub } from '@tabler/icons-react'
 import { cn } from '@/lib/utils'
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
+import { useAuth } from '../../auth-context'
 
 type SignUpFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -26,20 +28,18 @@ const formSchema = z
       .email({ message: 'Invalid email address' }),
     password: z
       .string()
-      .min(1, {
-        message: 'Please enter your password',
-      })
-      .min(7, {
-        message: 'Password must be at least 7 characters long',
-      }),
-    confirmPassword: z.string(),
+      .min(1, { message: 'Please enter your password' })
+      .min(7, { message: 'Password must be at least 7 characters long' }),
+    confirmPassword: z.string().min(1, { message: 'Please confirm your password' }),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match.",
+    message: "Passwords don't match",
     path: ['confirmPassword'],
   })
 
 export function SignUpForm({ className, ...props }: SignUpFormProps) {
+  const { signUp } = useAuth()
+  const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -51,14 +51,16 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
     },
   })
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
-    setIsLoading(true)
-    // eslint-disable-next-line no-console
-    console.log(data)
-
-    setTimeout(() => {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
+    try {
+      setIsLoading(true)
+      await signUp(data)
+      navigate({ to: '/sign-in' })
+    } catch (error) {
+      console.error('Sign up failed:', error)
+    } finally {
       setIsLoading(false)
-    }, 3000)
+    }
   }
 
   return (
@@ -86,7 +88,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
                 <FormItem className='space-y-1'>
                   <FormLabel>Password</FormLabel>
                   <FormControl>
-                    <PasswordInput placeholder='********' {...field} />
+                    <PasswordInput placeholder='Create a password' {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -99,7 +101,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
                 <FormItem className='space-y-1'>
                   <FormLabel>Confirm Password</FormLabel>
                   <FormControl>
-                    <PasswordInput placeholder='********' {...field} />
+                    <PasswordInput placeholder='Confirm your password' {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

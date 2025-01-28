@@ -18,6 +18,8 @@ import {
   IconUserCog,
   IconUserOff,
   IconUsers,
+  IconUserPlus,
+  IconFileDescription,
 } from '@tabler/icons-react'
 import { AudioWaveform, Command, GalleryVerticalEnd } from 'lucide-react'
 import { type SidebarData } from '../types'
@@ -63,6 +65,12 @@ export const sidebarData: SidebarData = {
           title: 'Apps',
           url: '/apps',
           icon: IconPackages,
+        },
+        {
+          title: 'Registrations',
+          url: '/registrations',
+          icon: IconFileDescription,
+          badge: '5',
         },
         {
           title: 'Chats',

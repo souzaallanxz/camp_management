@@ -1,8 +1,20 @@
+import { useEffect } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { Card } from '@/components/ui/card'
 import AuthLayout from '../auth-layout'
 import { UserAuthForm } from './components/user-auth-form'
+import { useAuth } from '../auth-context'
 
 export default function SignIn() {
+  const navigate = useNavigate()
+  const { isAuthenticated } = useAuth()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate({ to: '/' })
+    }
+  }, [isAuthenticated, navigate])
+
   return (
     <AuthLayout>
       <Card className='p-6'>
