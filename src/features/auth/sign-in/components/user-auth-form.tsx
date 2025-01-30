@@ -2,8 +2,7 @@ import { HTMLAttributes, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useNavigate } from '@tanstack/react-router'
-import { IconBrandFacebook, IconBrandGithub } from '@tabler/icons-react'
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { useAuth } from '../../auth-context'
+import { routeTree } from '@/routeTree.gen'
 
 type UserAuthFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -38,6 +38,7 @@ const formSchema = z.object({
 export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  const search = useSearch({ from: '/(auth)/sign-in' })
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -52,6 +53,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     try {
       setIsLoading(true)
       await signIn(data)
+      navigate({ to: search.redirect ?? '/' })
     } catch (error) {
       console.error('Login failed:', error)
     } finally {

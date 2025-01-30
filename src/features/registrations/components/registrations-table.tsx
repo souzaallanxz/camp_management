@@ -22,9 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Registration } from '../data/schema'
 import { DataTablePagination } from '@/components/data-table/data-table-pagination'
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar'
+import { type RegistrationWithActions } from './registrations-columns'
 
 declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -34,8 +34,8 @@ declare module '@tanstack/react-table' {
 }
 
 interface DataTableProps {
-  columns: ColumnDef<Registration>[]
-  data: Registration[]
+  columns: ColumnDef<RegistrationWithActions>[]
+  data: RegistrationWithActions[]
 }
 
 export function RegistrationsTable({ columns, data }: DataTableProps) {
@@ -68,7 +68,7 @@ export function RegistrationsTable({ columns, data }: DataTableProps) {
 
   return (
     <div className='space-y-4'>
-      <DataTableToolbar table={table} />
+      <DataTableToolbar table={table} searchField="name" />
       <div className='rounded-md border'>
         <Table>
           <TableHeader>

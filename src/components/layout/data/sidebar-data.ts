@@ -20,6 +20,9 @@ import {
   IconUsers,
   IconUserPlus,
   IconFileDescription,
+  IconTent,
+  IconCampfire,
+  IconIceCream,
 } from '@tabler/icons-react'
 import { AudioWaveform, Command, GalleryVerticalEnd } from 'lucide-react'
 import { type SidebarData } from '../types'
@@ -82,6 +85,21 @@ export const sidebarData: SidebarData = {
           title: 'Users',
           url: '/users',
           icon: IconUsers,
+        },
+        {
+          title: 'Campistas',
+          url: '/campers',
+          icon: IconTent,
+        },
+        {
+          title: 'Acampamentos',
+          url: '/camps',
+          icon: IconCampfire,
+        },
+        {
+          title: 'Snack Bar',
+          url: '/snack-bar',
+          icon: IconIceCream,
         },
       ],
     },

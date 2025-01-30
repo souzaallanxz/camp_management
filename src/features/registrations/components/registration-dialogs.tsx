@@ -1,16 +1,17 @@
 import { RegistrationDialog } from './registration-dialog'
-import { RegistrationDetailsDialog } from './registration-details-dialog'
+import { RegistrationDetailsSheet } from './registration-details-dialog'
 import { RegistrationDeleteDialog } from './registration-delete-dialog'
+import { RegistrationOnboardDialog } from './registration-onboard-dialog'
 import { useRegistrationDialogs } from '../context/registration-dialogs-context'
 
 interface RegistrationDialogsProps {
-  onRegistrationCreated: () => void
   onRegistrationDeleted: () => void
+  onRegistrationUpdated: () => void
 }
 
 export function RegistrationDialogs({
-  onRegistrationCreated,
   onRegistrationDeleted,
+  onRegistrationUpdated,
 }: RegistrationDialogsProps) {
   const {
     openDialog,
@@ -23,13 +24,13 @@ export function RegistrationDialogs({
       <RegistrationDialog
         open={openDialog === 'create'}
         onOpenChange={handleOpenChange}
-        onRegistrationCreated={onRegistrationCreated}
       />
 
-      <RegistrationDetailsDialog
+      <RegistrationDetailsSheet
         open={openDialog === 'view'}
         onOpenChange={handleOpenChange}
         registration={selectedRegistration}
+        onRegistrationUpdated={onRegistrationUpdated}
       />
 
       <RegistrationDeleteDialog
@@ -37,6 +38,13 @@ export function RegistrationDialogs({
         onOpenChange={handleOpenChange}
         registration={selectedRegistration}
         onRegistrationDeleted={onRegistrationDeleted}
+      />
+
+      <RegistrationOnboardDialog
+        open={openDialog === 'onboard'}
+        onOpenChange={handleOpenChange}
+        registration={selectedRegistration}
+        onSuccess={onRegistrationUpdated}
       />
     </>
   )

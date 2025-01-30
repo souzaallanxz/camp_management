@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, ReactNode } from 'react'
 import { Registration } from '../data/schema'
+import { getRegistrationById } from '../services/registration-service'
+import { toast } from 'sonner'
 
-type DialogType = 'create' | 'view' | 'delete' | null
+type DialogType = 'create' | 'view' | 'delete' | 'onboard' | null
 
 interface RegistrationDialogsContextType {
   openDialog: DialogType
@@ -10,6 +12,7 @@ interface RegistrationDialogsContextType {
   openCreateDialog: () => void
   openViewDialog: (registration: Registration) => void
   openDeleteDialog: (registration: Registration) => void
+  openOnboardDialog: (registration: Registration) => void
 }
 
 const RegistrationDialogsContext = createContext<RegistrationDialogsContextType | undefined>(undefined)
@@ -34,14 +37,26 @@ export function RegistrationDialogsProvider({ children }: RegistrationDialogsPro
     setSelectedRegistration(null)
   }
 
-  const openViewDialog = (registration: Registration) => {
-    setSelectedRegistration(registration)
-    setOpenDialog('view')
+  const openViewDialog = async (registration: Registration) => {
+    try {
+      const fullRegistration = await getRegistrationById(registration.id)
+      setSelectedRegistration(fullRegistration)
+      setOpenDialog('view')
+    } catch (error) {
+      toast.error('Failed to load registration details', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred'
+      })
+    }
   }
 
   const openDeleteDialog = (registration: Registration) => {
     setSelectedRegistration(registration)
     setOpenDialog('delete')
+  }
+
+  const openOnboardDialog = (registration: Registration) => {
+    setSelectedRegistration(registration)
+    setOpenDialog('onboard')
   }
 
   return (
@@ -53,6 +68,7 @@ export function RegistrationDialogsProvider({ children }: RegistrationDialogsPro
         openCreateDialog,
         openViewDialog,
         openDeleteDialog,
+        openOnboardDialog,
       }}
     >
       {children}

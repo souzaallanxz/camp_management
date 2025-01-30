@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -7,7 +6,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -15,269 +13,369 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useToast } from '@/components/ui/use-toast'
-import { createRegistration } from '../services/registration-service'
-import { createPayment } from '../services/payment-service'
-import { PaymentMethod } from '../data/schema'
-import { useNavigate } from '@tanstack/react-router'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
+import { registrationService } from '../services/registration-service'
+import { toast } from 'sonner'
+import { useCamps } from '@/features/camps/hooks/use-camps'
+import { z } from 'zod'
+import { formatCurrency } from '@/lib/utils'
+import { type Camp } from '@/features/camps/data/schema'
+import { Separator } from '@/components/ui/separator'
+import { paymentService } from '../services/payment-service'
+import { MBWayService } from '../services/mbway-service'
+
+const createRegistrationSchema = z.object({
+  // Registration fields
+  name: z.string().min(1, 'Nome é obrigatório'),
+  email: z.string().email('Email inválido'),
+  contact: z.string().min(1, 'Contacto é obrigatório'),
+  camp_id: z.string().uuid('Selecione um acampamento'),
+  form_id: z.string().optional().nullable(),
+  
+  // Payment fields
+  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro'], {
+    required_error: 'Selecione um método de pagamento',
+  }),
+  amount: z.coerce.number().min(0, 'Valor deve ser maior que 0'),
+  phone_number: z.string()
+    .nullable()
+    .optional()
+    .refine((val) => {
+      if (!val) return true
+      // Remove any non-digit characters
+      const digits = val.replace(/\D/g, '')
+      // Check if it's a valid Portuguese phone number (9 digits, starting with 9)
+      return /^9\d{8}$/.test(digits)
+    }, 'Número de telefone inválido. Deve começar com 9 e ter 9 dígitos'),
+})
+
+type CreateRegistrationFormData = z.infer<typeof createRegistrationSchema>
 
 interface RegistrationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onRegistrationCreated: () => void
 }
 
 export function RegistrationDialog({
   open,
   onOpenChange,
-  onRegistrationCreated,
 }: RegistrationDialogProps) {
-  const { toast } = useToast()
-  const navigate = useNavigate()
-  const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    contact: '',
-    camp: '',
-    form_id: '',
+  const queryClient = useQueryClient()
+  const { data: camps = [] } = useCamps()
+
+  const form = useForm<CreateRegistrationFormData>({
+    resolver: zodResolver(createRegistrationSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      contact: '',
+      camp_id: '',
+      form_id: '',
+      payment_method: undefined,
+      amount: 0,
+      phone_number: '',
+    },
   })
-  const [paymentData, setPaymentData] = useState({
-    payment_method: 'MB Way' as PaymentMethod,
-    amount: '',
-    payment_link: '',
-  })
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  const handlePaymentInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setPaymentData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  const handlePaymentMethodChange = (value: PaymentMethod) => {
-    setPaymentData((prev) => ({
-      ...prev,
-      payment_method: value,
-    }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      // Create registration first
-      const registration = await createRegistration({
-        ...formData,
-        form_id: formData.form_id || null,
-      })
-
-      console.log('Registration created successfully:', registration)
-
+  const { mutateAsync: createRegistration, isPending: isCreating } = useMutation({
+    mutationFn: async (data: CreateRegistrationFormData) => {
       try {
-        // Then create the initial payment
-        const paymentToCreate = {
-          registration_id: registration.id,
-          payment_date: new Date().toISOString(),
-          payment_method: paymentData.payment_method,
-          amount: Number(paymentData.amount),
-          payment_link: paymentData.payment_link || null,
+        // Cria a inscrição com os dados do futuro camper
+        const registration = await registrationService.create({
+          camp_id: data.camp_id,
+          name: data.name,
+          email: data.email,
+          contact: data.contact,
+          form_id: data.form_id,
+        })
+
+        // Cria o pagamento associado à inscrição apenas se o valor for maior que 0
+        if (registration && data.amount > 0) {
+          const payment = await paymentService.createPayment({
+            registration_id: registration.id,
+            payment_method: data.payment_method,
+            amount: data.amount,
+            payment_date: new Date().toISOString(),
+            phone_number: data.phone_number || null,
+            payment_link: null,
+          })
+
+          // Se o método de pagamento for MB Way, faz o pedido de pagamento
+          if (data.payment_method === 'MB Way' && data.phone_number) {
+            console.log('Iniciando pagamento MB Way:', {
+              method: data.payment_method,
+              phone: data.phone_number,
+              amount: data.amount,
+              form_id: data.form_id,
+            })
+
+            try {
+              const mbwayResult = await MBWayService.requestPayment({
+                mobileNumber: data.phone_number,
+                amount: data.amount,
+                description: `Pagamento de inscrição - ${data.name}`,
+                orderId: data.form_id || String(payment.id),
+                email: data.email,
+              })
+
+              console.log('Resposta MB Way:', mbwayResult)
+              
+              if (mbwayResult.Success) {
+                toast.success('Pedido de pagamento MB Way enviado! Por favor, verifique o seu telemóvel.')
+              } else {
+                toast.error(`Erro MB Way: ${mbwayResult.Message}`)
+              }
+            } catch (error) {
+              console.error('Erro ao processar MB Way:', error)
+              const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+              toast.error(`Erro ao enviar pedido de pagamento MB Way: ${errorMessage}`)
+            }
+          } else if (data.payment_method === 'MB Way') {
+            console.log('MB Way selecionado mas faltando número de telefone:', {
+              method: data.payment_method,
+              phone: data.phone_number,
+            })
+          }
         }
 
-        console.log('Attempting to create payment:', paymentToCreate)
-
-        const payment = await createPayment(paymentToCreate)
-        console.log('Payment created successfully:', payment)
-
-        toast({
-          description: 'Inscrição e pagamento criados com sucesso',
-        })
-      } catch (paymentError) {
-        console.error('Error creating payment:', paymentError)
-        
-        // Even if payment fails, the registration was created
-        toast({
-          variant: 'destructive',
-          title: 'Aviso',
-          description: 'Inscrição criada, mas houve um erro ao registrar o pagamento.',
-        })
+        return registration
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
+        throw new Error(message)
       }
-
-      onRegistrationCreated()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['registrations'] })
       onOpenChange(false)
-      
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        contact: '',
-        camp: '',
-        form_id: '',
-      })
-      setPaymentData({
-        payment_method: 'MB Way' as PaymentMethod,
-        amount: '',
-        payment_link: '',
-      })
+      form.reset()
+      toast.success('Inscrição criada com sucesso!')
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
+      toast.error(message)
+    },
+  })
+
+  const isPending = isCreating
+
+  async function onSubmit(data: CreateRegistrationFormData) {
+    try {
+      await createRegistration(data)
     } catch (error) {
-      console.error('Full error details:', error)
-      
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : 'Erro desconhecido ao criar inscrição'
-      
-      if (errorMessage.includes('autenticado')) {
-        toast({
-          variant: 'destructive',
-          title: 'Erro de Autenticação',
-          description: 'Sessão expirada. Redirecionando para o login...',
-        })
-        setTimeout(() => {
-          navigate({ to: '/sign-in' })
-        }, 2000)
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Erro',
-          description: errorMessage,
-        })
-      }
-    } finally {
-      setLoading(false)
+      const message = error instanceof Error ? error.message : 'Erro ao salvar inscrição'
+      toast.error(message)
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Nova Inscrição</DialogTitle>
+      <DialogContent className="sm:max-w-[600px] p-6">
+        <DialogHeader className="space-y-2">
+          <DialogTitle>Nova inscrição</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="name">Nome</Label>
-              <Input
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="contact">Contacto</Label>
-              <Input
-                id="contact"
-                name="contact"
-                value={formData.contact}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="camp">Campo</Label>
-              <Input
-                id="camp"
-                name="camp"
-                value={formData.camp}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="form_id">ID do Formulário</Label>
-              <Input
-                id="form_id"
-                name="form_id"
-                value={formData.form_id}
-                onChange={handleInputChange}
-              />
-            </div>
 
-            {/* Payment Section */}
-            <div className="pt-4 border-t">
-              <h3 className="text-lg font-medium mb-4">Informação de Pagamento</h3>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="payment_method">Método de Pagamento</Label>
-                  <Select
-                    value={paymentData.payment_method}
-                    onValueChange={handlePaymentMethodChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="MB Way">MB Way</SelectItem>
-                      <SelectItem value="Transferência Bancária">
-                        Transferência Bancária
-                      </SelectItem>
-                      <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="amount">Valor</Label>
-                  <Input
-                    id="amount"
-                    name="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={paymentData.amount}
-                    onChange={handlePaymentInputChange}
-                    required
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6">
+            {/* Registration Section */}
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-medium mb-4">Dados da Inscrição</h3>
+                <Separator className="mb-6" />
+                
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Nome</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div>
-                  <Label htmlFor="payment_link">Link de Pagamento</Label>
-                  <Input
-                    id="payment_link"
-                    name="payment_link"
-                    value={paymentData.payment_link}
-                    onChange={handlePaymentInputChange}
+
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="contact"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Contacto</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="camp_id"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Acampamento</FormLabel>
+                        <FormControl>
+                          <Select
+                            onValueChange={(value) => {
+                              field.onChange(value)
+                              // Atualiza o valor do pagamento com o preço do acampamento
+                              const camp = camps.find((c: Camp) => c.id === value)
+                              if (camp) {
+                                const price = typeof camp.price === 'string' ? parseFloat(camp.price) : camp.price
+                                form.setValue('amount', price)
+                              }
+                            }}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione um acampamento" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {camps.map((camp: Camp) => (
+                                <SelectItem key={camp.id} value={camp.id}>
+                                  {camp.name} - {formatCurrency(camp.price)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="form_id"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Form ID</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ''} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex justify-end space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'A criar...' : 'Criar'}
-            </Button>
-          </div>
-        </form>
+            {/* Payment Section */}
+            <div className="space-y-6 mt-8">
+              <div>
+                <h3 className="text-sm font-medium mb-4">Dados do Pagamento</h3>
+                <Separator className="mb-6" />
+
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="payment_method"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Método de Pagamento</FormLabel>
+                        <FormControl>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione o método de pagamento" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="MB Way">MB Way</SelectItem>
+                              <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
+                              <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Valor</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            {...field}
+                            value={field.value || ''}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="phone_number"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col space-y-1.5">
+                        <FormLabel>Telefone (MB Way)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field}
+                            value={field.value ?? ''}
+                            onChange={(e) => field.onChange(e.target.value || null)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-4 mt-8 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isPending}>
+                Criar
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   )

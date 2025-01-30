@@ -1,142 +1,193 @@
 import { ColumnDef } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
 import { Registration } from '../data/schema'
-import { useRegistrationDialogs } from '../context/registration-dialogs-context'
 import { formatCurrency } from '@/lib/utils'
-import { IconEye, IconTrash, IconDotsVertical } from '@tabler/icons-react'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { IconDots, IconEye, IconUserCheck, IconCreditCard } from '@tabler/icons-react'
+import { RegistrationDetailsSheet } from './registration-details-dialog'
+import { RegistrationOnboardDialog } from './registration-onboard-dialog'
+import { SnackbarBalanceDialog } from './snackbar-balance-dialog'
 
 interface RegistrationWithActions extends Registration {
-  onView?: (id: string) => void
+  onRegistrationUpdated: () => void
 }
 
-const statusStyles = {
-  paid: 'bg-green-100 text-green-900 dark:bg-green-900 dark:text-green-100',
-  partial: 'bg-yellow-100 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-100',
-  unpaid: 'bg-red-100 text-red-900 dark:bg-red-900 dark:text-red-100'
+interface ActionsProps {
+  registration: Registration
+  onRegistrationUpdated: () => void
+}
+
+function Actions({ registration, onRegistrationUpdated }: ActionsProps) {
+  const [showOnboardDialog, setShowOnboardDialog] = useState(false)
+  const [showDetailsDialog, setShowDetailsDialog] = useState(false)
+  const [showSnackbarBalanceDialog, setShowSnackbarBalanceDialog] = useState(false)
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0">
+            <span className="sr-only">Open menu</span>
+            <IconDots className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setShowDetailsDialog(true)}>
+            <IconEye className="mr-2 h-4 w-4" />
+            Ver detalhes
+          </DropdownMenuItem>
+          {registration.onboarding_status !== 'Onboarded' && (
+            <DropdownMenuItem onClick={() => setShowOnboardDialog(true)}>
+              <IconUserCheck className="mr-2 h-4 w-4" />
+              Onboard
+            </DropdownMenuItem>
+          )}
+          {registration.onboarding_status === 'Onboarded' && (
+            <DropdownMenuItem onClick={() => setShowSnackbarBalanceDialog(true)}>
+              <IconCreditCard className="mr-2 h-4 w-4" />
+              Carregar cartão
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <RegistrationDetailsSheet
+        open={showDetailsDialog}
+        onOpenChange={setShowDetailsDialog}
+        registration={registration}
+        onRegistrationUpdated={onRegistrationUpdated}
+      />
+
+      <RegistrationOnboardDialog
+        open={showOnboardDialog}
+        onOpenChange={setShowOnboardDialog}
+        registration={registration}
+        onSuccess={onRegistrationUpdated}
+      />
+
+      <SnackbarBalanceDialog
+        open={showSnackbarBalanceDialog}
+        onOpenChange={setShowSnackbarBalanceDialog}
+        registrationId={registration.id}
+        onSuccess={onRegistrationUpdated}
+      />
+    </>
+  )
 }
 
 export const columns: ColumnDef<RegistrationWithActions>[] = [
-  {
-    id: 'select',
-    header: ({ table }) => (
-      <Checkbox
-        checked={table.getIsAllPageRowsSelected()}
-        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        aria-label='Select all'
-        className='translate-y-[2px]'
-      />
-    ),
-    cell: ({ row }) => (
-      <Checkbox
-        checked={row.getIsSelected()}
-        onCheckedChange={(value) => row.toggleSelected(!!value)}
-        aria-label='Select row'
-        className='translate-y-[2px]'
-      />
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
+    {
     accessorKey: 'form_id',
-    header: 'Form ID',
-  },
+    header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Form ID" />
+    ),
+    cell: ({ row }) => {
+        return <div>{row.original.form_id || '-'}</div>
+    }
+    },
   {
     accessorKey: 'name',
-    header: 'Name',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Nome" />
+    ),
+    cell: ({ row }) => {
+      const camperName = row.original.camper?.name
+      const registrationName = row.original.name
+      return <div>{camperName || registrationName}</div>
+    }
   },
   {
     accessorKey: 'email',
-    header: 'Email',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Email" />
+    ),
+    cell: ({ row }) => {
+      const camperEmail = row.original.camper?.email
+      const registrationEmail = row.original.email
+      return <div>{camperEmail || registrationEmail}</div>
+    }
   },
   {
     accessorKey: 'contact',
-    header: 'Contact',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Contacto" />
+    ),
+    cell: ({ row }) => {
+      const camperContact = row.original.camper?.contact
+      const registrationContact = row.original.contact
+      return <div>{camperContact || registrationContact}</div>
+    }
   },
   {
     accessorKey: 'camp',
-    header: 'Camp',
-  },
-  {
-    accessorKey: 'total_amount_paid',
-    header: 'Amount Paid',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Acampamento" />
+    ),
     cell: ({ row }) => {
-      const amount = row.getValue('total_amount_paid') as number
-      return formatCurrency(amount || 0)
+      return <div>{row.original.camp?.name}</div>
     }
   },
   {
     accessorKey: 'status',
-    header: 'Status',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Status" />
+    ),
     cell: ({ row }) => {
-      const status = row.getValue('status') as string
+      const status = row.original.status
+      const statusStyles = {
+        paid: 'bg-green-100 text-green-900 dark:bg-green-900 dark:text-green-100',
+        partial: 'bg-yellow-100 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-100',
+        unpaid: 'bg-red-100 text-red-900 dark:bg-red-900 dark:text-red-100'
+      }
+
       return (
-        <Badge className={cn(statusStyles[status as keyof typeof statusStyles])}>
+        <Badge className={statusStyles[status]}>
           {status.charAt(0).toUpperCase() + status.slice(1)}
         </Badge>
       )
-    },
-    filterFn: (row, id, value) => {
-      return value.includes(row.getValue(id))
-    },
+    }
   },
   {
-    accessorKey: 'created_at',
-    header: 'Created At',
+    accessorKey: 'onboarding_status',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Onboarding" />
+    ),
     cell: ({ row }) => {
-      const date = new Date(row.getValue('created_at'))
-      return <div>{date.toLocaleString()}</div>
-    },
+      const status = row.original.onboarding_status
+      const statusStyles = {
+        Pendente: 'bg-yellow-100 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-100',
+        Onboarded: 'bg-green-100 text-green-900 dark:bg-green-900 dark:text-green-100'
+      }
+
+      return (
+        <Badge className={statusStyles[status]}>
+          {status}
+        </Badge>
+      )
+    }
+  },
+  {
+    accessorKey: 'total_amount_paid',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Valor Pago" />
+    ),
+    cell: ({ row }) => {
+      return <div>{formatCurrency(row.original.total_amount_paid || 0)}</div>
+    }
   },
   {
     id: 'actions',
-    cell: function ActionsCell({ row }) {
-      const { openDeleteDialog } = useRegistrationDialogs()
+    cell: ({ row }) => {
+      const registration = row.original
       return (
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant='ghost'
-              className='flex h-8 w-8 p-0 data-[state=open]:bg-muted'
-            >
-              <IconDotsVertical className='h-4 w-4' />
-              <span className='sr-only'>Open menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align='end' className='w-[160px]'>
-            <DropdownMenuItem
-              onClick={() => row.original.onView?.(row.original.id)}
-              className='flex items-center'
-            >
-              View Details
-              <DropdownMenuShortcut>
-                <IconEye size={16} />
-              </DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => openDeleteDialog(row.original)}
-              className='!text-red-500'
-            >
-              Delete
-              <DropdownMenuShortcut>
-                <IconTrash size={16} />
-              </DropdownMenuShortcut>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Actions
+          registration={registration}
+          onRegistrationUpdated={registration.onRegistrationUpdated}
+        />
       )
-    },
-  },
+    }
+  }
 ] 

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -6,23 +5,32 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { IconPlus } from '@tabler/icons-react'
-import { columns } from './components/registrations-columns'
+import { useQuery } from '@tanstack/react-query'
+import { getRegistrations } from './services/registration-service'
 import { RegistrationsTable } from './components/registrations-table'
-import { RegistrationDetails } from './components/registration-details'
-import { useRegistrations } from './hooks/use-registrations'
-import { RegistrationDialogsProvider } from './context/registration-dialogs-context'
 import { RegistrationDialogs } from './components/registration-dialogs'
-import { Registration } from './data/schema'
 import { useRegistrationDialogs } from './context/registration-dialogs-context'
+import { type Registration } from './data/schema'
+import { columns } from './components/registrations-columns'
+import { RegistrationDialogsProvider } from './context/registration-dialogs-context'
 
 function RegistrationsContent() {
-  const { data: registrations, isLoading, refetch } = useRegistrations()
-  const [selectedRegistrationId, setSelectedRegistrationId] = useState<string | null>(null)
-  const { openCreateDialog } = useRegistrationDialogs()
+  const { data: registrations = [], refetch } = useQuery({
+    queryKey: ['registrations'],
+    queryFn: getRegistrations,
+  })
 
-  const registrationsWithActions = registrations?.map((registration: Registration) => ({
+  const { openCreateDialog, openViewDialog, openOnboardDialog, openDeleteDialog } = useRegistrationDialogs()
+
+  const registrationsWithActions = registrations.map((registration: Registration) => ({
     ...registration,
-    onView: (id: string) => setSelectedRegistrationId(id)
+    onView: () => openViewDialog(registration),
+    onDelete: () => openDeleteDialog(registration),
+    onOnboard: () => {
+      if (registration.onboarding_status === 'Onboarded') return
+      openOnboardDialog(registration)
+    },
+    onRegistrationUpdated: () => refetch()
   }))
 
   return (
@@ -38,39 +46,31 @@ function RegistrationsContent() {
       <Main>
         <div className='mb-2 flex items-center justify-between space-y-2 flex-wrap'>
           <div>
-            <h2 className='text-2xl font-bold tracking-tight'>Registrations</h2>
+            <h2 className='text-2xl font-bold tracking-tight'>Inscrições</h2>
             <p className='text-muted-foreground'>
-              Manage your camp registrations and payments here.
+              Gerencie todas as inscrições registradas no sistema.
             </p>
           </div>
           <Button onClick={openCreateDialog}>
             <IconPlus className='mr-2 h-4 w-4' />
-            New Registration
+            Nova Inscrição
           </Button>
         </div>
 
         <div className='-mx-4 flex-1 overflow-auto px-4 py-1'>
-          <RegistrationsTable
-            data={registrationsWithActions || []}
-            columns={columns}
-          />
+          <RegistrationsTable data={registrationsWithActions} columns={columns} />
         </div>
       </Main>
 
-      <RegistrationDetails
-        registrationId={selectedRegistrationId}
-        onOpenChange={(open) => !open && setSelectedRegistrationId(null)}
-      />
-
       <RegistrationDialogs
-        onRegistrationCreated={refetch}
         onRegistrationDeleted={refetch}
+        onRegistrationUpdated={refetch}
       />
     </>
   )
 }
 
-export default function Registrations() {
+export function RegistrationsFeature() {
   return (
     <RegistrationDialogsProvider>
       <RegistrationsContent />

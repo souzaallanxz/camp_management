@@ -1,6 +1,6 @@
 import { DotsHorizontalIcon } from '@radix-ui/react-icons'
 import { Row } from '@tanstack/react-table'
-import { IconEye, IconTrash } from '@tabler/icons-react'
+import { IconEye, IconTrash, IconUserPlus } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -16,9 +16,12 @@ interface DataTableRowActionsProps {
   row: Row<Registration>
   onView: (registration: Registration) => void
   onDelete: (registration: Registration) => void
+  onOnboard: (registration: Registration) => void
 }
 
-export function DataTableRowActions({ row, onView, onDelete }: DataTableRowActionsProps) {
+export function DataTableRowActions({ row, onView, onDelete, onOnboard }: DataTableRowActionsProps) {
+  const isOnboarded = row.original.onboarding_status === 'Onboarded'
+
   return (
     <>
       <DropdownMenu modal={false}>
@@ -40,10 +43,20 @@ export function DataTableRowActions({ row, onView, onDelete }: DataTableRowActio
               <IconEye size={16} />
             </DropdownMenuShortcut>
           </DropdownMenuItem>
+          {!isOnboarded && (
+            <DropdownMenuItem
+              onClick={() => onOnboard(row.original)}
+            >
+              Onboard
+              <DropdownMenuShortcut>
+                <IconUserPlus size={16} />
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => onDelete(row.original)}
-            className='!text-red-500'
+            className='text-red-600'
           >
             Delete
             <DropdownMenuShortcut>
@@ -54,4 +67,4 @@ export function DataTableRowActions({ row, onView, onDelete }: DataTableRowActio
       </DropdownMenu>
     </>
   )
-} 
+}
