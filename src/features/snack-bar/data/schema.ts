@@ -2,7 +2,11 @@ import { z } from 'zod'
 
 export const snackBarTransactionSchema = z.object({
   camperId: z.string(),
-  amount: z.number().positive(),
+  amount: z.string()
+    .min(1, 'O valor é obrigatório')
+    .refine((val) => !isNaN(Number(val)), 'Valor inválido')
+    .refine((val) => Number(val) >= 0.01, 'O valor deve ser maior que zero')
+    .transform((val) => Number(val)),
 })
 
 export const snackBarTransactionResponseSchema = z.object({

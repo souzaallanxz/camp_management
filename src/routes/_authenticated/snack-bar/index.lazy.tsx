@@ -35,7 +35,7 @@ export default function SnackBarPage() {
   const form = useForm<SnackBarTransaction>({
     resolver: zodResolver(snackBarTransactionSchema),
     defaultValues: {
-      amount: 0,
+      amount: '',
       camperId: '',
     },
   })
@@ -62,7 +62,6 @@ export default function SnackBarPage() {
     queryFn: async () => {
       try {
         const data = await snackBarService.getAllTransactions()
-        console.log('All Transactions:', data)
         return data
       } catch (error) {
         console.error('Error fetching all transactions:', error)
@@ -95,7 +94,7 @@ export default function SnackBarPage() {
       })
       
       // Reset form and selected camper
-      form.reset({ amount: 0, camperId: '' })
+      form.reset({ amount: '', camperId: '' })
       setSelectedCamperId('')
     },
     onError: (error) => {
@@ -129,7 +128,8 @@ export default function SnackBarPage() {
   }
 
   const amount = form.watch('amount')
-  const isAmountValid = Number(amount) > 0 && Number(amount) <= balance
+  const amountNumber = Number(amount)
+  const isAmountValid = !isNaN(amountNumber) && amountNumber > 0 && amountNumber <= balance
 
   if (!currentCamp) {
     return (
@@ -252,15 +252,14 @@ export default function SnackBarPage() {
                             <FormItem>
                               <FormControl>
                                 <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
+                                  type="text"
                                   placeholder="0.00"
                                   {...field}
-                                  value={field.value === 0 ? '' : field.value}
                                   onChange={(e) => {
-                                    const value = e.target.value === '' ? 0 : parseFloat(e.target.value)
-                                    field.onChange(value)
+                                    const value = e.target.value
+                                    if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+                                      field.onChange(value)
+                                    }
                                   }}
                                 />
                               </FormControl>

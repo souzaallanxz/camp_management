@@ -41,6 +41,7 @@ export class MBWayService {
           orderId: formattedOrderId,
           amount: data.amount.toFixed(2), // Ensure amount is formatted with 2 decimal places
           mobileNumber: formattedMobileNumber,
+          description: data.description,
         }),
       })
 
@@ -60,17 +61,20 @@ export class MBWayService {
         throw new Error(`Resposta inválida do MB Way: ${responseText}`)
       }
 
-      if (!result.Success) {
+      // Check if result is a string (error message)
+      if (typeof result === 'string') {
+        throw new Error(`Erro MB Way: ${result}`)
+      }
+
+      // Check if result has Success property and it's false
+      if (result.Success === false) {
         throw new Error(result.Message || 'Erro ao processar pagamento MB Way')
       }
 
       return result
     } catch (error) {
       console.error('Erro no serviço MB Way:', error)
-      const message = error instanceof Error 
-        ? error.message 
-        : 'Erro ao processar pagamento MB Way'
-      throw new Error(message)
+      throw error // Propagate the original error instead of creating a new one
     }
   }
 } 

@@ -14,6 +14,7 @@ import { CamperDialogsProvider, useCamperDialogs } from './context/camper-dialog
 import { CamperDetails } from './components/camper-details'
 import { useState } from 'react'
 import { CamperSnackbarBalanceDialog } from './components/camper-snackbar-balance-dialog'
+import { toast } from 'sonner'
 
 function CampersContent() {
   const { data: campers = [], refetch } = useQuery({
@@ -51,7 +52,11 @@ function CampersContent() {
   const [selectedCamperForBalance, setSelectedCamperForBalance] = useState<string | null>(null)
 
   const handleLoadCard = (camper: Camper) => {
-    setSelectedCamperForBalance(camper.id)
+    if (!camper.registration_id) {
+      toast.error('Este campista não tem uma inscrição associada')
+      return
+    }
+    setSelectedCamperForBalance(camper.registration_id)
     setShowSnackbarBalanceDialog(true)
   }
 

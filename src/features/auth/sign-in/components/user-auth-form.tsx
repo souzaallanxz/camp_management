@@ -104,6 +104,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               Login
             </Button>
 
+            {/* Temporarily hidden - Create account section
             <div className='relative my-2'>
               <div className='absolute inset-0 flex items-center'>
                 <span className='w-full border-t' />
@@ -123,6 +124,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
             >
               Criar conta
             </Button>
+            */}
 
           </div>
         </form>

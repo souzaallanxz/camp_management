@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -9,8 +9,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { PaymentMethod } from '../data/schema'
+import { PaymentMethod, Registration } from '../data/schema'
 import { createPayment } from '../services/payment-service'
+import { MBWayService } from '../services/mbway-service'
+import { getRegistrationById } from '../services/registration-service'
 
 interface PaymentFormProps {
   registrationId: string
@@ -24,6 +26,25 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
   const [amount, setAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('MB Way')
   const [phoneNumber, setPhoneNumber] = useState('')
+  const [registration, setRegistration] = useState<Registration | null>(null)
+
+  useEffect(() => {
+    async function loadRegistration() {
+      try {
+        const data = await getRegistrationById(registrationId)
+        setRegistration(data)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to load registration'
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: message,
+        })
+      }
+    }
+
+    loadRegistration()
+  }, [registrationId, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,6 +63,43 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
         return
       }
 
+      // If payment method is MB Way, trigger the payment request first
+      if (paymentMethod === 'MB Way') {
+        if (!registration) {
+          toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Erro ao carregar dados da inscrição',
+          })
+          return
+        }
+
+        try {
+          const mbwayResponse = await MBWayService.requestPayment({
+            mobileNumber: phoneNumber,
+            amount: numericAmount,
+            description: `Pagamento de inscrição - ${registration.name}`,
+            orderId: registration.form_id || `${registrationId}-${Date.now()}`,
+            email: registration.email,
+          })
+
+          // If we get here, the MB Way request was successful
+          toast({
+            title: 'MB Way',
+            description: 'Pedido MB Way enviado. Por favor, confirme o pagamento na sua app.',
+          })
+        } catch (error) {
+          toast({
+            variant: 'destructive',
+            title: 'Erro MB Way',
+            description: error instanceof Error ? error.message : 'Erro ao processar pagamento MB Way',
+          })
+          setLoading(false)
+          return
+        }
+      }
+
+      // Only proceed with payment creation if we get here
       await createPayment({
         registration_id: registrationId,
         amount: numericAmount,
@@ -131,7 +189,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
           Cancelar
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? 'A criar...' : 'Criar Pagamento'}
+          {loading ? 'A processar...' : 'Criar Pagamento'}
         </Button>
       </div>
     </form>

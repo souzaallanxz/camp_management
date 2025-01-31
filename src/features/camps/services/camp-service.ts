@@ -36,6 +36,21 @@ async function update(id: string, camp: UpdateCamp) {
 }
 
 async function remove(id: string) {
+  // Check if there are any registrations for this camp
+  const { data: registrations, error: registrationsError } = await supabase
+    .from('registrations')
+    .select('id')
+    .eq('camp_id', id)
+    .limit(1)
+
+  if (registrationsError) {
+    throw registrationsError
+  }
+
+  if (registrations && registrations.length > 0) {
+    throw new Error('Não é possível excluir um acampamento que possui inscrições. Por favor, exclua todas as inscrições primeiro.')
+  }
+
   const { error } = await supabase.from('camps').delete().eq('id', id)
 
   if (error) {
