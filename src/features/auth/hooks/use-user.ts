@@ -5,6 +5,7 @@ interface UseUserReturn {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
+  email: string | null
 }
 
 export const useUser = (): UseUserReturn => {
@@ -18,5 +19,6 @@ export const useUser = (): UseUserReturn => {
     user: auth.user,
     isAuthenticated: auth.isAuthenticated,
     isLoading: auth.isLoading,
+    email: auth.user?.user_metadata.email || null,
   }
 } 

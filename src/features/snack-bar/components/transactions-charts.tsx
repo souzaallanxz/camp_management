@@ -6,15 +6,13 @@ import type { SnackBarTransactionResponse } from '../data/schema'
 
 interface TransactionsChartsProps {
   data: SnackBarTransactionResponse[]
-  currentCamp: {
+  currentCamp?: {
     id: string
     name: string
-    start_date: string
-    end_date: string
   }
 }
 
-export function TransactionsCharts({ data, currentCamp }: TransactionsChartsProps) {
+export function TransactionsCharts({ data }: TransactionsChartsProps) {
   // Group transactions by day
   const transactionsByDay = data.reduce((acc, transaction) => {
     const day = format(new Date(transaction.created_at), 'dd/MM', { locale: ptBR })

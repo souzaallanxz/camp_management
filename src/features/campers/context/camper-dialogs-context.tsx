@@ -1,5 +1,4 @@
 import { createContext, useContext, useState } from 'react'
-import { Camper } from '../data/schema'
 
 interface CamperDialogsContextType {
   isCreateDialogOpen: boolean

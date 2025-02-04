@@ -65,7 +65,7 @@ export const snackBarService = {
 
     if (error) throw error
 
-    const camperData = data as CamperWithBalance
+    const camperData = data as unknown as CamperWithBalance
 
     // Sum all balance records
     const totalBalance = camperData?.registration?.snackbar_balance?.reduce(

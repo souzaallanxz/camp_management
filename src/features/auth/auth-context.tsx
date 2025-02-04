@@ -8,6 +8,7 @@ import {
 import { User } from '@supabase/supabase-js'
 import { authService } from './auth-service'
 import type { SignInCredentials, SignUpCredentials } from './types'
+import { toast } from '@/hooks/use-toast'
 
 interface AuthContextType {
   user: User | null
@@ -27,36 +28,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        setIsLoading(true)
         const currentUser = await authService.getCurrentUser()
+        console.log('Auth initialized:', { currentUser })
         setUser(currentUser)
-      } catch (error) {
-        console.error('Error loading user:', error)
+      } catch {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load user information.',
+        })
       } finally {
         setIsLoading(false)
       }
     }
 
     initializeAuth()
+
+    // Subscribe to auth changes
+    const { data: { subscription } } = authService.onAuthStateChange((_event, session) => {
+      console.log('Auth state changed:', { session })
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = useCallback(async (credentials: SignInCredentials) => {
     try {
       const { user } = await authService.signIn(credentials)
+      console.log('User signed in:', user)
       setUser(user)
-      // Success notification can be added later
-    } catch (error) {
-      console.error('Sign in failed:', error)
-      throw error
+      toast({
+        title: 'Success',
+        description: 'Successfully signed in.',
+      })
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to sign in. Please check your credentials.',
+      })
+      throw new Error('Failed to sign in')
     }
   }, [])
 
   const signUp = useCallback(async (credentials: SignUpCredentials) => {
     try {
       await authService.signUp(credentials)
-      // Success notification can be added later
-    } catch (error) {
-      console.error('Sign up failed:', error)
-      throw error
+      toast({
+        title: 'Success',
+        description: 'Account created successfully.',
+      })
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to create account.',
+      })
+      throw new Error('Failed to create account')
     }
   }, [])
 
@@ -64,12 +96,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await authService.signOut()
       setUser(null)
-      // Success notification can be added later
+      toast({
+        title: 'Success',
+        description: 'Successfully signed out.',
+      })
     } catch (error) {
-      console.error('Sign out failed:', error)
-      throw error
+      // Only show error toast if it's not a missing session error
+      if (!(error instanceof Error && error.message.includes('Auth session missing'))) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to sign out.',
+        })
+        throw error
+      }
+      // If it was a missing session error, still clear the user state
+      setUser(null)
     }
   }, [])
+
+  console.log('Auth state:', { user, isLoading })
 
   return (
     <AuthContext.Provider

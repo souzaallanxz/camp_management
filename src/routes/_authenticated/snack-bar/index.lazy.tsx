@@ -35,7 +35,7 @@ export default function SnackBarPage() {
   const form = useForm<SnackBarTransaction>({
     resolver: zodResolver(snackBarTransactionSchema),
     defaultValues: {
-      amount: '',
+      amount: 0,
       camperId: '',
     },
   })
@@ -94,7 +94,7 @@ export default function SnackBarPage() {
       })
       
       // Reset form and selected camper
-      form.reset({ amount: '', camperId: '' })
+      form.reset({ amount: 0, camperId: '' })
       setSelectedCamperId('')
     },
     onError: (error) => {
@@ -324,7 +324,6 @@ export default function SnackBarPage() {
 
             <TransactionsCharts 
               data={allTransactions} 
-              currentCamp={currentCamp} 
             />
           </div>
         </div>

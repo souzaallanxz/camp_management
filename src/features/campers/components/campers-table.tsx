@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import {
-  ColumnDef,
-  ColumnFiltersState,
-  RowData,
-  SortingState,
-  VisibilityState,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFacetedRowModel,
@@ -25,17 +23,16 @@ import {
 import { type Camper } from '../data/schema'
 import { DataTablePagination } from './data-table-pagination'
 import { DataTableToolbar } from './data-table-toolbar'
-import { columns } from './campers-columns'
+import { columns as defaultColumns } from './campers-columns'
 
-declare module '@tanstack/react-table' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface ColumnMeta<TData extends RowData, TValue> {
-    className: string
-  }
+export interface CamperWithActions extends Camper {
+  onEdit?: (camper: Camper) => void
+  onLoadCard?: (camper: Camper) => void
+  total_balance: number
 }
 
 interface DataTableProps {
-  data: Camper[]
+  data: CamperWithActions[]
 }
 
 export function CampersTable({ data }: DataTableProps) {
@@ -46,7 +43,7 @@ export function CampersTable({ data }: DataTableProps) {
 
   const table = useReactTable({
     data,
-    columns,
+    columns: defaultColumns,
     state: {
       sorting,
       columnVisibility,
@@ -73,14 +70,10 @@ export function CampersTable({ data }: DataTableProps) {
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className='group/row'>
+              <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead
-                      key={header.id}
-                      colSpan={header.colSpan}
-                      className={header.column.columnDef.meta?.className ?? ''}
-                    >
+                    <TableHead key={header.id}>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -99,13 +92,9 @@ export function CampersTable({ data }: DataTableProps) {
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && 'selected'}
-                  className='group/row'
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className={cell.column.columnDef.meta?.className ?? ''}
-                    >
+                    <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -117,7 +106,7 @@ export function CampersTable({ data }: DataTableProps) {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={defaultColumns.length}
                   className='h-24 text-center'
                 >
                   No results.

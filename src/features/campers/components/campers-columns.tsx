@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatCurrency } from '@/lib/utils'
 
-interface CamperWithActions extends Camper {
+export interface CamperWithActions extends Camper {
   onEdit?: (camper: Camper) => void
   onLoadCard?: (camper: Camper) => void
   total_balance: number
@@ -25,6 +25,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Form ID" />
     ),
+    cell: ({ row }) => row.getValue('form_id') || '-'
   },
   {
     accessorKey: 'name',
@@ -49,6 +50,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Acampamento" />
     ),
+    cell: ({ row }) => row.getValue('camp') || '-'
   },
   {
     accessorKey: 'total_balance',
@@ -56,7 +58,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
       <DataTableColumnHeader column={column} title="Saldo" />
     ),
     cell: ({ row }) => {
-      const balance = row.original.total_balance
+      const balance = row.getValue('total_balance') as number
       return (
         <div className={`font-medium ${balance > 0 ? 'text-green-600' : 'text-red-600'}`}>
           {formatCurrency(balance)}
@@ -71,7 +73,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     ),
     cell: ({ row }) => {
       const notes = row.getValue('additional_notes') as string
-      return notes ? <LongText>{notes}</LongText> : null
+      return notes ? <LongText>{notes}</LongText> : '-'
     },
   },
   {

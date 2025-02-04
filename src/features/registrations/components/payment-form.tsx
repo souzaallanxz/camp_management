@@ -75,7 +75,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
         }
 
         try {
-          const mbwayResponse = await MBWayService.requestPayment({
+          await MBWayService.requestPayment({
             mobileNumber: phoneNumber,
             amount: numericAmount,
             description: `Pagamento de inscrição - ${registration.name}`,

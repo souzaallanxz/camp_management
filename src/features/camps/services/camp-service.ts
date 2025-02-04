@@ -1,8 +1,30 @@
 import { supabase } from '@/lib/supabase'
 import { type Camp, type InsertCamp, type UpdateCamp } from '../data/schema'
 
+async function getCurrentUserTeam() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('User not authenticated')
+
+  const { data: userData, error: userError } = await supabase
+    .from('auth.users')
+    .select('team_id')
+    .eq('id', user.id)
+    .single()
+
+  if (userError) throw userError
+  if (!userData?.team_id) throw new Error('User has no team assigned')
+
+  return userData.team_id
+}
+
 async function findAll() {
-  const { data, error } = await supabase.from('camps').select('*')
+  const teamId = await getCurrentUserTeam()
+  
+  const { data, error } = await supabase
+    .from('camps')
+    .select('*')
+    .eq('team_id', teamId)
+    .order('created_at', { ascending: false })
 
   if (error) {
     throw error

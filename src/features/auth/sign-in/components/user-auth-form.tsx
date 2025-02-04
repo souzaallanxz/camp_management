@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { useAuth } from '../../auth-context'
-import { routeTree } from '@/routeTree.gen'
+import { toast } from '@/hooks/use-toast'
 
 type UserAuthFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -54,8 +54,12 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
       setIsLoading(true)
       await signIn(data)
       navigate({ to: search.redirect ?? '/' })
-    } catch (error) {
-      console.error('Login failed:', error)
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to sign in. Please check your credentials and try again.',
+      })
     } finally {
       setIsLoading(false)
     }
@@ -104,7 +108,6 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               Login
             </Button>
 
-            {/* Temporarily hidden - Create account section
             <div className='relative my-2'>
               <div className='absolute inset-0 flex items-center'>
                 <span className='w-full border-t' />
@@ -117,15 +120,13 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
             </div>
 
             <Button
-              variant="outline"
-              className="w-full"
-              type="button"
+              variant='outline'
+              className='w-full'
+              type='button'
               onClick={() => navigate({ to: '/sign-up' })}
             >
               Criar conta
             </Button>
-            */}
-
           </div>
         </form>
       </Form>

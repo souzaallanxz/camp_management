@@ -7,7 +7,7 @@ import { PaymentsTable } from './payments-table';
 import { getRegistrationById, updateRegistration } from '../services/registration-service';
 import { useToast } from '@/components/ui/use-toast';
 import { getPaymentsByRegistrationId } from '../services/payment-service';
-import { Payment } from '../data/schema';
+import { Payment, type Registration } from '../data/schema';
 
 interface RegistrationDetailProps {
   registrationId: string;
@@ -37,10 +37,12 @@ export function RegistrationDetail({ registrationId }: RegistrationDetailProps) 
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!formData) return;
+    
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
-    });
+    } as Registration);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,7 +70,7 @@ export function RegistrationDetail({ registrationId }: RegistrationDetailProps) 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             {Object.entries(registration).map(([key, value]) => {
-              if (key === 'created_at') {
+              if (key === 'created_at' || !formData) {
                 return (
                   <div key={key}>
                     <Label>{key}</Label>
@@ -81,7 +83,7 @@ export function RegistrationDetail({ registrationId }: RegistrationDetailProps) 
                   <Label>{key}</Label>
                   <Input
                     name={key}
-                    value={formData[key]}
+                    value={String(formData[key as keyof Registration] ?? '')}
                     onChange={handleInputChange}
                     disabled={!isEditing}
                   />

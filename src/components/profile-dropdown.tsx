@@ -12,18 +12,29 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/features/auth/auth-context'
+import { toast } from '@/hooks/use-toast'
 
 export function ProfileDropdown() {
-  const { signOut } = useAuth()
+  const { signOut, user } = useAuth()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
     try {
       await signOut()
       navigate({ to: '/sign-in' })
-    } catch (error) {
-      console.error('Logout failed:', error)
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to log out. Please try again.',
+      })
     }
+  }
+
+  // Get user initials for avatar fallback
+  const getInitials = () => {
+    if (!user?.email) return 'U'
+    return user.email.charAt(0).toUpperCase()
   }
 
   return (
@@ -31,17 +42,17 @@ export function ProfileDropdown() {
       <DropdownMenuTrigger asChild>
         <Button variant='ghost' className='relative h-8 w-8 rounded-full'>
           <Avatar className='h-8 w-8'>
-            <AvatarImage src='/avatars/01.png' alt='@shadcn' />
-            <AvatarFallback>SN</AvatarFallback>
+            <AvatarImage src='/avatars/01.png' alt={user?.email || 'User'} />
+            <AvatarFallback>{getInitials()}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className='w-56' align='end' forceMount>
         <DropdownMenuLabel className='font-normal'>
           <div className='flex flex-col space-y-1'>
-            <p className='text-sm font-medium leading-none'>satnaing</p>
+            <p className='text-sm font-medium leading-none'>{user?.email}</p>
             <p className='text-xs leading-none text-muted-foreground'>
-              satnaingdev@gmail.com
+              {user?.email}
             </p>
           </div>
         </DropdownMenuLabel>

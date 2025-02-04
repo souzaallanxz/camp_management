@@ -10,9 +10,9 @@ import { getRegistrations } from './services/registration-service'
 import { RegistrationsTable } from './components/registrations-table'
 import { RegistrationDialogs } from './components/registration-dialogs'
 import { useRegistrationDialogs } from './context/registration-dialogs-context'
-import { type Registration } from './data/schema'
-import { columns } from './components/registrations-columns'
+import { columns, type RegistrationWithActions } from './components/registrations-columns'
 import { RegistrationDialogsProvider } from './context/registration-dialogs-context'
+import { Actions } from './components/registrations-columns'
 
 function RegistrationsContent() {
   const { data: registrations = [], refetch } = useQuery({
@@ -20,18 +20,13 @@ function RegistrationsContent() {
     queryFn: getRegistrations,
   })
 
-  const { openCreateDialog, openViewDialog, openOnboardDialog, openDeleteDialog } = useRegistrationDialogs()
+  const { openCreateDialog } = useRegistrationDialogs()
 
-  const registrationsWithActions = registrations.map((registration: Registration) => ({
+  const registrationsWithActions = registrations.map((registration) => ({
     ...registration,
-    onView: () => openViewDialog(registration),
-    onDelete: () => openDeleteDialog(registration),
-    onOnboard: () => {
-      if (registration.onboarding_status === 'Onboarded') return
-      openOnboardDialog(registration)
-    },
-    onRegistrationUpdated: () => refetch()
-  }))
+    actions: <Actions registration={registration} onRegistrationUpdated={refetch} />,
+    onRegistrationUpdated: refetch
+  })) as RegistrationWithActions[]
 
   return (
     <>

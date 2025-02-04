@@ -8,7 +8,7 @@ export const columns: ColumnDef<Payment>[] = [
   {
     accessorKey: 'payment_date',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Date' />
+      <DataTableColumnHeader column={column} title='Data' />
     ),
     cell: ({ row }) => {
       const date = new Date(row.getValue('payment_date'))
@@ -18,13 +18,13 @@ export const columns: ColumnDef<Payment>[] = [
   {
     accessorKey: 'payment_method',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Method' />
+      <DataTableColumnHeader column={column} title='Método de Pagamento' />
     ),
   },
   {
     accessorKey: 'amount',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Amount' />
+      <DataTableColumnHeader column={column} title='Valor' />
     ),
     cell: ({ row }) => {
       const amount = row.getValue('amount') as number
@@ -33,7 +33,7 @@ export const columns: ColumnDef<Payment>[] = [
   },
   {
     accessorKey: 'payment_status',
-    header: 'Status',
+    header: 'Estado',
     cell: ({ row }) => {
       const status = row.original.payment_status
       const statusStyles = {

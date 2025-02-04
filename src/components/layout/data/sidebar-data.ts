@@ -15,6 +15,7 @@ import {
 import { Command } from 'lucide-react'
 import { type SidebarData } from '../types'
 import { useUser } from '@/features/auth/hooks/use-user'
+import { useTeamData } from '@/features/teams/hooks/use-team-data'
 
 // Default sidebar data without user info
 export const sidebarData: SidebarData = {
@@ -50,7 +51,7 @@ export const sidebarData: SidebarData = {
         //   icon: IconPackages,
         // },
         {
-          title: 'Registrations',
+          title: 'Inscrições',
           url: '/registrations',
           icon: IconFileDescription,
         },
@@ -189,15 +190,48 @@ export const sidebarData: SidebarData = {
 }
 
 // Hook version with user info
-export const useSidebarData = (): SidebarData => {
-  const { user } = useUser()
+export function useSidebarData(): SidebarData {
+  const user = useUser()
+  const teamData = useTeamData()
 
   return {
-    ...sidebarData,
     user: {
-      name: user?.user_metadata?.name ?? 'User',
+      name: user?.email ?? 'User',
       email: user?.email ?? '',
       avatar: '/avatars/shadcn.jpg',
     },
+    teams: teamData.teams,
+    navGroups: [
+      {
+        title: 'General',
+        items: [
+          {
+            title: 'Dashboard',
+            url: '/',
+            icon: IconLayoutDashboard,
+          },
+          {
+            title: 'Inscrições',
+            url: '/registrations',
+            icon: IconFileDescription,
+          },
+          {
+            title: 'Campistas',
+            url: '/campers',
+            icon: IconTent,
+          },
+          {
+            title: 'Acampamentos',
+            url: '/camps',
+            icon: IconCampfire,
+          },
+          {
+            title: 'Snack Bar',
+            url: '/snack-bar',
+            icon: IconIceCream,
+          },
+        ],
+      }
+    ],
   }
 }

@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import {
-  ColumnDef,
-  ColumnFiltersState,
-  RowData,
-  SortingState,
-  VisibilityState,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFacetedRowModel,
@@ -25,13 +24,6 @@ import {
 import { DataTablePagination } from '@/components/data-table/data-table-pagination'
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar'
 import { type RegistrationWithActions } from './registrations-columns'
-
-declare module '@tanstack/react-table' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface ColumnMeta<TData extends RowData, TValue> {
-    className: string
-  }
-}
 
 interface DataTableProps {
   columns: ColumnDef<RegistrationWithActions>[]

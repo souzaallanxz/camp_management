@@ -1,3 +1,4 @@
+import React from 'react'
 import { ColumnDef } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
@@ -11,16 +12,17 @@ import { RegistrationDetailsSheet } from './registration-details-dialog'
 import { RegistrationOnboardDialog } from './registration-onboard-dialog'
 import { SnackbarBalanceDialog } from './snackbar-balance-dialog'
 
-interface RegistrationWithActions extends Registration {
+export interface RegistrationWithActions extends Registration {
   onRegistrationUpdated: () => void
+  actions: React.ReactElement
 }
 
-interface ActionsProps {
+export interface ActionsProps {
   registration: Registration
   onRegistrationUpdated: () => void
 }
 
-function Actions({ registration, onRegistrationUpdated }: ActionsProps) {
+export function Actions({ registration, onRegistrationUpdated }: ActionsProps) {
   const [showOnboardDialog, setShowOnboardDialog] = useState(false)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [showSnackbarBalanceDialog, setShowSnackbarBalanceDialog] = useState(false)

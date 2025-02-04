@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import {
-  ColumnDef,
-  ColumnFiltersState,
-  RowData,
-  SortingState,
-  VisibilityState,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
   flexRender,
   getCoreRowModel,
   getFacetedRowModel,
@@ -27,13 +26,6 @@ import { DataTableToolbar } from '@/components/data-table/data-table-toolbar'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Payment } from '../data/schema'
-
-declare module '@tanstack/react-table' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface ColumnMeta<TData extends RowData, TValue> {
-    className: string
-  }
-}
 
 interface DataTableProps {
   data: Payment[]
@@ -104,7 +96,6 @@ export function PaymentsTable({ data }: DataTableProps) {
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className={header.column.columnDef.meta?.className}
                   >
                     {header.isPlaceholder
                       ? null
@@ -128,7 +119,6 @@ export function PaymentsTable({ data }: DataTableProps) {
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className={cell.column.columnDef.meta?.className ?? ''}
                     >
                       {flexRender(
                         cell.column.columnDef.cell,

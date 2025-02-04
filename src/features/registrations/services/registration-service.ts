@@ -4,12 +4,16 @@ import {
   type UpdateRegistration,
 } from '../data/schema'
 
-async function checkAuth() {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) {
-    throw new Error('Você precisa estar autenticado para realizar esta ação. Por favor, faça login.')
-  }
-  return session
+async function getCurrentUserTeam() {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('User not authenticated')
+
+  // Use o RPC function que criamos para obter o team_id do usuário
+  const { data: team, error } = await supabase.rpc('get_current_user_team')
+  if (error) throw error
+  if (!team || !team[0]?.id) throw new Error('User has no team assigned')
+
+  return team[0].id
 }
 
 async function findAll() {
@@ -26,7 +30,7 @@ async function findAll() {
       created_at,
       updated_at,
       camp_id,
-      camp:camps!registrations_camp_id_fkey (
+      camp:camps!inner (
         id,
         name,
         price,
@@ -35,16 +39,13 @@ async function findAll() {
         created_at,
         updated_at
       ),
-      camper:campers!campers_registration_id_fkey (
+      camper:campers (
         id,
         name,
         email,
         contact,
         created_at,
         updated_at
-      ),
-      registration_totals (
-        total_amount_paid
       )
     `)
     .order('created_at', { ascending: false })
@@ -53,45 +54,55 @@ async function findAll() {
     throw error
   }
 
-  // Transform the data to include total_amount_paid at the root level and fix camper data
-  return data.map((registration) => {
-    const totalPaid = registration.registration_totals?.[0]?.total_amount_paid || 0
-    const camper = Array.isArray(registration.camper) ? registration.camper[0] : registration.camper
-    const camp = Array.isArray(registration.camp) ? registration.camp[0] : registration.camp
+  // Get totals for each registration using the secure function
+  const registrationsWithTotals = await Promise.all(
+    data.map(async (registration) => {
+      const { data: totalData, error: totalError } = await supabase
+        .rpc('get_registration_total', { registration_id: registration.id })
 
-    const { id, name, email, contact, status, onboarding_status, created_at, updated_at, camp_id, form_id } = registration
+      if (totalError) {
+        return null
+      }
 
-    return {
-      id,
-      name,
-      email,
-      contact,
-      status,
-      onboarding_status,
-      form_id,
-      created_at,
-      updated_at,
-      camp_id,
-      camp: camp ? {
-        id: camp.id,
-        name: camp.name,
-        price: camp.price,
-        start_date: camp.start_date,
-        end_date: camp.end_date,
-        created_at: camp.created_at,
-        updated_at: camp.updated_at
-      } : null,
-      camper: camper ? {
-        id: camper.id,
-        name: camper.name,
-        email: camper.email,
-        contact: camper.contact,
-        created_at: camper.created_at,
-        updated_at: camper.updated_at
-      } : null,
-      total_amount_paid: totalPaid
-    }
-  })
+      const camper = Array.isArray(registration.camper) ? registration.camper[0] : registration.camper
+      const camp = Array.isArray(registration.camp) ? registration.camp[0] : registration.camp
+
+      const result: Registration = {
+        id: registration.id,
+        name: registration.name,
+        email: registration.email,
+        contact: registration.contact,
+        status: registration.status,
+        onboarding_status: registration.onboarding_status,
+        form_id: registration.form_id,
+        created_at: registration.created_at,
+        updated_at: registration.updated_at,
+        camp_id: registration.camp_id,
+        camp: camp ? {
+          id: camp.id,
+          name: camp.name,
+          price: camp.price,
+          start_date: camp.start_date,
+          end_date: camp.end_date,
+          created_at: camp.created_at,
+          updated_at: camp.updated_at
+        } : null,
+        camper: camper ? {
+          id: camper.id,
+          name: camper.name,
+          email: camper.email,
+          contact: camper.contact,
+          created_at: camper.created_at,
+          updated_at: camper.updated_at
+        } : null,
+        total_amount_paid: totalData || 0
+      }
+
+      return result
+    })
+  )
+
+  return registrationsWithTotals.filter((r): r is Registration => r !== null)
 }
 
 interface CreateRegistrationData {
@@ -155,12 +166,12 @@ export const registrationService = {
 }
 
 export async function getRegistrations(): Promise<Registration[]> {
-  await checkAuth()
+  await getCurrentUserTeam()
   return findAll()
 }
 
 export async function getRegistrationById(id: string): Promise<Registration> {
-  await checkAuth()
+  const teamId = await getCurrentUserTeam()
 
   const { data, error } = await supabase
     .from('registrations')
@@ -182,7 +193,8 @@ export async function getRegistrationById(id: string): Promise<Registration> {
         start_date,
         end_date,
         created_at,
-        updated_at
+        updated_at,
+        team_id
       ),
       camper:campers!campers_registration_id_fkey (
         id,
@@ -197,20 +209,21 @@ export async function getRegistrationById(id: string): Promise<Registration> {
       )
     `)
     .eq('id', id)
+    .eq('camp.team_id', teamId)
     .single()
 
   if (error) {
-    throw new Error(`Error fetching registration: ${error.message}`)
+    throw error
   }
 
   if (!data) {
     throw new Error('Registration not found')
   }
 
-  // Transform the data to include total_amount_paid at the root level and fix camper data
   const totalPaid = data.registration_totals?.[0]?.total_amount_paid || 0
   const camper = Array.isArray(data.camper) ? data.camper[0] : data.camper
   const camp = Array.isArray(data.camp) ? data.camp[0] : data.camp
+
   const { id: registrationId, name, email, contact, status, onboarding_status, created_at, updated_at, camp_id, form_id } = data
 
   return {
@@ -246,7 +259,7 @@ export async function getRegistrationById(id: string): Promise<Registration> {
 }
 
 export async function createRegistration(registration: Omit<Registration, 'id' | 'created_at' | 'updated_at'>) {
-  const session = await checkAuth()
+  const session = await getCurrentUserTeam()
 
   const { data, error } = await supabase
     .from('registrations')
@@ -297,7 +310,7 @@ export async function deleteRegistration(id: string) {
 }
 
 export async function updateOnboardingStatus(id: string, status: 'Pendente' | 'Onboarded') {
-  await checkAuth()
+  await getCurrentUserTeam()
 
   // First, get the camper's form_id
   const { data: camper, error: camperError } = await supabase

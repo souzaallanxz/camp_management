@@ -44,28 +44,18 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
 
       // If payment method is MB Way, trigger the payment request first
       if (paymentMethod === 'MB Way') {
-        try {
-          const mbwayResponse = await MBWayService.requestPayment({
-            mobileNumber: phoneNumber,
-            amount: numericAmount,
-            description: `Carregamento Cartão - ${registrationId}`,
-            orderId: `${registrationId}-${Date.now()}`,
-          })
+        await MBWayService.requestPayment({
+          mobileNumber: phoneNumber,
+          amount: numericAmount,
+          description: `Carregamento Cartão - ${registrationId}`,
+          orderId: `${registrationId}-${Date.now()}`,
+        })
 
-          // If we get here, the MB Way request was successful
-          toast({
-            title: 'MB Way',
-            description: 'Pedido MB Way enviado. Por favor, confirme o pagamento na sua app.',
-          })
-        } catch (error) {
-          toast({
-            variant: 'destructive',
-            title: 'Erro MB Way',
-            description: error instanceof Error ? error.message : 'Erro ao processar pagamento MB Way',
-          })
-          setLoading(false)
-          return
-        }
+        // If we get here, the MB Way request was successful
+        toast({
+          title: 'MB Way',
+          description: 'Pedido MB Way enviado. Por favor, confirme o pagamento na sua app.',
+        })
       }
 
       // Only proceed with the balance creation if we get here
