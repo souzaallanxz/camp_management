@@ -3,9 +3,6 @@ import { useTeam } from '../context/team-context'
 
 export function useTeamData() {
   const { team } = useTeam()
-  
-  console.log('Current team in useTeamData:', team)
-
   return {
     teams: [
       {

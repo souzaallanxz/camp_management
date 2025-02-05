@@ -3,10 +3,7 @@ import { Payment } from '../data/schema'
 
 export async function getPaymentsByRegistrationId(registrationId: string): Promise<Payment[]> {
   const { data, error } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('registration_id', registrationId)
-    .order('payment_date', { ascending: false })
+    .rpc('get_registration_payments', { p_registration_id: registrationId })
 
   if (error) {
     throw new Error(`Error fetching payments: ${error.message}`)
@@ -25,28 +22,28 @@ interface CreatePaymentData {
 }
 
 async function updateRegistrationStatus(registrationId: string) {
-  // Get the registration with its camp and total payments
+  // Get total using the secure function
+  const { data: totalPaid, error: totalError } = await supabase
+    .rpc('get_registration_total', { registration_id: registrationId })
+
+  if (totalError) throw totalError
+
+  // Get the registration with its camp
   const { data: registration, error: registrationError } = await supabase
     .from('registrations')
     .select(`
       id,
-      camps!registrations_camp_id_fkey (
+      camp:camps!registrations_camp_id_fkey (
         price
-      ),
-      payments (
-        amount
       )
     `)
     .eq('id', registrationId)
     .single()
 
   if (registrationError) throw registrationError
-
   if (!registration) throw new Error('Registration not found')
 
-  // Calculate total payments
-  const totalPaid = registration.payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
-  const camp = Array.isArray(registration.camps) ? registration.camps[0] : registration.camps
+  const camp = Array.isArray(registration.camp) ? registration.camp[0] : registration.camp
   const campPrice = Number(camp?.price || 0)
 
   // Determine new status

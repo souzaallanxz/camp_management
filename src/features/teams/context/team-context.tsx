@@ -26,10 +26,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const fetchTeam = async () => {
-    console.log('fetchTeam called:', { user, isAuthLoading }) // Debug log
+    
 
     if (!user || isAuthLoading) {
-      console.log('No user or still loading auth, skipping fetch') // Debug log
+      
       setTeam(null)
       setShowOnboarding(false)
       setIsLoading(false)
@@ -38,16 +38,16 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
     try {
       setIsLoading(true)
-      console.log('Fetching team for user:', user.email) // Debug log
+      
       const team = await teamService.getCurrentUserTeam()
-      console.log('Team fetched:', team) // Debug log
+      
 
       setTeam(team)
       const shouldShowOnboarding = !team
-      console.log('Should show onboarding:', shouldShowOnboarding) // Debug log
+      
       setShowOnboarding(shouldShowOnboarding)
     } catch (error) {
-      console.error('Error fetching team:', error) // Debug log
+      
       setTeam(null)
       setShowOnboarding(true)
       toast({
@@ -62,7 +62,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
   // Fetch team whenever auth state changes
   useEffect(() => {
-    console.log('Auth state changed:', { user, isAuthLoading }) // Debug log
+    
     if (!isAuthLoading) {
       fetchTeam()
     }
@@ -70,37 +70,30 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
   // Ensure dialog stays open if no team
   useEffect(() => {
-    console.log('State changed:', { user, team, isLoading, showOnboarding }) // Debug log
+    
     if (user && !isLoading && !team) {
-      console.log('Setting showOnboarding to true') // Debug log
+      
       setShowOnboarding(true)
     }
   }, [user, team, isLoading])
 
   // Prevent closing the dialog if user has no team
   const handleOpenChange = (open: boolean) => {
-    console.log('Dialog open change:', { open, team, user }) // Debug log
+    
     if (!team && user && !open) {
-      console.log('Preventing dialog from closing') // Debug log
+      
       return
     }
     setShowOnboarding(open)
   }
 
   const handleTeamCreated = async () => {
-    console.log('Team created, refetching...') // Debug log
+    
     await fetchTeam()
   }
 
   const shouldShowDialog = user && !isLoading && showOnboarding
-  console.log('Dialog visibility conditions:', {
-    hasUser: !!user,
-    notLoading: !isLoading,
-    showOnboarding,
-    shouldShowDialog,
-    userEmail: user?.email,
-    hasTeam: !!team
-  }) // Debug log
+  
 
   return (
     <TeamContext.Provider

@@ -3,106 +3,106 @@ import {
   type Registration,
   type UpdateRegistration,
 } from '../data/schema'
-
-async function getCurrentUserTeam() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('User not authenticated')
-
-  // Use o RPC function que criamos para obter o team_id do usuário
-  const { data: team, error } = await supabase.rpc('get_current_user_team')
-  if (error) throw error
-  if (!team || !team[0]?.id) throw new Error('User has no team assigned')
-
-  return team[0].id
-}
+import { getCurrentUserTeam } from '@/features/auth/auth-service'
 
 async function findAll() {
-  const { data, error } = await supabase
-    .from('registrations')
-    .select(`
-      id,
-      name,
-      email,
-      contact,
-      status,
-      onboarding_status,
-      form_id,
-      created_at,
-      updated_at,
-      camp_id,
-      camp:camps!inner (
-        id,
-        name,
-        price,
-        start_date,
-        end_date,
-        created_at,
-        updated_at
-      ),
-      camper:campers (
+  try {
+    const teamId = await getCurrentUserTeam()
+
+    const { data, error } = await supabase
+      .from('registrations')
+      .select(`
         id,
         name,
         email,
         contact,
+        status,
+        onboarding_status,
+        form_id,
         created_at,
-        updated_at
-      )
-    `)
-    .order('created_at', { ascending: false })
+        updated_at,
+        camp_id,
+        camp:camps!registrations_camp_id_fkey (
+          id,
+          name,
+          price,
+          start_date,
+          end_date,
+          created_at,
+          updated_at,
+          team_id
+        ),
+        camper:campers (
+          id,
+          name,
+          email,
+          contact,
+          created_at,
+          updated_at
+        )
+      `)
+      .eq('camp.team_id', teamId)
+      .order('created_at', { ascending: false })
 
-  if (error) {
+    if (error) {
+      throw error
+    }
+
+    // Get totals for each registration using the secure function
+    const registrationsWithTotals = await Promise.all(
+      data.map(async (registration) => {
+        const { data: totalData, error: totalError } = await supabase
+          .rpc('get_registration_total', { registration_id: registration.id })
+
+        if (totalError) {
+          return null
+        }
+
+        const camper = Array.isArray(registration.camper) ? registration.camper[0] : registration.camper
+        const camp = Array.isArray(registration.camp) ? registration.camp[0] : registration.camp
+
+        const result: Registration = {
+          id: registration.id,
+          name: registration.name,
+          email: registration.email,
+          contact: registration.contact,
+          status: registration.status,
+          onboarding_status: registration.onboarding_status,
+          form_id: registration.form_id,
+          created_at: registration.created_at,
+          updated_at: registration.updated_at,
+          camp_id: registration.camp_id,
+          camp: camp ? {
+            id: camp.id,
+            name: camp.name,
+            price: camp.price,
+            start_date: camp.start_date,
+            end_date: camp.end_date,
+            created_at: camp.created_at,
+            updated_at: camp.updated_at
+          } : null,
+          camper: camper ? {
+            id: camper.id,
+            name: camper.name,
+            email: camper.email,
+            contact: camper.contact,
+            created_at: camper.created_at,
+            updated_at: camper.updated_at
+          } : null,
+          total_amount_paid: totalData || 0
+        }
+
+        return result
+      })
+    )
+
+    return registrationsWithTotals.filter((r): r is Registration => r !== null)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'User has no team assigned') {
+      return []
+    }
     throw error
   }
-
-  // Get totals for each registration using the secure function
-  const registrationsWithTotals = await Promise.all(
-    data.map(async (registration) => {
-      const { data: totalData, error: totalError } = await supabase
-        .rpc('get_registration_total', { registration_id: registration.id })
-
-      if (totalError) {
-        return null
-      }
-
-      const camper = Array.isArray(registration.camper) ? registration.camper[0] : registration.camper
-      const camp = Array.isArray(registration.camp) ? registration.camp[0] : registration.camp
-
-      const result: Registration = {
-        id: registration.id,
-        name: registration.name,
-        email: registration.email,
-        contact: registration.contact,
-        status: registration.status,
-        onboarding_status: registration.onboarding_status,
-        form_id: registration.form_id,
-        created_at: registration.created_at,
-        updated_at: registration.updated_at,
-        camp_id: registration.camp_id,
-        camp: camp ? {
-          id: camp.id,
-          name: camp.name,
-          price: camp.price,
-          start_date: camp.start_date,
-          end_date: camp.end_date,
-          created_at: camp.created_at,
-          updated_at: camp.updated_at
-        } : null,
-        camper: camper ? {
-          id: camper.id,
-          name: camper.name,
-          email: camper.email,
-          contact: camper.contact,
-          created_at: camper.created_at,
-          updated_at: camper.updated_at
-        } : null,
-        total_amount_paid: totalData || 0
-      }
-
-      return result
-    })
-  )
-
-  return registrationsWithTotals.filter((r): r is Registration => r !== null)
 }
 
 interface CreateRegistrationData {
@@ -114,7 +114,21 @@ interface CreateRegistrationData {
 }
 
 async function create(registration: CreateRegistrationData) {
+  const teamId = await getCurrentUserTeam()
+
   try {
+    // First verify if the camp belongs to the user's team
+    const { data: camp, error: campError } = await supabase
+      .from('camps')
+      .select('id')
+      .eq('id', registration.camp_id)
+      .eq('team_id', teamId)
+      .single()
+
+    if (campError || !camp) {
+      throw new Error('Camp not found or does not belong to your team')
+    }
+
     const { data, error } = await supabase
       .from('registrations')
       .insert(registration)
@@ -137,10 +151,13 @@ async function create(registration: CreateRegistrationData) {
 }
 
 async function update(id: string, registration: UpdateRegistration) {
+  const teamId = await getCurrentUserTeam()
+
   const { data, error } = await supabase
     .from('registrations')
     .update(registration)
     .eq('id', id)
+    .eq('camp.team_id', teamId)
     .select()
 
   if (error) {
@@ -151,7 +168,13 @@ async function update(id: string, registration: UpdateRegistration) {
 }
 
 async function remove(id: string) {
-  const { error } = await supabase.from('registrations').delete().eq('id', id)
+  const teamId = await getCurrentUserTeam()
+
+  const { error } = await supabase
+    .from('registrations')
+    .delete()
+    .eq('id', id)
+    .eq('camp.team_id', teamId)
 
   if (error) {
     throw error
@@ -165,9 +188,23 @@ export const registrationService = {
   remove,
 }
 
-export async function getRegistrations(): Promise<Registration[]> {
-  await getCurrentUserTeam()
-  return findAll()
+export async function getRegistrations() {
+  const teamId = await getCurrentUserTeam()
+
+  const { data, error } = await supabase
+    .from('registrations')
+    .select(`
+      *,
+      camp:camps!registrations_camp_id_fkey (
+        id,
+        name,
+        team_id
+      )
+    `)
+    .eq('camp.team_id', teamId)
+
+  if (error) throw error
+  return data
 }
 
 export async function getRegistrationById(id: string): Promise<Registration> {
@@ -196,16 +233,13 @@ export async function getRegistrationById(id: string): Promise<Registration> {
         updated_at,
         team_id
       ),
-      camper:campers!campers_registration_id_fkey (
+      camper:campers (
         id,
         name,
         email,
         contact,
         created_at,
         updated_at
-      ),
-      registration_totals (
-        total_amount_paid
       )
     `)
     .eq('id', id)
@@ -220,7 +254,14 @@ export async function getRegistrationById(id: string): Promise<Registration> {
     throw new Error('Registration not found')
   }
 
-  const totalPaid = data.registration_totals?.[0]?.total_amount_paid || 0
+  // Get total using the secure function
+  const { data: totalData, error: totalError } = await supabase
+    .rpc('get_registration_total', { registration_id: data.id })
+
+  if (totalError) {
+    throw totalError
+  }
+
   const camper = Array.isArray(data.camper) ? data.camper[0] : data.camper
   const camp = Array.isArray(data.camp) ? data.camp[0] : data.camp
 
@@ -254,18 +295,29 @@ export async function getRegistrationById(id: string): Promise<Registration> {
       created_at: camper.created_at,
       updated_at: camper.updated_at
     } : null,
-    total_amount_paid: totalPaid
+    total_amount_paid: totalData || 0
   }
 }
 
 export async function createRegistration(registration: Omit<Registration, 'id' | 'created_at' | 'updated_at'>) {
-  const session = await getCurrentUserTeam()
+  const teamId = await getCurrentUserTeam()
+
+  // First verify if the camp belongs to the user's team
+  const { data: camp, error: campError } = await supabase
+    .from('camps')
+    .select('id')
+    .eq('id', registration.camp_id)
+    .eq('team_id', teamId)
+    .single()
+
+  if (campError || !camp) {
+    throw new Error('Camp not found or does not belong to your team')
+  }
 
   const { data, error } = await supabase
     .from('registrations')
     .insert({
       ...registration,
-      user_id: session.user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
@@ -284,10 +336,13 @@ export async function createRegistration(registration: Omit<Registration, 'id' |
 }
 
 export async function updateRegistration(id: string, registration: UpdateRegistration) {
+  const teamId = await getCurrentUserTeam()
+
   const { data, error } = await supabase
     .from('registrations')
     .update(registration)
     .eq('id', id)
+    .eq('camp.team_id', teamId)
     .select()
     .single()
 
@@ -299,10 +354,13 @@ export async function updateRegistration(id: string, registration: UpdateRegistr
 }
 
 export async function deleteRegistration(id: string) {
+  const teamId = await getCurrentUserTeam()
+
   const { error } = await supabase
     .from('registrations')
     .delete()
     .eq('id', id)
+    .eq('camp.team_id', teamId)
 
   if (error) {
     throw new Error(`Error deleting registration: ${error.message}`)
@@ -310,13 +368,14 @@ export async function deleteRegistration(id: string) {
 }
 
 export async function updateOnboardingStatus(id: string, status: 'Pendente' | 'Onboarded') {
-  await getCurrentUserTeam()
+  const teamId = await getCurrentUserTeam()
 
   // First, get the camper's form_id
   const { data: camper, error: camperError } = await supabase
     .from('campers')
-    .select('form_id')
+    .select('form_id, registration:registration_id(camp:camp_id(team_id))')
     .eq('registration_id', id)
+    .eq('registration.camp.team_id', teamId)
     .single()
 
   if (camperError) {
@@ -332,6 +391,7 @@ export async function updateOnboardingStatus(id: string, status: 'Pendente' | 'O
       updated_at: new Date().toISOString()
     })
     .eq('id', id)
+    .eq('camp.team_id', teamId)
     .select()
     .single()
 

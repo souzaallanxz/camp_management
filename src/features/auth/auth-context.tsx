@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         setIsLoading(true)
         const currentUser = await authService.getCurrentUser()
-        console.log('Auth initialized:', { currentUser })
+        
         setUser(currentUser)
       } catch {
         toast({
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Subscribe to auth changes
     const { data: { subscription } } = authService.onAuthStateChange((_event, session) => {
-      console.log('Auth state changed:', { session })
+      
       setUser(session?.user ?? null)
     })
 
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(async (credentials: SignInCredentials) => {
     try {
       const { user } = await authService.signIn(credentials)
-      console.log('User signed in:', user)
+      
       setUser(user)
       toast({
         title: 'Success',
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  console.log('Auth state:', { user, isLoading })
+  
 
   return (
     <AuthContext.Provider

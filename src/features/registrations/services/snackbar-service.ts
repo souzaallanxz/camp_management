@@ -1,47 +1,59 @@
 import { supabase } from '@/lib/supabase'
-import { SnackbarBalance } from '../data/schema'
+import type { SnackBarTransaction } from '../data/schema'
 
-export async function createSnackbarBalance(data: Omit<SnackbarBalance, 'id' | 'created_at' | 'updated_at'>) {
-  const { data: snackbarBalance, error } = await supabase
-    .from('snackbar_balance')
-    .insert(data)
+export async function getCampCampers(campId: string) {
+  const { data, error } = await supabase
+    .rpc('get_camp_campers', { p_camp_id: campId })
+
+  if (error) {
+    throw new Error(`Error fetching campers: ${error.message}`)
+  }
+
+  return data || []
+}
+
+export async function getCampTransactions(campId: string) {
+  const { data, error } = await supabase
+    .rpc('get_camp_snackbar_transactions', { p_camp_id: campId })
+
+  if (error) {
+    throw new Error(`Error fetching transactions: ${error.message}`)
+  }
+
+  return data || []
+}
+
+export async function createTransaction(transaction: Omit<SnackBarTransaction, 'id' | 'created_at'>) {
+  const { data, error } = await supabase
+    .from('snack_bar_transactions')
+    .insert({
+      ...transaction,
+      created_at: new Date().toISOString()
+    })
     .select()
     .single()
 
-  if (error) throw error
+  if (error) {
+    throw new Error(`Error creating transaction: ${error.message}`)
+  }
 
-  return snackbarBalance
+  return data
 }
 
-export async function getSnackbarBalanceByRegistrationId(registrationId: string) {
-  const { data: snackbarBalance, error } = await supabase
-    .from('snackbar_balance')
-    .select('*')
-    .eq('registration_id', registrationId)
-
-  if (error) throw error
-
-  return snackbarBalance
-}
-
-export async function updateSnackbarBalance(id: string, data: Partial<Omit<SnackbarBalance, 'id' | 'created_at' | 'updated_at'>>) {
-  const { data: snackbarBalance, error } = await supabase
-    .from('snackbar_balance')
-    .update(data)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) throw error
-
-  return snackbarBalance
-}
-
-export async function deleteSnackbarBalance(id: string) {
+export async function deleteTransaction(id: string) {
   const { error } = await supabase
-    .from('snackbar_balance')
+    .from('snack_bar_transactions')
     .delete()
     .eq('id', id)
 
-  if (error) throw error
+  if (error) {
+    throw new Error(`Error deleting transaction: ${error.message}`)
+  }
+}
+
+export const snackbarService = {
+  getCampCampers,
+  getCampTransactions,
+  createTransaction,
+  deleteTransaction
 } 

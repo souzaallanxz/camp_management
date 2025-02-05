@@ -1,40 +1,37 @@
 import { supabase } from '@/lib/supabase'
 import { type Camp, type InsertCamp, type UpdateCamp } from '../data/schema'
-
-async function getCurrentUserTeam() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('User not authenticated')
-
-  const { data: userData, error: userError } = await supabase
-    .from('auth.users')
-    .select('team_id')
-    .eq('id', user.id)
-    .single()
-
-  if (userError) throw userError
-  if (!userData?.team_id) throw new Error('User has no team assigned')
-
-  return userData.team_id
-}
+import { getCurrentUserTeam } from '@/features/auth/auth-service'
 
 async function findAll() {
+  try {
+    const teamId = await getCurrentUserTeam()
+    
+    const { data, error } = await supabase
+      .from('camps')
+      .select('*')
+      .eq('team_id', teamId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      throw error
+    }
+
+    return data as Camp[]
+  } catch (error) {
+    if (error instanceof Error && error.message === 'User has no team assigned') {
+      return []
+    }
+    throw error
+  }
+}
+
+async function create(camp: InsertCamp) {
   const teamId = await getCurrentUserTeam()
   
   const { data, error } = await supabase
     .from('camps')
-    .select('*')
-    .eq('team_id', teamId)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    throw error
-  }
-
-  return data as Camp[]
-}
-
-async function create(camp: InsertCamp) {
-  const { data, error } = await supabase.from('camps').insert(camp).select()
+    .insert({ ...camp, team_id: teamId })
+    .select()
 
   if (error) {
     throw error
@@ -44,10 +41,13 @@ async function create(camp: InsertCamp) {
 }
 
 async function update(id: string, camp: UpdateCamp) {
+  const teamId = await getCurrentUserTeam()
+  
   const { data, error } = await supabase
     .from('camps')
     .update(camp)
     .eq('id', id)
+    .eq('team_id', teamId)
     .select()
 
   if (error) {
@@ -58,6 +58,8 @@ async function update(id: string, camp: UpdateCamp) {
 }
 
 async function remove(id: string) {
+  const teamId = await getCurrentUserTeam()
+
   // Check if there are any registrations for this camp
   const { data: registrations, error: registrationsError } = await supabase
     .from('registrations')
@@ -73,7 +75,11 @@ async function remove(id: string) {
     throw new Error('Não é possível excluir um acampamento que possui inscrições. Por favor, exclua todas as inscrições primeiro.')
   }
 
-  const { error } = await supabase.from('camps').delete().eq('id', id)
+  const { error } = await supabase
+    .from('camps')
+    .delete()
+    .eq('id', id)
+    .eq('team_id', teamId)
 
   if (error) {
     throw error
