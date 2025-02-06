@@ -23,15 +23,15 @@ type UserAuthFormProps = HTMLAttributes<HTMLDivElement>
 const formSchema = z.object({
   email: z
     .string()
-    .min(1, { message: 'Please enter your email' })
-    .email({ message: 'Invalid email address' }),
+    .min(1, { message: 'Por favor, digite seu e-mail' })
+    .email({ message: 'E-mail inválido' }),
   password: z
     .string()
     .min(1, {
-      message: 'Please enter your password',
+      message: 'Por favor, digite sua senha',
     })
     .min(7, {
-      message: 'Password must be at least 7 characters long',
+      message: 'A senha deve ter pelo menos 7 caracteres',
     }),
 })
 
@@ -57,8 +57,8 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     } catch {
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to sign in. Please check your credentials and try again.',
+        title: 'Erro',
+        description: 'Falha ao entrar. Por favor, verifique suas credenciais e tente novamente.',
       })
     } finally {
       setIsLoading(false)
@@ -75,9 +75,9 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               name='email'
               render={({ field }) => (
                 <FormItem className='space-y-1'>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>E-mail</FormLabel>
                   <FormControl>
-                    <Input placeholder='name@example.com' {...field} />
+                    <Input placeholder='nome@exemplo.com' {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -89,12 +89,12 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               render={({ field }) => (
                 <FormItem className='space-y-1'>
                   <div className='flex items-center justify-between'>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>Senha</FormLabel>
                     <Link
                       to='/forgot-password'
                       className='text-sm font-medium text-muted-foreground hover:opacity-75'
                     >
-                      Forgot password?
+                      Esqueceu a senha?
                     </Link>
                   </div>
                   <FormControl>
@@ -105,7 +105,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               )}
             />
             <Button className='mt-2' disabled={isLoading}>
-              Login
+              Entrar
             </Button>
 
             <div className='relative my-2'>

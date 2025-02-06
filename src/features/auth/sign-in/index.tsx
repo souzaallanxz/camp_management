@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Card } from '@/components/ui/card'
-import AuthLayout from '../auth-layout'
+import CampImage from '@/assets/camp.jpg'
+import Logo from '@/assets/logo.png'
 import { UserAuthForm } from './components/user-auth-form'
 import { useAuth } from '../auth-context'
 
@@ -16,34 +16,54 @@ export default function SignIn() {
   }, [isAuthenticated, navigate])
 
   return (
-    <AuthLayout>
-      <Card className='p-6'>
-        <div className='flex flex-col space-y-2 text-left'>
-          <h1 className='text-2xl font-semibold tracking-tight'>Login</h1>
-          <p className='text-sm text-muted-foreground'>
-            Enter your email and password below <br />
-            to log into your account
+    <div className='container relative grid h-svh flex-col items-center justify-center lg:max-w-none lg:grid-cols-2 lg:px-0'>
+      <div className='relative hidden h-full flex-col bg-muted text-white dark:border-r lg:flex overflow-hidden'>
+        <div className='absolute inset-0 bg-zinc-900/70 z-10' />
+        <img
+          src={CampImage}
+          className='absolute inset-0 w-full h-full object-cover'
+          alt='Campfire by the lake'
+        />
+
+        <div className='relative z-20 pt-6 px-10'>
+          <div className='flex items-center'>
+            <img
+              src={Logo}
+              alt="Campy Logo"
+              className='h-40 w-auto'
+            />
+          </div>
+        </div>
+      </div>
+      <div className='lg:p-8'>
+        <div className='mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[350px]'>
+          <div className='flex flex-col space-y-2 text-left'>
+            <h1 className='text-2xl font-semibold tracking-tight'>Entrar</h1>
+            <p className='text-sm text-muted-foreground'>
+              Digite seu e-mail e senha abaixo <br />
+              para acessar sua conta
+            </p>
+          </div>
+          <UserAuthForm />
+          <p className='px-8 text-center text-sm text-muted-foreground'>
+            Ao entrar, você concorda com nossos{' '}
+            <a
+              href='/terms'
+              className='underline underline-offset-4 hover:text-primary'
+            >
+              Termos e Condições
+            </a>{' '}
+            e{' '}
+            <a
+              href='/privacy'
+              className='underline underline-offset-4 hover:text-primary'
+            >
+              Política de Privacidade
+            </a>
+            .
           </p>
         </div>
-        <UserAuthForm />
-        <p className='mt-4 px-8 text-center text-sm text-muted-foreground'>
-          By clicking login, you agree to our{' '}
-          <a
-            href='/terms'
-            className='underline underline-offset-4 hover:text-primary'
-          >
-            Terms of Service
-          </a>{' '}
-          and{' '}
-          <a
-            href='/privacy'
-            className='underline underline-offset-4 hover:text-primary'
-          >
-            Privacy Policy
-          </a>
-          .
-        </p>
-      </Card>
-    </AuthLayout>
+      </div>
+    </div>
   )
 }
