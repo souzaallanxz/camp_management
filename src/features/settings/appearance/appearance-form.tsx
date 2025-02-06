@@ -166,7 +166,7 @@ export function AppearanceForm() {
         />
 
         <Button type='submit' disabled={isLoading || isSaving}>
-          {isSaving ? 'A guardar...' : 'Atualizar preferências'}
+          {isSaving ? 'A guardar...' : 'Guardar'}
         </Button>
       </form>
     </Form>

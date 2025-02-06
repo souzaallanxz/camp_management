@@ -106,9 +106,6 @@ export default function Dashboard() {
               <TabsTrigger value='reports' disabled>
                 Reports
               </TabsTrigger>
-              <TabsTrigger value='notifications' disabled>
-                Notifications
-              </TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value='overview' className='space-y-4'>
@@ -234,7 +231,7 @@ const topNav = [
     isActive: true,
     disabled: false,
   },
-  {
+  /*{
     title: 'Customers',
     href: 'dashboard/customers',
     isActive: false,
@@ -248,8 +245,8 @@ const topNav = [
   },
   {
     title: 'Settings',
-    href: 'dashboard/settings',
+    href: 'settings/prodf',
     isActive: false,
     disabled: true,
-  },
+  },*/
 ]

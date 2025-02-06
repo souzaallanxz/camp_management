@@ -4,6 +4,8 @@ import {
   IconNotification,
   IconPalette,
   IconUser,
+  IconCreditCard,
+  IconBuildingCommunity,
 } from '@tabler/icons-react'
 import { Separator } from '@/components/ui/separator'
 import { Header } from '@/components/layout/header'
@@ -53,6 +55,16 @@ const sidebarNavItems = [
     title: 'Perfil',
     icon: <IconUser size={18} />,
     href: '/settings',
+  },
+  {
+    title: 'Organização',
+    icon: <IconBuildingCommunity size={18} />,
+    href: '/settings/organization',
+  },
+  {
+    title: 'Faturação',
+    icon: <IconCreditCard size={18} />,
+    href: '/settings/billing',
   },
   {
     title: 'Aparência',

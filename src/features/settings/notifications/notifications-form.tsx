@@ -218,7 +218,7 @@ export function NotificationsForm() {
             </FormItem>
           )}
         />
-        <Button type='submit'>Update notifications</Button>
+        <Button type='submit'>Guardar</Button>
       </form>
     </Form>
   )

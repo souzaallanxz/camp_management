@@ -16,7 +16,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible='icon' variant='floating' {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={sidebarData.teams} />
+        <TeamSwitcher teams={sidebarData.teams} isLoading={sidebarData.isLoading} />
       </SidebarHeader>
       <SidebarContent>
         {sidebarData.navGroups.map((props) => (

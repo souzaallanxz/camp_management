@@ -22,24 +22,32 @@ export const teamService = {
   },
 
   async createTeam(dto: CreateTeamDto) {
-    try {
-      const { data: team, error } = await supabase
-        .rpc('create_team_for_current_user', {
-          team_name: dto.name
-        })
-        .single()
+    const { data: team, error } = await supabase
+      .rpc('create_team_for_current_user', {
+        team_name: dto.name
+      })
+      .single()
 
-      if (error) {
-        throw error
-      }
-
-      if (!team) {
-        throw new Error('Failed to create team: No data returned')
-      }
-
-      return team as Team
-    } catch (error) {
+    if (error) {
       throw error
     }
+
+    if (!team) {
+      throw new Error('Failed to create team: No data returned')
+    }
+
+    return team as Team
+  },
+
+  async updateTeam(teamId: string, data: { name: string }) {
+    const { error } = await supabase
+      .rpc('update_team_name', {
+        team_id: teamId,
+        new_name: data.name
+      })
+
+    if (error) throw error
+
+    return true
   }
 } 

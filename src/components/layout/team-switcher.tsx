@@ -15,18 +15,37 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export function TeamSwitcher({
   teams,
+  isLoading = false,
 }: {
   teams: {
     name: string
     logo: React.ElementType
     plan: string
   }[]
+  isLoading?: boolean
 }) {
   const { isMobile } = useSidebar()
   const currentTeam = teams[0] // Since we only have one team for now
+
+  if (isLoading) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <div className="flex items-center space-x-4 p-2">
+            <Skeleton className="h-8 w-8 rounded-lg" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[100px]" />
+              <Skeleton className="h-3 w-[70px]" />
+            </div>
+          </div>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    )
+  }
 
   return (
     <SidebarMenu>

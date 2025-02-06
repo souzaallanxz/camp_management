@@ -174,7 +174,7 @@ export function ProfileForm() {
         />
 
         <Button type="submit" disabled={isLoading || isSaving}>
-          {isSaving ? 'A guardar...' : 'Atualizar perfil'}
+          {isSaving ? 'A guardar...' : 'Guardar'}
         </Button>
       </form>
     </Form>

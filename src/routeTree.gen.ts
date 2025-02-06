@@ -59,11 +59,17 @@ const AuthenticatedChatsIndexLazyImport = createFileRoute(
 const AuthenticatedAppsIndexLazyImport = createFileRoute(
   '/_authenticated/apps/',
 )()
+const AuthenticatedSettingsOrganizationLazyImport = createFileRoute(
+  '/_authenticated/settings/organization',
+)()
 const AuthenticatedSettingsNotificationsLazyImport = createFileRoute(
   '/_authenticated/settings/notifications',
 )()
 const AuthenticatedSettingsDisplayLazyImport = createFileRoute(
   '/_authenticated/settings/display',
+)()
+const AuthenticatedSettingsBillingLazyImport = createFileRoute(
+  '/_authenticated/settings/billing',
 )()
 const AuthenticatedSettingsAppearanceLazyImport = createFileRoute(
   '/_authenticated/settings/appearance',
@@ -275,6 +281,17 @@ const AuthenticatedCampersIndexRoute = AuthenticatedCampersIndexImport.update({
   import('./routes/_authenticated/campers/index.lazy').then((d) => d.Route),
 )
 
+const AuthenticatedSettingsOrganizationLazyRoute =
+  AuthenticatedSettingsOrganizationLazyImport.update({
+    id: '/organization',
+    path: '/organization',
+    getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/settings/organization.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
 const AuthenticatedSettingsNotificationsLazyRoute =
   AuthenticatedSettingsNotificationsLazyImport.update({
     id: '/notifications',
@@ -293,6 +310,17 @@ const AuthenticatedSettingsDisplayLazyRoute =
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/settings/display.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedSettingsBillingLazyRoute =
+  AuthenticatedSettingsBillingLazyImport.update({
+    id: '/billing',
+    path: '/billing',
+    getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/settings/billing.lazy').then(
       (d) => d.Route,
     ),
   )
@@ -449,6 +477,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAppearanceLazyImport
       parentRoute: typeof AuthenticatedSettingsRouteLazyImport
     }
+    '/_authenticated/settings/billing': {
+      id: '/_authenticated/settings/billing'
+      path: '/billing'
+      fullPath: '/settings/billing'
+      preLoaderRoute: typeof AuthenticatedSettingsBillingLazyImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    }
     '/_authenticated/settings/display': {
       id: '/_authenticated/settings/display'
       path: '/display'
@@ -461,6 +496,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/settings/notifications'
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsLazyImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    }
+    '/_authenticated/settings/organization': {
+      id: '/_authenticated/settings/organization'
+      path: '/organization'
+      fullPath: '/settings/organization'
+      preLoaderRoute: typeof AuthenticatedSettingsOrganizationLazyImport
       parentRoute: typeof AuthenticatedSettingsRouteLazyImport
     }
     '/_authenticated/campers/': {
@@ -547,8 +589,10 @@ const AuthenticatedSnackBarRouteWithChildren =
 interface AuthenticatedSettingsRouteLazyRouteChildren {
   AuthenticatedSettingsAccountLazyRoute: typeof AuthenticatedSettingsAccountLazyRoute
   AuthenticatedSettingsAppearanceLazyRoute: typeof AuthenticatedSettingsAppearanceLazyRoute
+  AuthenticatedSettingsBillingLazyRoute: typeof AuthenticatedSettingsBillingLazyRoute
   AuthenticatedSettingsDisplayLazyRoute: typeof AuthenticatedSettingsDisplayLazyRoute
   AuthenticatedSettingsNotificationsLazyRoute: typeof AuthenticatedSettingsNotificationsLazyRoute
+  AuthenticatedSettingsOrganizationLazyRoute: typeof AuthenticatedSettingsOrganizationLazyRoute
   AuthenticatedSettingsIndexLazyRoute: typeof AuthenticatedSettingsIndexLazyRoute
 }
 
@@ -558,10 +602,14 @@ const AuthenticatedSettingsRouteLazyRouteChildren: AuthenticatedSettingsRouteLaz
       AuthenticatedSettingsAccountLazyRoute,
     AuthenticatedSettingsAppearanceLazyRoute:
       AuthenticatedSettingsAppearanceLazyRoute,
+    AuthenticatedSettingsBillingLazyRoute:
+      AuthenticatedSettingsBillingLazyRoute,
     AuthenticatedSettingsDisplayLazyRoute:
       AuthenticatedSettingsDisplayLazyRoute,
     AuthenticatedSettingsNotificationsLazyRoute:
       AuthenticatedSettingsNotificationsLazyRoute,
+    AuthenticatedSettingsOrganizationLazyRoute:
+      AuthenticatedSettingsOrganizationLazyRoute,
     AuthenticatedSettingsIndexLazyRoute: AuthenticatedSettingsIndexLazyRoute,
   }
 
@@ -620,8 +668,10 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
+  '/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
+  '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
   '/campers': typeof AuthenticatedCampersIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
@@ -648,8 +698,10 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
+  '/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
+  '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
   '/campers': typeof AuthenticatedCampersIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
@@ -681,8 +733,10 @@ export interface FileRoutesById {
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
+  '/_authenticated/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
+  '/_authenticated/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
   '/_authenticated/campers/': typeof AuthenticatedCampersIndexRoute
   '/_authenticated/registrations/': typeof AuthenticatedRegistrationsIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexLazyRoute
@@ -714,8 +768,10 @@ export interface FileRouteTypes {
     | '/'
     | '/settings/account'
     | '/settings/appearance'
+    | '/settings/billing'
     | '/settings/display'
     | '/settings/notifications'
+    | '/settings/organization'
     | '/campers'
     | '/registrations'
     | '/apps'
@@ -741,8 +797,10 @@ export interface FileRouteTypes {
     | '/'
     | '/settings/account'
     | '/settings/appearance'
+    | '/settings/billing'
     | '/settings/display'
     | '/settings/notifications'
+    | '/settings/organization'
     | '/campers'
     | '/registrations'
     | '/apps'
@@ -772,8 +830,10 @@ export interface FileRouteTypes {
     | '/_authenticated/'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
+    | '/_authenticated/settings/billing'
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/notifications'
+    | '/_authenticated/settings/organization'
     | '/_authenticated/campers/'
     | '/_authenticated/registrations/'
     | '/_authenticated/apps/'
@@ -882,8 +942,10 @@ export const routeTree = rootRoute
       "children": [
         "/_authenticated/settings/account",
         "/_authenticated/settings/appearance",
+        "/_authenticated/settings/billing",
         "/_authenticated/settings/display",
         "/_authenticated/settings/notifications",
+        "/_authenticated/settings/organization",
         "/_authenticated/settings/"
       ]
     },
@@ -923,12 +985,20 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/settings/appearance.lazy.tsx",
       "parent": "/_authenticated/settings"
     },
+    "/_authenticated/settings/billing": {
+      "filePath": "_authenticated/settings/billing.lazy.tsx",
+      "parent": "/_authenticated/settings"
+    },
     "/_authenticated/settings/display": {
       "filePath": "_authenticated/settings/display.lazy.tsx",
       "parent": "/_authenticated/settings"
     },
     "/_authenticated/settings/notifications": {
       "filePath": "_authenticated/settings/notifications.lazy.tsx",
+      "parent": "/_authenticated/settings"
+    },
+    "/_authenticated/settings/organization": {
+      "filePath": "_authenticated/settings/organization.lazy.tsx",
       "parent": "/_authenticated/settings"
     },
     "/_authenticated/campers/": {

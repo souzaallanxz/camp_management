@@ -210,7 +210,7 @@ export function AccountForm() {
             </FormItem>
           )}
         />
-        <Button type='submit'>Update account</Button>
+        <Button type='submit'>Guardar</Button>
       </form>
     </Form>
   )

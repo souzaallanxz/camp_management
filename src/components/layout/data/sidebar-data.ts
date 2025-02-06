@@ -190,9 +190,9 @@ export const sidebarData: SidebarData = {
 }
 
 // Hook version with user info
-export function useSidebarData(): SidebarData {
+export function useSidebarData(): SidebarData & { isLoading: boolean } {
   const user = useUser()
-  const teamData = useTeamData()
+  const { teams, isLoading } = useTeamData()
 
   return {
     user: {
@@ -200,7 +200,8 @@ export function useSidebarData(): SidebarData {
       email: user?.email ?? '',
       avatar: '/avatars/shadcn.jpg',
     },
-    teams: teamData.teams,
+    teams,
+    isLoading,
     navGroups: [
       {
         title: 'General',
