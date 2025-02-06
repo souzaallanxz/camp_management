@@ -15,8 +15,63 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Overview } from './components/overview'
 import { RecentSales } from './components/recent-sales'
+import { useDashboardMetrics } from './hooks/use-dashboard-metrics'
+import { Skeleton } from '@/components/ui/skeleton'
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('pt-PT', {
+    style: 'currency',
+    currency: 'EUR'
+  }).format(value)
+}
+
+function MetricCard({
+  title,
+  value,
+  percentageChange,
+  icon,
+  isLoading,
+  valueFormatter = (val: number) => String(val)
+}: {
+  title: string
+  value: number
+  percentageChange: number | null
+  icon: React.ReactNode
+  isLoading: boolean
+  valueFormatter?: (value: number) => string
+}) {
+  return (
+    <Card>
+      <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+        <CardTitle className='text-sm font-medium'>
+          {title}
+        </CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <>
+            <Skeleton className='h-8 w-[100px] mb-1' />
+            <Skeleton className='h-4 w-[140px]' />
+          </>
+        ) : (
+          <>
+            <div className='text-2xl font-bold'>{valueFormatter(value)}</div>
+            {percentageChange !== null && (
+              <p className={`text-xs ${percentageChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {percentageChange >= 0 ? '+' : ''}{percentageChange.toFixed(1)}% face ao {title === 'Total de Campistas' ? 'ano' : 'mês'} anterior
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function Dashboard() {
+  const { monthlyPayments, monthlyRegistrations, monthlySnackbar, yearlyCampers, isLoading } = useDashboardMetrics()
+
   return (
     <>
       {/* ===== Top Heading ===== */}
@@ -58,11 +113,13 @@ export default function Dashboard() {
           </div>
           <TabsContent value='overview' className='space-y-4'>
             <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-              <Card>
-                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                  <CardTitle className='text-sm font-medium'>
-                    Total Revenue
-                  </CardTitle>
+              <MetricCard
+                title='Total Pagamentos'
+                value={monthlyPayments?.total || 0}
+                percentageChange={monthlyPayments?.percentageChange || null}
+                isLoading={isLoading}
+                valueFormatter={formatCurrency}
+                icon={
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
                     viewBox='0 0 24 24'
@@ -75,19 +132,14 @@ export default function Dashboard() {
                   >
                     <path d='M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' />
                   </svg>
-                </CardHeader>
-                <CardContent>
-                  <div className='text-2xl font-bold'>$45,231.89</div>
-                  <p className='text-xs text-muted-foreground'>
-                    +20.1% from last month
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                  <CardTitle className='text-sm font-medium'>
-                    Subscriptions
-                  </CardTitle>
+                }
+              />
+              <MetricCard
+                title='Total de Inscrições'
+                value={monthlyRegistrations?.total || 0}
+                percentageChange={monthlyRegistrations?.percentageChange || null}
+                isLoading={isLoading}
+                icon={
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
                     viewBox='0 0 24 24'
@@ -102,17 +154,15 @@ export default function Dashboard() {
                     <circle cx='9' cy='7' r='4' />
                     <path d='M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' />
                   </svg>
-                </CardHeader>
-                <CardContent>
-                  <div className='text-2xl font-bold'>+2350</div>
-                  <p className='text-xs text-muted-foreground'>
-                    +180.1% from last month
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                  <CardTitle className='text-sm font-medium'>Sales</CardTitle>
+                }
+              />
+              <MetricCard
+                title='Total de Carregamentos'
+                value={monthlySnackbar?.total || 0}
+                percentageChange={monthlySnackbar?.percentageChange || null}
+                isLoading={isLoading}
+                valueFormatter={formatCurrency}
+                icon={
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
                     viewBox='0 0 24 24'
@@ -126,19 +176,14 @@ export default function Dashboard() {
                     <rect width='20' height='14' x='2' y='5' rx='2' />
                     <path d='M2 10h20' />
                   </svg>
-                </CardHeader>
-                <CardContent>
-                  <div className='text-2xl font-bold'>+12,234</div>
-                  <p className='text-xs text-muted-foreground'>
-                    +19% from last month
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-                  <CardTitle className='text-sm font-medium'>
-                    Active Now
-                  </CardTitle>
+                }
+              />
+              <MetricCard
+                title='Total de Campistas'
+                value={yearlyCampers?.total || 0}
+                percentageChange={yearlyCampers?.percentageChange || null}
+                isLoading={isLoading}
+                icon={
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
                     viewBox='0 0 24 24'
@@ -151,14 +196,8 @@ export default function Dashboard() {
                   >
                     <path d='M22 12h-4l-3 9L9 3l-3 9H2' />
                   </svg>
-                </CardHeader>
-                <CardContent>
-                  <div className='text-2xl font-bold'>+573</div>
-                  <p className='text-xs text-muted-foreground'>
-                    +201 since last hour
-                  </p>
-                </CardContent>
-              </Card>
+                }
+              />
             </div>
             <div className='grid grid-cols-1 gap-4 lg:grid-cols-7'>
               <Card className='col-span-1 lg:col-span-4'>
