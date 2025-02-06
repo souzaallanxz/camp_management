@@ -13,11 +13,27 @@ export interface CampPaymentsData {
   totalRegistrations: number
 }
 
+export interface RecentRegistration {
+  id: string
+  name: string
+  email: string
+  totalPaid: number
+  createdAt: string
+}
+
 interface RawCampPaymentsData {
   camp_id: string
   camp_name: string
   total_payments: number
   total_registrations: number
+}
+
+interface RawRecentRegistration {
+  id: string
+  name: string
+  email: string
+  total_paid: number
+  created_at: string
 }
 
 export const dashboardService = {
@@ -94,6 +110,22 @@ export const dashboardService = {
       campName: camp.camp_name,
       totalPayments: Number(camp.total_payments),
       totalRegistrations: Number(camp.total_registrations)
+    }))
+  },
+
+  async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
+    const { data, error } = await supabase.rpc('get_team_recent_registrations', {
+      p_limit: limit
+    })
+
+    if (error) throw error
+
+    return (data as RawRecentRegistration[]).map(reg => ({
+      id: reg.id,
+      name: reg.name,
+      email: reg.email,
+      totalPaid: Number(reg.total_paid),
+      createdAt: reg.created_at
     }))
   }
 } 
