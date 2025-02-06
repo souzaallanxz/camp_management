@@ -191,20 +191,54 @@ export const registrationService = {
 export async function getRegistrations() {
   const teamId = await getCurrentUserTeam()
 
-  const { data, error } = await supabase
+  const { data: registrations, error } = await supabase
     .from('registrations')
     .select(`
       *,
       camp:camps!registrations_camp_id_fkey (
         id,
         name,
+        price,
         team_id
       )
     `)
     .eq('camp.team_id', teamId)
 
   if (error) throw error
-  return data
+
+  // Get totals for each registration using the secure function
+  const registrationsWithTotals = await Promise.all(
+    registrations.map(async (registration) => {
+      const { data: totalPaid, error: totalError } = await supabase
+        .rpc('get_registration_total', { registration_id: registration.id })
+
+      if (totalError) {
+        return null
+      }
+
+      const camp = Array.isArray(registration.camp) ? registration.camp[0] : registration.camp
+      const campPrice = Number(camp?.price || 0)
+      const totalPaidAmount = Number(totalPaid || 0)
+
+      // Determine status based on total paid vs camp price
+      let status = registration.status
+      if (totalPaidAmount >= campPrice) {
+        status = 'paid'
+      } else if (totalPaidAmount > 0) {
+        status = 'partial'
+      } else {
+        status = 'unpaid'
+      }
+
+      return {
+        ...registration,
+        total_amount_paid: totalPaidAmount,
+        status
+      }
+    })
+  )
+
+  return registrationsWithTotals.filter((r): r is Registration => r !== null)
 }
 
 export async function getRegistrationById(id: string): Promise<Registration> {
