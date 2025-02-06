@@ -11,9 +11,21 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
+
+const languages = [
+  { value: 'pt', label: 'Português' },
+  { value: 'en', label: 'English' },
+] as const
 
 const profileFormSchema = z.object({
   name: z.string().min(2, {
@@ -21,6 +33,9 @@ const profileFormSchema = z.object({
   }),
   email: z.string().email({
     message: 'Email inválido.',
+  }),
+  language: z.enum(['pt', 'en'], {
+    required_error: 'Por favor selecione um idioma.',
   }),
 })
 
@@ -35,6 +50,7 @@ export function ProfileForm() {
     defaultValues: {
       name: '',
       email: '',
+      language: 'pt',
     },
   })
 
@@ -46,6 +62,7 @@ export function ProfileForm() {
           form.reset({
             name: user.user_metadata?.name || '',
             email: user.email || '',
+            language: user.user_metadata?.language || 'pt',
           })
         }
       } catch {
@@ -67,7 +84,10 @@ export function ProfileForm() {
     setIsSaving(true)
     try {
       const { error: updateError } = await supabase.auth.updateUser({
-        data: { name: data.name }
+        data: { 
+          name: data.name,
+          language: data.language
+        }
       })
 
       if (updateError) throw updateError
@@ -119,6 +139,35 @@ export function ProfileForm() {
               <FormControl>
                 <Input {...field} disabled type="email" />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="language"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Idioma</FormLabel>
+              <Select 
+                onValueChange={field.onChange} 
+                defaultValue={field.value}
+                disabled={isLoading || isSaving}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um idioma" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {languages.map((language) => (
+                    <SelectItem key={language.value} value={language.value}>
+                      {language.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}

@@ -1,6 +1,7 @@
-import { createLazyFileRoute } from '@tanstack/react-router'
-import SettingsDisplay from '@/features/settings/display'
+import { createLazyFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createLazyFileRoute('/_authenticated/settings/display')({
-  component: SettingsDisplay,
+  component: () => {
+    throw redirect({ to: '/settings' })
+  },
 })

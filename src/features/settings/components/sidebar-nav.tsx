@@ -17,6 +17,7 @@ interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> {
     href: string
     title: string
     icon: JSX.Element
+    disabled?: boolean
   }[]
 }
 
@@ -30,6 +31,8 @@ export default function SidebarNav({
   const [val, setVal] = useState(pathname ?? '/settings')
 
   const handleSelect = (e: string) => {
+    const item = items.find(i => i.href === e)
+    if (item?.disabled) return
     setVal(e)
     navigate({ to: e })
   }
@@ -43,7 +46,11 @@ export default function SidebarNav({
           </SelectTrigger>
           <SelectContent>
             {items.map((item) => (
-              <SelectItem key={item.href} value={item.href}>
+              <SelectItem 
+                key={item.href} 
+                value={item.href}
+                disabled={item.disabled}
+              >
                 <div className='flex gap-x-4 px-2 py-1'>
                   <span className='scale-125'>{item.icon}</span>
                   <span className='text-md'>{item.title}</span>
@@ -66,22 +73,39 @@ export default function SidebarNav({
           )}
           {...props}
         >
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              to={item.href}
-              className={cn(
-                buttonVariants({ variant: 'ghost' }),
-                pathname === item.href
-                  ? 'bg-muted hover:bg-muted'
-                  : 'hover:bg-transparent hover:underline',
-                'justify-start'
-              )}
-            >
-              <span className='mr-2'>{item.icon}</span>
-              {item.title}
-            </Link>
-          ))}
+          {items.map((item) => {
+            if (item.disabled) {
+              return (
+                <span
+                  key={item.href}
+                  className={cn(
+                    buttonVariants({ variant: 'ghost' }),
+                    'justify-start opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <span className='mr-2'>{item.icon}</span>
+                  {item.title}
+                </span>
+              )
+            }
+
+            return (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  buttonVariants({ variant: 'ghost' }),
+                  pathname === item.href
+                    ? 'bg-muted hover:bg-muted'
+                    : 'hover:bg-transparent hover:underline',
+                  'justify-start'
+                )}
+              >
+                <span className='mr-2'>{item.icon}</span>
+                {item.title}
+              </Link>
+            )
+          })}
         </nav>
       </ScrollArea>
     </>

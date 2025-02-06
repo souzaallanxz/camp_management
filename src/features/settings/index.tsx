@@ -3,7 +3,6 @@ import {
   IconBrowserCheck,
   IconNotification,
   IconPalette,
-  IconTool,
   IconUser,
 } from '@tabler/icons-react'
 import { Separator } from '@/components/ui/separator'
@@ -29,10 +28,10 @@ export default function Settings() {
       <Main fixed>
         <div className='space-y-0.5'>
           <h1 className='text-2xl font-bold tracking-tight md:text-3xl'>
-            Settings
+            Definições
           </h1>
           <p className='text-muted-foreground'>
-            Manage your account settings and set e-mail preferences.
+            Gerir as suas definições e preferências.
           </p>
         </div>
         <Separator className='my-4 lg:my-6' />
@@ -51,28 +50,25 @@ export default function Settings() {
 
 const sidebarNavItems = [
   {
-    title: 'Profile',
+    title: 'Perfil',
     icon: <IconUser size={18} />,
     href: '/settings',
   },
   {
-    title: 'Account',
-    icon: <IconTool size={18} />,
-    href: '/settings/account',
-  },
-  {
-    title: 'Appearance',
+    title: 'Aparência',
     icon: <IconPalette size={18} />,
     href: '/settings/appearance',
   },
   {
-    title: 'Notifications',
+    title: 'Notificações',
     icon: <IconNotification size={18} />,
     href: '/settings/notifications',
+    disabled: true,
   },
   {
-    title: 'Display',
+    title: 'Ecrãs',
     icon: <IconBrowserCheck size={18} />,
     href: '/settings/display',
+    disabled: true,
   },
 ]
