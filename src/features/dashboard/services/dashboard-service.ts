@@ -6,6 +6,20 @@ export interface MetricData {
   percentageChange: number | null
 }
 
+export interface CampPaymentsData {
+  campId: string
+  campName: string
+  totalPayments: number
+  totalRegistrations: number
+}
+
+interface RawCampPaymentsData {
+  camp_id: string
+  camp_name: string
+  total_payments: number
+  total_registrations: number
+}
+
 export const dashboardService = {
   async getMonthlyPayments(): Promise<MetricData> {
     const now = new Date()
@@ -68,5 +82,18 @@ export const dashboardService = {
       previousTotal: Number(data[0].previous_year_count) || 0,
       percentageChange: data[0].percentage_change
     }
+  },
+
+  async getCampPayments(): Promise<CampPaymentsData[]> {
+    const { data, error } = await supabase.rpc('get_team_camp_payments')
+
+    if (error) throw error
+
+    return (data as RawCampPaymentsData[]).map(camp => ({
+      campId: camp.camp_id,
+      campName: camp.camp_name,
+      totalPayments: Number(camp.total_payments),
+      totalRegistrations: Number(camp.total_registrations)
+    }))
   }
 } 
