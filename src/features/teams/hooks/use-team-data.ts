@@ -1,22 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ElementType } from 'react'
-import { Command } from 'lucide-react'
 import { teamService } from '../services/team-service'
 import { toast } from '@/hooks/use-toast'
-
-interface Team {
-  id: string
-  name: string
-  logo: ElementType
-  plan: string
-}
+import type { Team } from '../types'
 
 // Default team data
 const defaultTeam: Team = {
   id: '0',
   name: 'Minha Organização',
-  logo: Command,
-  plan: 'Standard Plan'
+  logo_url: null,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString()
 }
 
 export function useTeamData() {
@@ -29,12 +22,7 @@ export function useTeamData() {
       const team = await teamService.getCurrentUserTeam()
 
       if (team) {
-        setTeams([{
-          id: team.id,
-          name: team.name,
-          logo: Command,
-          plan: 'Standard Plan'
-        }])
+        setTeams([team])
       } else {
         setTeams([defaultTeam])
       }

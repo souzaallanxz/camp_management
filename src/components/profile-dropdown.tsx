@@ -63,23 +63,16 @@ export function ProfileDropdown() {
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
             <Link to='/settings'>
-              Profile
+              Perfil
               <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link to='/settings'>
-              Billing
+            <Link to='/settings/billing'>
+              Faturação
               <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to='/settings'>
-              Settings
-              <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem>New Team</DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout}>

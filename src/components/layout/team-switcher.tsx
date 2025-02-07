@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { ChevronsUpDown, Plus } from 'lucide-react'
+import { ChevronsUpDown, Plus, Building2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,20 +16,14 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useTeamData } from '@/features/teams/hooks/use-team-data'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import type { Team } from '@/features/teams/types'
 
-export function TeamSwitcher({
-  teams,
-  isLoading = false,
-}: {
-  teams: {
-    name: string
-    logo: React.ElementType
-    plan: string
-  }[]
-  isLoading?: boolean
-}) {
+export function TeamSwitcher({ isLoading = false }: { isLoading?: boolean }) {
   const { isMobile } = useSidebar()
-  const currentTeam = teams[0] // Since we only have one team for now
+  const { teams } = useTeamData()
+  const currentTeam = teams[0]
 
   if (isLoading) {
     return (
@@ -47,6 +41,8 @@ export function TeamSwitcher({
     )
   }
 
+  if (!currentTeam) return null
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -56,14 +52,23 @@ export function TeamSwitcher({
               size='lg'
               className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
             >
-              <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground'>
-                <currentTeam.logo className='size-4' />
+              <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-background text-foreground'>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage 
+                    src={currentTeam.logo_url || undefined} 
+                    alt={currentTeam.name}
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="bg-background">
+                    <Building2 className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
               </div>
               <div className='grid flex-1 text-left text-sm leading-tight'>
                 <span className='truncate font-semibold'>
                   {currentTeam.name}
                 </span>
-                <span className='truncate text-xs'>{currentTeam.plan}</span>
+                <span className='truncate text-xs'>Free</span>
               </div>
               <ChevronsUpDown className='ml-auto' />
             </SidebarMenuButton>
@@ -83,7 +88,16 @@ export function TeamSwitcher({
                 className='gap-2 p-2'
               >
                 <div className='flex size-6 items-center justify-center rounded-sm border'>
-                  <team.logo className='size-4 shrink-0' />
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage 
+                      src={team.logo_url || undefined} 
+                      alt={team.name}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="bg-background">
+                      <Building2 className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
                 </div>
                 {team.name}
                 <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>

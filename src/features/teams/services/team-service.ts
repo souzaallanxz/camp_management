@@ -1,7 +1,23 @@
 import { supabase } from '@/lib/supabase'
 import type { CreateTeamDto, Team } from '../types'
 
+export interface UpdateTeamData {
+  name?: string
+  logo_url?: string | null
+}
+
 export const teamService = {
+  async getTeams() {
+    const { data: teams, error } = await supabase
+      .from('teams')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return teams as Team[]
+  },
+
   async getCurrentUserTeam() {
     const { data: team, error } = await supabase
       .rpc('get_current_user_team')
@@ -39,15 +55,17 @@ export const teamService = {
     return team as Team
   },
 
-  async updateTeam(teamId: string, data: { name: string }) {
-    const { error } = await supabase
-      .rpc('update_team_name', {
-        team_id: teamId,
-        new_name: data.name
+  async updateTeam(id: string, data: UpdateTeamData) {
+    const { data: result, error } = await supabase
+      .rpc('update_current_user_team', {
+        p_team_id: id,
+        team_name: data.name,
+        team_logo_url: data.logo_url
       })
+      .single()
 
     if (error) throw error
 
-    return true
+    return result as Team
   }
 } 
