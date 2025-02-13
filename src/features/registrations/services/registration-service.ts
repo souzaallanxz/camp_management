@@ -191,6 +191,7 @@ export const registrationService = {
 export async function getRegistrations() {
   try {
     const teamId = await getCurrentUserTeam()
+    
 
     const { data: registrations, error } = await supabase
       .from('registrations')

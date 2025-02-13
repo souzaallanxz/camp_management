@@ -61,9 +61,9 @@ export const teamService = {
     const { data: result, error } = await supabase
       .rpc('update_current_user_team', {
         p_team_id: id,
-        team_name: data.name,
-        team_logo_url: data.logo_url,
-        team_tier: data.tier
+        team_name: data.name || null,
+        team_logo_url: data.logo_url === undefined ? null : data.logo_url,
+        team_tier: data.tier || null
       })
       .single()
 

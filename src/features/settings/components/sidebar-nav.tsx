@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react'
+import { useState, type JSX, useEffect } from 'react'
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { Link } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
@@ -29,6 +29,12 @@ export default function SidebarNav({
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [val, setVal] = useState(pathname ?? '/settings')
+  const [updateKey, setUpdateKey] = useState(0)
+
+  // Force re-render of icons when pathname changes
+  useEffect(() => {
+    setUpdateKey(prev => prev + 1)
+  }, [pathname])
 
   const handleSelect = (e: string) => {
     const item = items.find(i => i.href === e)
@@ -47,7 +53,7 @@ export default function SidebarNav({
           <SelectContent>
             {items.map((item) => (
               <SelectItem 
-                key={item.href} 
+                key={`${item.href}-${updateKey}`}
                 value={item.href}
                 disabled={item.disabled}
               >
@@ -77,7 +83,7 @@ export default function SidebarNav({
             if (item.disabled) {
               return (
                 <span
-                  key={item.href}
+                  key={`${item.href}-${updateKey}`}
                   className={cn(
                     buttonVariants({ variant: 'ghost' }),
                     'justify-start opacity-50 cursor-not-allowed'
@@ -91,7 +97,7 @@ export default function SidebarNav({
 
             return (
               <Link
-                key={item.href}
+                key={`${item.href}-${updateKey}`}
                 to={item.href}
                 className={cn(
                   buttonVariants({ variant: 'ghost' }),
