@@ -17,6 +17,10 @@ import { Overview } from './components/overview'
 import { RecentSales } from './components/recent-sales'
 import { useDashboardMetrics } from './hooks/use-dashboard-metrics'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useState } from 'react'
+import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
+import { Badge } from '@/components/ui/badge'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-PT', {
@@ -31,7 +35,8 @@ function MetricCard({
   percentageChange,
   icon,
   isLoading,
-  valueFormatter = (val: number) => String(val)
+  valueFormatter = (val: number) => String(val),
+  isLocked = false,
 }: {
   title: string
   value: number
@@ -39,6 +44,7 @@ function MetricCard({
   icon: React.ReactNode
   isLoading: boolean
   valueFormatter?: (value: number) => string
+  isLocked?: boolean
 }) {
   return (
     <Card>
@@ -54,6 +60,10 @@ function MetricCard({
             <Skeleton className='h-8 w-[100px] mb-1' />
             <Skeleton className='h-4 w-[140px]' />
           </>
+        ) : isLocked ? (
+          <div className='flex items-center'>
+            <Badge variant="secondary" className="text-xs px-2 py-0.5">Premium Feature</Badge>
+          </div>
         ) : (
           <>
             <div className='text-2xl font-bold'>{valueFormatter(value)}</div>
@@ -71,6 +81,8 @@ function MetricCard({
 
 export default function Dashboard() {
   const { monthlyPayments, monthlyRegistrations, monthlySnackbar, yearlyCampers, isLoading } = useDashboardMetrics()
+  const permissions = useTeamPermissions()
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
 
   return (
     <>
@@ -159,6 +171,7 @@ export default function Dashboard() {
                 percentageChange={monthlySnackbar?.percentageChange || null}
                 isLoading={isLoading}
                 valueFormatter={formatCurrency}
+                isLocked={!permissions.dashboard.viewRechargesTotal}
                 icon={
                   <svg
                     xmlns='http://www.w3.org/2000/svg'
@@ -197,29 +210,38 @@ export default function Dashboard() {
               />
             </div>
             <div className='grid grid-cols-1 gap-4 lg:grid-cols-7'>
-              <Card className='col-span-1 lg:col-span-4'>
-                <CardHeader>
-                  <CardTitle>Overview</CardTitle>
-                </CardHeader>
-                <CardContent className='pl-2'>
-                  <Overview />
-                </CardContent>
-              </Card>
-              <Card className='col-span-1 lg:col-span-3'>
-                <CardHeader>
-                  <CardTitle>Últimas Inscrições</CardTitle>
-                  <CardDescription>
-                    {monthlyRegistrations?.total} inscrições este mês
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <RecentSales />
-                </CardContent>
-              </Card>
+              {permissions.dashboard.viewOverview && (
+                <Card className='col-span-1 lg:col-span-4'>
+                  <CardHeader>
+                    <CardTitle>Overview</CardTitle>
+                  </CardHeader>
+                  <CardContent className='pl-2'>
+                    <Overview />
+                  </CardContent>
+                </Card>
+              )}
+              {permissions.dashboard.viewLatestRegistrations && (
+                <Card className='col-span-1 lg:col-span-3'>
+                  <CardHeader>
+                    <CardTitle>Últimas Inscrições</CardTitle>
+                    <CardDescription>
+                      {monthlyRegistrations?.total} inscrições este mês
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <RecentSales />
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
         </Tabs>
       </Main>
+
+      <TierUpgradeDialog
+        open={showUpgradeDialog}
+        onOpenChange={setShowUpgradeDialog}
+      />
     </>
   )
 }

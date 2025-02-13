@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { SignUpCredentials } from './types'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import { teamService } from '@/features/teams/services/team-service'
 
 export async function signIn(email: string | { email: string, password: string }, password?: string) {
   try {
@@ -48,17 +49,13 @@ export async function getCurrentUser() {
 }
 
 export async function getCurrentUserTeam() {
-  const { data, error } = await supabase.rpc('get_current_user_team')
+  const team = await teamService.getCurrentUserTeam()
 
-  if (error) {
-    throw error
-  }
-
-  if (!data || !data.id) {
+  if (!team) {
     throw new Error('User has no team assigned')
   }
 
-  return data.id
+  return team.id
 }
 
 export const authService = {

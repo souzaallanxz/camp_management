@@ -9,7 +9,8 @@ const defaultTeam: Team = {
   name: 'Minha Organização',
   logo_url: null,
   created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString()
+  updated_at: new Date().toISOString(),
+  tier: 'free'
 }
 
 export function useTeamData() {

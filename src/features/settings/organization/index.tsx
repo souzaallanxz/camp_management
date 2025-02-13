@@ -1,7 +1,7 @@
 "use client";
 
 import { Separator } from "@/components/ui/separator"
-import OrganizationForm from "./organization-form"
+import { OrganizationForm } from "./organization-form"
 
 export default function OrganizationSettings() {
   return (

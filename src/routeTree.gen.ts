@@ -20,6 +20,7 @@ import { Route as AuthenticatedCampsImport } from './routes/_authenticated/camps
 import { Route as authSignInImport } from './routes/(auth)/sign-in'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as auth500Import } from './routes/(auth)/500'
+import { Route as AuthenticatedSnackBarIndexImport } from './routes/_authenticated/snack-bar/index'
 import { Route as AuthenticatedRegistrationsIndexImport } from './routes/_authenticated/registrations/index'
 import { Route as AuthenticatedCampersIndexImport } from './routes/_authenticated/campers/index'
 
@@ -43,9 +44,6 @@ const AuthenticatedUsersIndexLazyImport = createFileRoute(
 )()
 const AuthenticatedTasksIndexLazyImport = createFileRoute(
   '/_authenticated/tasks/',
-)()
-const AuthenticatedSnackBarIndexLazyImport = createFileRoute(
-  '/_authenticated/snack-bar/',
 )()
 const AuthenticatedSettingsIndexLazyImport = createFileRoute(
   '/_authenticated/settings/',
@@ -214,15 +212,6 @@ const AuthenticatedTasksIndexLazyRoute =
     import('./routes/_authenticated/tasks/index.lazy').then((d) => d.Route),
   )
 
-const AuthenticatedSnackBarIndexLazyRoute =
-  AuthenticatedSnackBarIndexLazyImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedSnackBarRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/snack-bar/index.lazy').then((d) => d.Route),
-  )
-
 const AuthenticatedSettingsIndexLazyRoute =
   AuthenticatedSettingsIndexLazyImport.update({
     id: '/',
@@ -260,6 +249,14 @@ const AuthenticatedAppsIndexLazyRoute = AuthenticatedAppsIndexLazyImport.update(
   } as any,
 ).lazy(() =>
   import('./routes/_authenticated/apps/index.lazy').then((d) => d.Route),
+)
+
+const AuthenticatedSnackBarIndexRoute = AuthenticatedSnackBarIndexImport.update(
+  {
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedSnackBarRoute,
+  } as any,
 )
 
 const AuthenticatedRegistrationsIndexRoute =
@@ -519,6 +516,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRegistrationsIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
+    '/_authenticated/snack-bar/': {
+      id: '/_authenticated/snack-bar/'
+      path: '/'
+      fullPath: '/snack-bar/'
+      preLoaderRoute: typeof AuthenticatedSnackBarIndexImport
+      parentRoute: typeof AuthenticatedSnackBarImport
+    }
     '/_authenticated/apps/': {
       id: '/_authenticated/apps/'
       path: '/apps'
@@ -547,13 +551,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsIndexLazyImport
       parentRoute: typeof AuthenticatedSettingsRouteLazyImport
     }
-    '/_authenticated/snack-bar/': {
-      id: '/_authenticated/snack-bar/'
-      path: '/'
-      fullPath: '/snack-bar/'
-      preLoaderRoute: typeof AuthenticatedSnackBarIndexLazyImport
-      parentRoute: typeof AuthenticatedSnackBarImport
-    }
     '/_authenticated/tasks/': {
       id: '/_authenticated/tasks/'
       path: '/tasks'
@@ -574,11 +571,11 @@ declare module '@tanstack/react-router' {
 // Create and export the route tree
 
 interface AuthenticatedSnackBarRouteChildren {
-  AuthenticatedSnackBarIndexLazyRoute: typeof AuthenticatedSnackBarIndexLazyRoute
+  AuthenticatedSnackBarIndexRoute: typeof AuthenticatedSnackBarIndexRoute
 }
 
 const AuthenticatedSnackBarRouteChildren: AuthenticatedSnackBarRouteChildren = {
-  AuthenticatedSnackBarIndexLazyRoute: AuthenticatedSnackBarIndexLazyRoute,
+  AuthenticatedSnackBarIndexRoute: AuthenticatedSnackBarIndexRoute,
 }
 
 const AuthenticatedSnackBarRouteWithChildren =
@@ -674,11 +671,11 @@ export interface FileRoutesByFullPath {
   '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
   '/campers': typeof AuthenticatedCampersIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
+  '/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
   '/chats': typeof AuthenticatedChatsIndexLazyRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexLazyRoute
   '/settings/': typeof AuthenticatedSettingsIndexLazyRoute
-  '/snack-bar/': typeof AuthenticatedSnackBarIndexLazyRoute
   '/tasks': typeof AuthenticatedTasksIndexLazyRoute
   '/users': typeof AuthenticatedUsersIndexLazyRoute
 }
@@ -704,11 +701,11 @@ export interface FileRoutesByTo {
   '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
   '/campers': typeof AuthenticatedCampersIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
+  '/snack-bar': typeof AuthenticatedSnackBarIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
   '/chats': typeof AuthenticatedChatsIndexLazyRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexLazyRoute
   '/settings': typeof AuthenticatedSettingsIndexLazyRoute
-  '/snack-bar': typeof AuthenticatedSnackBarIndexLazyRoute
   '/tasks': typeof AuthenticatedTasksIndexLazyRoute
   '/users': typeof AuthenticatedUsersIndexLazyRoute
 }
@@ -739,11 +736,11 @@ export interface FileRoutesById {
   '/_authenticated/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
   '/_authenticated/campers/': typeof AuthenticatedCampersIndexRoute
   '/_authenticated/registrations/': typeof AuthenticatedRegistrationsIndexRoute
+  '/_authenticated/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexLazyRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexLazyRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexLazyRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexLazyRoute
-  '/_authenticated/snack-bar/': typeof AuthenticatedSnackBarIndexLazyRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexLazyRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexLazyRoute
 }
@@ -774,11 +771,11 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/campers'
     | '/registrations'
+    | '/snack-bar/'
     | '/apps'
     | '/chats'
     | '/help-center'
     | '/settings/'
-    | '/snack-bar/'
     | '/tasks'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
@@ -803,11 +800,11 @@ export interface FileRouteTypes {
     | '/settings/organization'
     | '/campers'
     | '/registrations'
+    | '/snack-bar'
     | '/apps'
     | '/chats'
     | '/help-center'
     | '/settings'
-    | '/snack-bar'
     | '/tasks'
     | '/users'
   id:
@@ -836,11 +833,11 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/organization'
     | '/_authenticated/campers/'
     | '/_authenticated/registrations/'
+    | '/_authenticated/snack-bar/'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
     | '/_authenticated/help-center/'
     | '/_authenticated/settings/'
-    | '/_authenticated/snack-bar/'
     | '/_authenticated/tasks/'
     | '/_authenticated/users/'
   fileRoutesById: FileRoutesById
@@ -1009,6 +1006,10 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/registrations/index.tsx",
       "parent": "/_authenticated"
     },
+    "/_authenticated/snack-bar/": {
+      "filePath": "_authenticated/snack-bar/index.tsx",
+      "parent": "/_authenticated/snack-bar"
+    },
     "/_authenticated/apps/": {
       "filePath": "_authenticated/apps/index.lazy.tsx",
       "parent": "/_authenticated"
@@ -1024,10 +1025,6 @@ export const routeTree = rootRoute
     "/_authenticated/settings/": {
       "filePath": "_authenticated/settings/index.lazy.tsx",
       "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/snack-bar/": {
-      "filePath": "_authenticated/snack-bar/index.lazy.tsx",
-      "parent": "/_authenticated/snack-bar"
     },
     "/_authenticated/tasks/": {
       "filePath": "_authenticated/tasks/index.lazy.tsx",

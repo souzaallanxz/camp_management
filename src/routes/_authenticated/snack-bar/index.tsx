@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
+import { useNavigate } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -27,8 +29,13 @@ import { TransactionsTable } from '@/features/snack-bar/components/transactions-
 import { TransactionsCharts } from '@/features/snack-bar/components/transactions-charts'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { IconCoinEuro, IconCashOff } from '@tabler/icons-react'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 
 export default function SnackBarPage() {
+  const navigate = useNavigate()
+  const permissions = useTeamPermissions()
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
   const [selectedCamperId, setSelectedCamperId] = useState<string>('')
   const queryClient = useQueryClient()
 
@@ -59,15 +66,7 @@ export default function SnackBarPage() {
 
   const { data: allTransactions = [] } = useQuery({
     queryKey: ['all-transactions'],
-    queryFn: async () => {
-      try {
-        const data = await snackBarService.getAllTransactions()
-        return data
-      } catch (error) {
-        console.error('Error fetching all transactions:', error)
-        throw error
-      }
-    },
+    queryFn: () => snackBarService.getAllTransactions(),
     refetchInterval: 5000, // Refetch every 5 seconds
   })
 
@@ -76,60 +75,80 @@ export default function SnackBarPage() {
       await snackBarService.deductBalance(transaction)
     },
     onSuccess: () => {
-      toast({
-        description: "Compra realizada com sucesso!",
-        className: "bg-green-500 text-white",
-        duration: 2000
-      })
+      toast.success('Compra realizada com sucesso!')
 
       // Invalidate all relevant queries
-      queryClient.invalidateQueries({ 
-        queryKey: ['camper-balance', selectedCamperId]
+      queryClient.invalidateQueries({
+        queryKey: ['camper-balance', selectedCamperId],
       })
-      queryClient.invalidateQueries({ 
-        queryKey: ['camper-transactions', selectedCamperId]
+      queryClient.invalidateQueries({
+        queryKey: ['camper-transactions', selectedCamperId],
       })
-      queryClient.invalidateQueries({ 
-        queryKey: ['all-transactions']
+      queryClient.invalidateQueries({
+        queryKey: ['all-transactions'],
       })
-      
+
       // Reset form and selected camper
       form.reset({ amount: 0, camperId: '' })
       setSelectedCamperId('')
     },
     onError: (error) => {
-      toast({
-        variant: "destructive",
-        description: error instanceof Error ? error.message : 'Erro ao processar compra',
-        duration: 3000
-      })
-    }
+      toast.error(
+        error instanceof Error ? error.message : 'Erro ao processar compra',
+      )
+    },
   })
 
   function onSubmit(data: SnackBarTransaction) {
     if (!selectedCamperId) return
-    
+
     const amount = Number(data.amount)
     if (amount > balance) {
-      toast({
-        variant: "destructive",
-        description: "Saldo insuficiente",
-        duration: 3000
-      })
+      toast.error('Saldo insuficiente')
       return
     }
 
     const transaction = {
       amount: amount,
-      camperId: selectedCamperId
+      camperId: selectedCamperId,
     }
-    
+
     mutation.mutate(transaction)
   }
 
   const amount = form.watch('amount')
   const amountNumber = Number(amount)
-  const isAmountValid = !isNaN(amountNumber) && amountNumber > 0 && amountNumber <= balance
+  const isAmountValid =
+    !isNaN(amountNumber) && amountNumber > 0 && amountNumber <= balance
+
+  // If no access to snack bar, show upgrade dialog or redirect
+  if (!permissions.snackBar.access) {
+    return (
+      <>
+        <div className="flex flex-col items-center justify-center h-full space-y-4">
+          <h2 className="text-2xl font-bold tracking-tight">
+            Funcionalidade Premium
+          </h2>
+          <p className="text-muted-foreground text-center max-w-md">
+            O Snack Bar está disponível apenas para equipas com plano Premium.
+            Faça upgrade do seu plano para aceder a esta funcionalidade.
+          </p>
+          <div className="flex gap-4">
+            <Button variant="outline" onClick={() => navigate({ to: '/' })}>
+              Voltar ao Dashboard
+            </Button>
+            <Button onClick={() => setShowUpgradeDialog(true)}>
+              Fazer Upgrade
+            </Button>
+          </div>
+        </div>
+        <TierUpgradeDialog
+          open={showUpgradeDialog}
+          onOpenChange={setShowUpgradeDialog}
+        />
+      </>
+    )
+  }
 
   if (!currentCamp) {
     return (
@@ -171,7 +190,15 @@ export default function SnackBarPage() {
                 <IconCoinEuro className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">€ {allTransactions.reduce((sum, transaction) => sum + Number(transaction.amount), 0).toFixed(2)}</div>
+                <div className="text-2xl font-bold">
+                  €{' '}
+                  {allTransactions
+                    .reduce(
+                      (sum, transaction) => sum + Number(transaction.amount),
+                      0,
+                    )
+                    .toFixed(2)}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Durante {currentCamp.name}
                 </p>
@@ -186,7 +213,9 @@ export default function SnackBarPage() {
                 <IconCashOff className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{allTransactions.length}</div>
+                <div className="text-2xl font-bold">
+                  {allTransactions.length}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Durante {currentCamp.name}
                 </p>
@@ -228,7 +257,9 @@ export default function SnackBarPage() {
                         </p>
                       </div>
                       <Separator className="my-4" />
-                      <div className={`text-2xl font-bold ${balance > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <div
+                        className={`text-2xl font-bold ${balance > 0 ? 'text-green-600' : 'text-red-600'}`}
+                      >
                         € {balance?.toFixed(2) ?? '0.00'}
                       </div>
                     </div>
@@ -243,8 +274,11 @@ export default function SnackBarPage() {
                         </p>
                       </div>
                       <Separator className="my-4" />
-                      
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
+                      <form
+                        onSubmit={form.handleSubmit(onSubmit)}
+                        className="space-y-4"
+                      >
                         <FormField
                           control={form.control}
                           name="amount"
@@ -257,7 +291,10 @@ export default function SnackBarPage() {
                                   {...field}
                                   onChange={(e) => {
                                     const value = e.target.value
-                                    if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+                                    if (
+                                      value === '' ||
+                                      /^\d*\.?\d{0,2}$/.test(value)
+                                    ) {
                                       field.onChange(value)
                                     }
                                   }}
@@ -272,18 +309,17 @@ export default function SnackBarPage() {
                           type="submit"
                           className="w-full"
                           disabled={
-                            !selectedCamperId || 
-                            mutation.isPending || 
+                            !selectedCamperId ||
+                            mutation.isPending ||
                             balance <= 0 ||
                             !isAmountValid
                           }
                         >
-                          {mutation.isPending 
-                            ? 'Debitando...' 
-                            : balance <= 0 
+                          {mutation.isPending
+                            ? 'A debitar...'
+                            : balance <= 0
                               ? 'Sem saldo disponível'
-                              : 'Debitar valor'
-                          }
+                              : 'Debitar valor'}
                         </Button>
                       </form>
                     </div>
@@ -299,7 +335,8 @@ export default function SnackBarPage() {
                     Histórico de Transações
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Últimas transações realizadas {selectedCamperId ? 'pelo campista' : ''}.
+                    Últimas transações realizadas{' '}
+                    {selectedCamperId ? 'pelo campista' : ''}.
                   </p>
                 </div>
                 <Separator className="my-4" />
@@ -322,12 +359,14 @@ export default function SnackBarPage() {
             </div>
             <Separator className="my-4" />
 
-            <TransactionsCharts 
-              data={allTransactions} 
-            />
+            <TransactionsCharts data={allTransactions} />
           </div>
         </div>
       </Main>
     </>
   )
-} 
+}
+
+export const Route = createFileRoute('/_authenticated/snack-bar/')({
+  component: SnackBarPage,
+})

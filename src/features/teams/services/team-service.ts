@@ -1,9 +1,10 @@
 import { supabase } from '@/lib/supabase'
-import type { CreateTeamDto, Team } from '../types'
+import type { CreateTeamDto, Team, TeamTier } from '../types'
 
 export interface UpdateTeamData {
   name?: string
   logo_url?: string | null
+  tier?: TeamTier
 }
 
 export const teamService = {
@@ -40,7 +41,8 @@ export const teamService = {
   async createTeam(dto: CreateTeamDto) {
     const { data: team, error } = await supabase
       .rpc('create_team_for_current_user', {
-        team_name: dto.name
+        team_name: dto.name,
+        team_tier: dto.tier ?? 'free'
       })
       .single()
 
@@ -60,7 +62,8 @@ export const teamService = {
       .rpc('update_current_user_team', {
         p_team_id: id,
         team_name: data.name,
-        team_logo_url: data.logo_url
+        team_logo_url: data.logo_url,
+        team_tier: data.tier
       })
       .single()
 

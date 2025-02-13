@@ -13,9 +13,10 @@ import {
   IconIceCream,
 } from '@tabler/icons-react'
 import { Command } from 'lucide-react'
-import { type SidebarData } from '../types'
+import { type SidebarData, type NavItem } from '../types'
 import { useUser } from '@/features/auth/hooks/use-user'
 import { useTeamData } from '@/features/teams/hooks/use-team-data'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
 
 // Default sidebar data without user info
 export const sidebarData: SidebarData = {
@@ -40,32 +41,11 @@ export const sidebarData: SidebarData = {
           url: '/',
           icon: IconLayoutDashboard,
         },
-        // {
-        //   title: 'Tasks',
-        //   url: '/tasks',
-        //   icon: IconChecklist,
-        // },
-        // {
-        //   title: 'Apps',
-        //   url: '/apps',
-        //   icon: IconPackages,
-        // },
         {
           title: 'Inscrições',
           url: '/registrations',
           icon: IconFileDescription,
         },
-        // {
-        //   title: 'Chats',
-        //   url: '/chats',
-        //   badge: '3',
-        //   icon: IconMessages,
-        // },
-        // {
-        //   title: 'Users',
-        //   url: '/users',
-        //   icon: IconUsers,
-        // },
         {
           title: 'Campistas',
           url: '/campers',
@@ -83,68 +63,6 @@ export const sidebarData: SidebarData = {
         },
       ],
     },
-    // {
-    //   title: 'Pages',
-    //   items: [
-    //     {
-    //       title: 'Auth',
-    //       icon: IconLockAccess,
-    //       items: [
-    //         {
-    //           title: 'Sign In',
-    //           url: '/sign-in',
-    //         },
-    //         {
-    //           title: 'Sign In (2 Col)',
-    //           url: '/sign-in-2',
-    //         },
-    //         {
-    //           title: 'Sign Up',
-    //           url: '/sign-up',
-    //         },
-    //         {
-    //           title: 'Forgot Password',
-    //           url: '/forgot-password',
-    //         },
-    //         {
-    //           title: 'OTP',
-    //           url: '/otp',
-    //         },
-    //       ],
-    //     },
-    //     {
-    //       title: 'Errors',
-    //       icon: IconBug,
-    //       items: [
-    //         {
-    //           title: 'Unauthorized',
-    //           url: '/401',
-    //           icon: IconLock,
-    //         },
-    //         {
-    //           title: 'Forbidden',
-    //           url: '/403',
-    //           icon: IconUserOff,
-    //         },
-    //         {
-    //           title: 'Not Found',
-    //           url: '/404',
-    //           icon: IconError404,
-    //         },
-    //         {
-    //           title: 'Internal Server Error',
-    //           url: '/500',
-    //           icon: IconServerOff,
-    //         },
-    //         {
-    //           title: 'Maintenance Error',
-    //           url: '/503',
-    //           icon: IconBarrierBlock,
-    //         },
-    //       ],
-    //     },
-    //   ],
-    // },
     {
       title: 'Other',
       items: [
@@ -192,7 +110,45 @@ export const sidebarData: SidebarData = {
 // Hook version with user info
 export function useSidebarData(): SidebarData & { isLoading: boolean } {
   const user = useUser()
-  const { teams, isLoading } = useTeamData()
+  const { teams: dbTeams, isLoading } = useTeamData()
+  const permissions = useTeamPermissions()
+
+  const teams = dbTeams.map(team => ({
+    name: team.name,
+    logo: Command,
+    plan: team.tier === 'premium' ? 'Premium' : 'Free',
+  }))
+
+  const generalItems: NavItem[] = [
+    {
+      title: 'Dashboard',
+      url: '/',
+      icon: IconLayoutDashboard,
+    },
+    {
+      title: 'Inscrições',
+      url: '/registrations',
+      icon: IconFileDescription,
+    },
+    {
+      title: 'Campistas',
+      url: '/campers',
+      icon: IconTent,
+    },
+    {
+      title: 'Acampamentos',
+      url: '/camps',
+      icon: IconCampfire,
+    },
+  ]
+
+  if (permissions.snackBar.access) {
+    generalItems.push({
+      title: 'Snack Bar',
+      url: '/snack-bar',
+      icon: IconIceCream,
+    })
+  }
 
   return {
     user: {
@@ -205,34 +161,49 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
     navGroups: [
       {
         title: 'General',
+        items: generalItems,
+      },
+      {
+        title: 'Other',
         items: [
           {
-            title: 'Dashboard',
-            url: '/',
-            icon: IconLayoutDashboard,
+            title: 'Settings',
+            icon: IconSettings,
+            items: [
+              {
+                title: 'Profile',
+                url: '/settings',
+                icon: IconUserCog,
+              },
+              {
+                title: 'Account',
+                url: '/settings/account',
+                icon: IconTool,
+              },
+              {
+                title: 'Appearance',
+                url: '/settings/appearance',
+                icon: IconPalette,
+              },
+              {
+                title: 'Notifications',
+                url: '/settings/notifications',
+                icon: IconNotification,
+              },
+              {
+                title: 'Display',
+                url: '/settings/display',
+                icon: IconBrowserCheck,
+              },
+            ],
           },
           {
-            title: 'Inscrições',
-            url: '/registrations',
-            icon: IconFileDescription,
-          },
-          {
-            title: 'Campistas',
-            url: '/campers',
-            icon: IconTent,
-          },
-          {
-            title: 'Acampamentos',
-            url: '/camps',
-            icon: IconCampfire,
-          },
-          {
-            title: 'Snack Bar',
-            url: '/snack-bar',
-            icon: IconIceCream,
+            title: 'Help Center',
+            url: '/help-center',
+            icon: IconHelp,
           },
         ],
-      }
+      },
     ],
   }
 }

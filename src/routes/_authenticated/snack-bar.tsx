@@ -1,8 +1,6 @@
-import { lazy } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-
-const SnackBarPage = lazy(() => import('./snack-bar/index.lazy'))
+import SnackBarPage from './snack-bar/index'
 
 export const Route = createFileRoute('/_authenticated/snack-bar')({
   component: SnackBarPage,
-}) 
+})

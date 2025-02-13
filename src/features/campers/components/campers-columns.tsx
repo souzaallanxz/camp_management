@@ -12,10 +12,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatCurrency } from '@/lib/utils'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 export interface CamperWithActions extends Camper {
   onEdit?: (camper: Camper) => void
   onLoadCard?: (camper: Camper) => void
+  onUpgradeClick?: () => void
   total_balance: number
 }
 
@@ -80,6 +83,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     id: 'actions',
     cell: function ActionsCell({ row }) {
       const camper = row.original
+      const permissions = useTeamPermissions()
 
       return (
         <DropdownMenu modal={false}>
@@ -102,15 +106,27 @@ export const columns: ColumnDef<CamperWithActions>[] = [
                 <IconEdit size={16} />
               </DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => camper.onLoadCard?.(camper)}
-              className='flex items-center'
-            >
-              Carregar cartão
-              <DropdownMenuShortcut>
-                <IconCreditCard size={16} />
-              </DropdownMenuShortcut>
-            </DropdownMenuItem>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuItem
+                    onClick={() => permissions.campers.rechargeCard ? camper.onLoadCard?.(camper) : camper.onUpgradeClick?.()}
+                    className='flex items-center'
+                    disabled={!permissions.campers.rechargeCard}
+                  >
+                    Carregar cartão
+                    <DropdownMenuShortcut>
+                      <IconCreditCard size={16} />
+                    </DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </TooltipTrigger>
+                {!permissions.campers.rechargeCard && (
+                  <TooltipContent>
+                    <p>Disponível apenas no plano Premium</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </DropdownMenuContent>
         </DropdownMenu>
       )

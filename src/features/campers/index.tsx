@@ -15,6 +15,7 @@ import { CamperDetails } from './components/camper-details'
 import { useState } from 'react'
 import { CamperSnackbarBalanceDialog } from './components/camper-snackbar-balance-dialog'
 import { toast } from 'sonner'
+import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 
 function CampersContent() {
   const { data: campers = [], refetch } = useQuery({
@@ -49,6 +50,7 @@ function CampersContent() {
 
   const { openCreateDialog, selectedCamperId, openEditDialog, closeEditDialog } = useCamperDialogs()
   const [showSnackbarBalanceDialog, setShowSnackbarBalanceDialog] = useState(false)
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
   const [selectedCamperForBalance, setSelectedCamperForBalance] = useState<string | null>(null)
 
   const handleLoadCard = (camper: Camper) => {
@@ -63,7 +65,8 @@ function CampersContent() {
   const campersWithActions = campers.map(camper => ({
     ...camper,
     onEdit: () => openEditDialog(camper.id),
-    onLoadCard: () => handleLoadCard(camper)
+    onLoadCard: () => handleLoadCard(camper),
+    onUpgradeClick: () => setShowUpgradeDialog(true)
   }))
 
   return (
@@ -106,6 +109,10 @@ function CampersContent() {
         onOpenChange={setShowSnackbarBalanceDialog}
         camperId={selectedCamperForBalance || ''}
         onSuccess={refetch}
+      />
+      <TierUpgradeDialog
+        open={showUpgradeDialog}
+        onOpenChange={setShowUpgradeDialog}
       />
     </>
   )
