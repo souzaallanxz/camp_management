@@ -24,6 +24,7 @@ import { createPayment } from '../services/payment-service'
 import { formatCurrency } from '@/lib/utils'
 import { camperService } from '@/features/campers/services/camper-service'
 import { useQueryClient } from '@tanstack/react-query'
+import { MBWayService } from '../services/mbway-service'
 
 interface RegistrationOnboardDialogProps {
   open: boolean
@@ -92,6 +93,28 @@ export function RegistrationOnboardDialog({
 
     try {
       setLoading(true)
+
+      // If payment method is MB Way, trigger the payment request first
+      if (paymentMethod === 'MB Way') {
+        try {
+          await MBWayService.requestPayment({
+            mobileNumber: phoneNumber,
+            amount: remainingAmount,
+            description: `Pagamento de inscrição - ${registration.name}`,
+            orderId: registration.form_id || `${registration.id}-${Date.now()}`,
+            email: registration.email
+          })
+
+          // If we get here, the MB Way request was successful
+          toast.success('Pedido MB Way enviado. Por favor, confirme o pagamento na sua app.')
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Erro ao processar pagamento MB Way'
+          toast.error(message)
+          setLoading(false)
+          return
+        }
+      }
+
       // Criar o pagamento
       await createPayment({
         registration_id: registration.id,

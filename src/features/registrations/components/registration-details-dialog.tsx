@@ -126,6 +126,26 @@ export function RegistrationDetailsSheet({
                 <span className="col-span-3">{registration.contact}</span>
               </div>
               <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Número de BI/CC</span>
+                <span className="col-span-3">{registration.id_number || '-'}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Número de Utente SNS</span>
+                <span className="col-span-3">{registration.sns_number || '-'}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Data de Nascimento</span>
+                <span className="col-span-3">
+                  {registration.date_of_birth 
+                    ? new Date(registration.date_of_birth).toLocaleDateString() 
+                    : '-'}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Restrições Alimentares</span>
+                <span className="col-span-3">{registration.dietary_restrictions || '-'}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Acampamento</span>
                 <span className="col-span-3">{registration.camp?.name}</span>
               </div>
@@ -146,6 +166,29 @@ export function RegistrationDetailsSheet({
                 <span className="col-span-3">
                   {new Date(registration.created_at).toLocaleString()}
                 </span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium leading-none">Informações do Encarregado de Educação</h3>
+              <div className="text-sm text-muted-foreground">
+                Informações de contacto do encarregado de educação.
+              </div>
+            </div>
+            <Separator />
+
+            <div className="grid gap-4 text-sm">
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Nome</span>
+                <span className="col-span-3">{registration.guardian_name || '-'}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Email</span>
+                <span className="col-span-3">{registration.guardian_email || '-'}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Telemóvel</span>
+                <span className="col-span-3">{registration.guardian_phone || '-'}</span>
               </div>
             </div>
 

@@ -13,6 +13,13 @@ export const registrationSchema = z.object({
   form_id: z.string().optional().nullable(),
   created_at: z.string().or(z.date()),
   updated_at: z.string().or(z.date()),
+  id_number: z.string().optional().nullable(),
+  sns_number: z.string().optional().nullable(),
+  date_of_birth: z.string().or(z.date()).optional().nullable(),
+  dietary_restrictions: z.string().optional().nullable(),
+  guardian_name: z.string().optional().nullable(),
+  guardian_email: z.string().email('Email inválido').optional().nullable(),
+  guardian_phone: z.string().optional().nullable(),
 })
 
 export interface Registration extends z.infer<typeof registrationSchema> {

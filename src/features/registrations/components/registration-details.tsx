@@ -123,6 +123,22 @@ export function RegistrationDetails({ registrationId, onOpenChange }: Registrati
                 <span className="col-span-3">{registration.contact}</span>
               </div>
               <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">ID Number</span>
+                <span className="col-span-3">{registration.id_number}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">SNS Number</span>
+                <span className="col-span-3">{registration.sns_number}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Date of Birth</span>
+                <span className="col-span-3">{registration.date_of_birth ? new Date(registration.date_of_birth).toLocaleDateString() : 'Not provided'}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Dietary Restrictions</span>
+                <span className="col-span-3">{registration.dietary_restrictions || 'None'}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Camp</span>
                 <span className="col-span-3">{registration.camp?.name}</span>
               </div>
@@ -139,6 +155,29 @@ export function RegistrationDetails({ registrationId, onOpenChange }: Registrati
                 <span className="col-span-3">
                   {new Date(registration.created_at).toLocaleString()}
                 </span>
+              </div>
+            </div>
+
+            <div className="pt-4 space-y-1">
+              <h3 className="text-sm font-medium leading-none">Guardian Information</h3>
+              <div className="text-sm text-muted-foreground">
+                Information about the legal guardian.
+              </div>
+            </div>
+            <Separator />
+
+            <div className="grid gap-4 text-sm">
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Guardian Name</span>
+                <span className="col-span-3">{registration.guardian_name || 'Not provided'}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Guardian Email</span>
+                <span className="col-span-3">{registration.guardian_email || 'Not provided'}</span>
+              </div>
+              <div className="grid grid-cols-4 items-center">
+                <span className="font-medium">Guardian Phone</span>
+                <span className="col-span-3">{registration.guardian_phone || 'Not provided'}</span>
               </div>
             </div>
 
