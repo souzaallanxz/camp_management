@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { PaymentMethod } from '../data/schema'
-import { supabase } from '@/lib/supabase'
+import { db } from '@/lib/db'
 import { MBWayService } from '../services/mbway-service'
 
 interface SnackbarBalanceFormProps {
@@ -50,37 +50,42 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
           description: `Carregamento Cartão - ${registrationId}`,
           orderId: `${registrationId}-${Date.now()}`,
         })
-
-        // If we get here, the MB Way request was successful
-        toast({
-          title: 'MB Way',
-          description: 'Pedido MB Way enviado. Por favor, confirme o pagamento na sua app.',
-        })
       }
 
-      // Only proceed with the balance creation if we get here
-      const { error } = await supabase
-        .from('snackbar_balance')
-        .insert({
-          registration_id: registrationId,
-          amount: numericAmount,
-          payment_method: paymentMethod,
-          phone_number: paymentMethod === 'MB Way' ? phoneNumber : null,
-        })
+      // Create the snackbar balance record
+      const { error } = await db.query(
+        `INSERT INTO snackbar_balance (
+          registration_id,
+          amount,
+          payment_method,
+          phone_number,
+          created_at,
+          updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *`,
+        [
+          registrationId,
+          numericAmount,
+          paymentMethod,
+          phoneNumber || null,
+          new Date().toISOString(),
+          new Date().toISOString(),
+        ]
+      )
 
       if (error) throw error
 
       toast({
         title: 'Sucesso',
-        description: 'Carregamento efetuado com sucesso',
+        description: 'Carregamento realizado com sucesso!',
       })
       onSuccess()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao efetuar carregamento'
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: message,
+        description: `Erro ao realizar carregamento: ${errorMessage}`,
       })
     } finally {
       setLoading(false)
@@ -88,69 +93,62 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 py-4">
-      <div className="grid gap-4 text-sm">
-        <div className="grid grid-cols-4 items-center">
-          <span className="font-medium">Método de Pagamento</span>
-          <div className="col-span-3">
-            <Select
-              value={paymentMethod}
-              onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="MB Way">MB Way</SelectItem>
-                <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
-                <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {paymentMethod === 'MB Way' && (
-          <div className="grid grid-cols-4 items-center">
-            <span className="font-medium">Número de Telemóvel</span>
-            <div className="col-span-3">
-              <Input
-                type="tel"
-                required
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="Introduza o número de telemóvel"
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-4 items-center">
-          <span className="font-medium">Valor</span>
-          <div className="col-span-3">
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Introduza o valor"
-            />
-          </div>
-        </div>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <label htmlFor="amount" className="text-sm font-medium">
+          Valor
+        </label>
+        <Input
+          id="amount"
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          required
+        />
       </div>
 
-      <div className="flex justify-end space-x-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={loading}
+      <div className="space-y-2">
+        <label htmlFor="paymentMethod" className="text-sm font-medium">
+          Método de Pagamento
+        </label>
+        <Select
+          value={paymentMethod}
+          onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}
         >
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione um método de pagamento" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="MB Way">MB Way</SelectItem>
+            <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
+            <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {paymentMethod === 'MB Way' && (
+        <div className="space-y-2">
+          <label htmlFor="phoneNumber" className="text-sm font-medium">
+            Número de Telefone
+          </label>
+          <Input
+            id="phoneNumber"
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="9XXXXXXXX"
+            required
+          />
+        </div>
+      )}
+
+      <div className="flex justify-end space-x-2">
+        <Button type="button" variant="outline" onClick={onCancel}>
           Cancelar
         </Button>
         <Button type="submit" disabled={loading}>
-          {loading ? 'A processar...' : 'Carregar'}
+          {loading ? 'Processando...' : 'Confirmar'}
         </Button>
       </div>
     </form>

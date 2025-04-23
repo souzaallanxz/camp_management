@@ -21,6 +21,9 @@ type SignUpFormProps = HTMLAttributes<HTMLDivElement>
 
 const formSchema = z
   .object({
+    name: z
+      .string()
+      .min(1, { message: 'Por favor, informe seu nome' }),
     email: z
       .string()
       .min(1, { message: 'Please enter your email' })
@@ -44,6 +47,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      name: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -54,7 +58,9 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
     try {
       setIsLoading(true)
       await signUp(data)
-      navigate({ to: '/sign-in' })
+      
+      // Após o registro bem-sucedido e autenticação, redirecionar para a página principal
+      navigate({ to: '/' })
     } catch (error) {
       console.error('Sign up failed:', error)
     } finally {
@@ -67,6 +73,19 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <div className='grid gap-2'>
+            <FormField
+              control={form.control}
+              name='name'
+              render={({ field }) => (
+                <FormItem className='space-y-1'>
+                  <FormLabel>Nome</FormLabel>
+                  <FormControl>
+                    <Input placeholder='Seu nome completo' {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name='email'

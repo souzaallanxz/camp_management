@@ -5,13 +5,14 @@ import { SearchProvider } from '@/context/search-context'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import SkipToMain from '@/components/skip-to-main'
-import { supabase } from '@/lib/supabase'
 import { TeamProvider } from '@/features/teams/context/team-context'
+import { getCurrentUser } from '@/features/auth/auth-service'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) {
+    try {
+      await getCurrentUser()
+    } catch {
       throw redirect({
         to: '/sign-in',
         search: {

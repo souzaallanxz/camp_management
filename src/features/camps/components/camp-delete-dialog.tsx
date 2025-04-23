@@ -12,7 +12,7 @@ import {
 import { type Camp } from '../data/schema'
 import { toast } from 'sonner'
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { db } from '@/lib/db'
 
 interface CampDeleteDialogProps {
   open: boolean
@@ -33,39 +33,39 @@ export function CampDeleteDialog({
 
     setIsDeleting(true)
 
-    // First check if we can delete the camp
-    const { data: registrations, error: registrationsError } = await supabase
-      .from('registrations')
-      .select('id')
-      .eq('camp_id', camp.id)
-      .limit(1)
-
-    if (registrationsError) {
-      toast.error('Erro ao verificar inscrições')
-      setIsDeleting(false)
-      return
-    }
-
-    if (registrations && registrations.length > 0) {
-      toast.error('Não é possível excluir um acampamento que possui inscrições. Por favor, exclua todas as inscrições primeiro.')
-      setIsDeleting(false)
-      return
-    }
-
-    // If we get here, we can try to delete the camp
     try {
-      const { error: deleteError } = await supabase
-        .from('camps')
-        .delete()
-        .eq('id', camp.id)
+      // First check if we can delete the camp
+      const { data: registrations, error: registrationsError } = await db.query(
+        'SELECT id FROM registrations WHERE camp_id = $1 LIMIT 1',
+        [camp.id]
+      )
 
-      if (deleteError) throw deleteError
+      if (registrationsError) {
+        throw new Error(`Error checking registrations: ${registrationsError.message}`)
+      }
 
+      if (registrations && registrations.length > 0) {
+        toast.error('Não é possível excluir um acampamento que possui inscrições. Por favor, exclua todas as inscrições primeiro.')
+        setIsDeleting(false)
+        return
+      }
+
+      // Delete the camp
+      const { error: deleteError } = await db.query(
+        'DELETE FROM camps WHERE id = $1',
+        [camp.id]
+      )
+
+      if (deleteError) {
+        throw new Error(`Error deleting camp: ${deleteError.message}`)
+      }
+
+      toast.success('Acampamento excluído com sucesso')
       queryClient.invalidateQueries({ queryKey: ['camps'] })
       onOpenChange(false)
-      toast.success('Acampamento excluído com sucesso!')
     } catch (error) {
-      toast.error('Erro ao excluir acampamento')
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Erro ao excluir acampamento: ${errorMessage}`)
     } finally {
       setIsDeleting(false)
     }
@@ -77,14 +77,17 @@ export function CampDeleteDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir acampamento</AlertDialogTitle>
           <AlertDialogDescription>
-            Tem certeza que deseja excluir o acampamento {camp?.name}? Esta ação
-            não pode ser desfeita.
+            Tem certeza que deseja excluir o acampamento {camp?.name}? Esta ação não pode ser desfeita.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
-            Excluir
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {isDeleting ? 'Excluindo...' : 'Excluir'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

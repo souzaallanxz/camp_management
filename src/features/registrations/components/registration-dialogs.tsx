@@ -17,13 +17,29 @@ export function RegistrationDialogs({
     openDialog,
     selectedRegistration,
     handleOpenChange,
+    forceCloseDialog,
   } = useRegistrationDialogs()
 
   return (
     <>
       <RegistrationDialog
         open={openDialog === 'create'}
-        onOpenChange={handleOpenChange}
+        onOpenChange={(open) => {
+          console.log('RegistrationDialog onOpenChange called with:', open);
+          if (!open) {
+            forceCloseDialog();
+            if (onRegistrationUpdated) {
+              onRegistrationUpdated();
+            }
+          } else {
+            handleOpenChange(open);
+          }
+        }}
+        onRegistrationCreated={() => {
+          console.log('Registration created callback');
+          forceCloseDialog();
+          onRegistrationUpdated();
+        }}
       />
 
       <RegistrationDetailsSheet

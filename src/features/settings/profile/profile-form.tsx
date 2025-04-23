@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/hooks/use-toast'
-import { supabase } from '@/lib/supabase'
+import { db } from '@/lib/db'
 import { useState, useEffect } from 'react'
 
 const languages = [
@@ -57,18 +57,33 @@ export function ProfileForm() {
   useEffect(() => {
     async function loadUserData() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
+        const token = localStorage.getItem('token')
+        if (!token) {
+          throw new Error('No token found')
+        }
+
+        const { data: result, error } = await db.query(
+          `SELECT id, email, name, team_id FROM public.users WHERE id = $1::uuid`,
+          [token]
+        )
+
+        if (error) {
+          throw new Error(`Error loading user data: ${String(error)}`)
+        }
+
+        if (result && result.length > 0) {
+          const user = result[0]
           form.reset({
-            name: user.user_metadata?.name || '',
+            name: user.name || '',
             email: user.email || '',
-            language: user.user_metadata?.language || 'pt',
+            language: 'pt', // Default language since it's not stored in the DB yet
           })
         }
-      } catch {
+      } catch (error: Error | unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
         toast({
           title: 'Erro',
-          description: 'Não foi possível carregar os dados do usuário.',
+          description: `Não foi possível carregar os dados do usuário: ${errorMessage}`,
           variant: 'destructive',
           duration: 3000,
         })
@@ -83,24 +98,37 @@ export function ProfileForm() {
   async function onSubmit(data: ProfileFormValues) {
     setIsSaving(true)
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: { 
-          name: data.name,
-          language: data.language
-        }
-      })
+      const token = localStorage.getItem('token')
+      if (!token) {
+        throw new Error('No token found')
+      }
 
-      if (updateError) throw updateError
+      const { data: result, error } = await db.query(
+        `UPDATE public.users
+         SET name = $1::text
+         WHERE id = $2::uuid
+         RETURNING id, email, name`,
+        [data.name, token]
+      )
+
+      if (error) {
+        throw new Error(`Error updating user data: ${String(error)}`)
+      }
+
+      if (!result || result.length === 0) {
+        throw new Error(`Failed to update user data`)
+      }
 
       toast({
         title: 'Perfil atualizado',
         description: 'As suas informações foram atualizadas com sucesso.',
         duration: 3000,
       })
-    } catch {
+    } catch (error: Error | unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       toast({
         title: 'Erro',
-        description: 'Ocorreu um erro ao atualizar o perfil.',
+        description: `Ocorreu um erro ao atualizar o perfil: ${errorMessage}`,
         variant: 'destructive',
         duration: 3000,
       })

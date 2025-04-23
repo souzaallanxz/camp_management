@@ -26,43 +26,43 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const fetchTeam = async () => {
-    
+    console.log('Fetching team for user:', user);
 
     if (!user || isAuthLoading) {
-      
-      setTeam(null)
-      setShowOnboarding(false)
-      setIsLoading(false)
-      return
+      console.log('No user or auth loading, skipping team fetch');
+      setTeam(null);
+      setShowOnboarding(false);
+      setIsLoading(false);
+      return;
     }
 
     try {
-      setIsLoading(true)
-      
-      const team = await teamService.getCurrentUserTeam()
-      
+      setIsLoading(true);
+      console.log('Calling teamService.getCurrentUserTeam()');
+      const team = await teamService.getCurrentUserTeam();
+      console.log('Received team:', team);
 
-      setTeam(team)
-      const shouldShowOnboarding = !team
-      
-      setShowOnboarding(shouldShowOnboarding)
+      setTeam(team);
+      const shouldShowOnboarding = !team;
+      console.log('Should show onboarding:', shouldShowOnboarding);
+      setShowOnboarding(shouldShowOnboarding);
     } catch (error) {
-      
-      setTeam(null)
-      setShowOnboarding(true)
+      console.error('Error fetching team:', error);
+      setTeam(null);
+      setShowOnboarding(true);
       toast({
         variant: 'destructive',
         title: 'Error',
         description: 'Failed to fetch team information. Please try again.',
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
   // Fetch team whenever auth state changes
   useEffect(() => {
-    
+    console.log('Auth state changed:', { user, isAuthLoading });
     if (!isAuthLoading) {
       fetchTeam()
     }
@@ -70,9 +70,9 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
   // Ensure dialog stays open if no team
   useEffect(() => {
-    
+    console.log('Team state changed:', { user, team, isLoading, showOnboarding });
     if (user && !isLoading && !team) {
-      
+      console.log('Setting showOnboarding to true because user has no team');
       setShowOnboarding(true)
     }
   }, [user, team, isLoading])

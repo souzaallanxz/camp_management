@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Avatar } from '@/components/ui/avatar'
 import { dashboardService } from '../services/dashboard-service'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from './empty-state'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-PT', {
@@ -20,20 +21,21 @@ function getInitials(name: string) {
 }
 
 export function RecentSales() {
-  const { data: registrations, isLoading } = useQuery({
+  const { data: registrations, isLoading, error } = useQuery({
     queryKey: ['dashboard', 'recent-registrations'],
     queryFn: () => dashboardService.getRecentRegistrations(5)
   })
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-4">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="flex items-center">
-            <Skeleton className="h-12 w-12 rounded-full" />
-            <div className="ml-4 space-y-1">
-              <Skeleton className="h-4 w-[200px]" />
-              <Skeleton className="h-4 w-[160px]" />
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <div className="ml-3 space-y-0.5">
+              <Skeleton className="h-3 w-[150px]" />
+              <Skeleton className="h-3 w-[120px]" />
+              <Skeleton className="h-2 w-[100px]" />
             </div>
           </div>
         ))}
@@ -41,18 +43,39 @@ export function RecentSales() {
     )
   }
 
+  if (error) {
+    return (
+      <EmptyState 
+        variant="alert"
+        title="Erro"
+        description="Não foi possível carregar as inscrições recentes."
+      />
+    )
+  }
+
+  if (!registrations || registrations.length === 0) {
+    return (
+      <EmptyState 
+        variant="alert"
+        title="Sem inscrições recentes"
+        description="Não existem inscrições recentes."
+      />
+    )
+  }
+
   return (
-    <div className="space-y-8">
-      {registrations?.map((registration) => (
-        <div key={registration.id} className="flex items-center">
-          <Avatar className="h-9 w-9">
-            <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground">
+    <div className="space-y-3">
+      {registrations.map((registration) => (
+        <div key={registration.id} className="flex items-center text-xs">
+          <Avatar className="h-7 w-7">
+            <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground text-xs">
               {getInitials(registration.name)}
             </div>
           </Avatar>
-          <div className="ml-4 space-y-1">
-            <p className="text-sm font-medium leading-none">{registration.name}</p>
-            <p className="text-sm text-muted-foreground">{registration.email}</p>
+          <div className="ml-2 space-y-0.5">
+            <p className="font-medium leading-none">{registration.name}</p>
+            <p className="text-muted-foreground text-xs">{registration.email}</p>
+            <p className="text-muted-foreground text-xs">{registration.campName}</p>
           </div>
           <div className="ml-auto font-medium">
             {formatCurrency(registration.totalPaid)}

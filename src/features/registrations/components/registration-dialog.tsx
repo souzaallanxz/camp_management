@@ -45,7 +45,7 @@ const createRegistrationSchema = z.object({
   // Payment fields
   payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro'], {
     required_error: 'Selecione um método de pagamento',
-  }),
+  }).optional(),
   amount: z.coerce.number().min(0, 'Valor deve ser maior que 0'),
   phone_number: z.string()
     .nullable()
@@ -58,21 +58,33 @@ const createRegistrationSchema = z.object({
       return /^9\d{8}$/.test(digits)
     }, 'Número de telefone inválido. Deve começar com 9 e ter 9 dígitos'),
 })
+.refine(
+  (data) => {
+    // Se amount > 0, payment_method é obrigatório
+    return data.amount <= 0 || !!data.payment_method;
+  },
+  {
+    message: "Método de pagamento é obrigatório quando o valor é maior que 0",
+    path: ["payment_method"],
+  }
+);
 
 type CreateRegistrationFormData = z.infer<typeof createRegistrationSchema>
 
 interface RegistrationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onRegistrationCreated?: () => void
 }
 
 export function RegistrationDialog({
   open,
   onOpenChange,
+  onRegistrationCreated,
 }: RegistrationDialogProps) {
   const queryClient = useQueryClient()
   const { data: camps = [] } = useCamps()
-
+  
   const form = useForm<CreateRegistrationFormData>({
     resolver: zodResolver(createRegistrationSchema),
     defaultValues: {
@@ -90,9 +102,18 @@ export function RegistrationDialog({
   const { mutateAsync: createRegistration, isPending: isCreating } = useMutation({
     mutationFn: async (data: CreateRegistrationFormData) => {
       try {
+        // Ensure camp_id is a string before sending
+        const camp_id = typeof data.camp_id === 'string' 
+          ? data.camp_id
+          : null;
+
+        if (!camp_id) {
+          throw new Error('Invalid camp_id format');
+        }
+
         // Cria a inscrição com os dados do futuro camper
         const registration = await registrationService.create({
-          camp_id: data.camp_id,
+          camp_id,
           name: data.name,
           email: data.email,
           contact: data.contact,
@@ -100,51 +121,49 @@ export function RegistrationDialog({
         })
 
         // Cria o pagamento associado à inscrição apenas se o valor for maior que 0
-        if (registration && data.amount > 0) {
-          const payment = await paymentService.createPayment({
-            registration_id: registration.id,
-            payment_method: data.payment_method,
-            amount: data.amount,
-            payment_date: new Date().toISOString(),
-            phone_number: data.phone_number || null,
-            payment_link: null,
-          })
-
-          // Se o método de pagamento for MB Way, faz o pedido de pagamento
-          if (data.payment_method === 'MB Way' && data.phone_number) {
-            console.log('Iniciando pagamento MB Way:', {
-              method: data.payment_method,
-              phone: data.phone_number,
+        if (registration && data.amount > 0 && data.payment_method) {
+          try {
+            // Garantir que o método de pagamento seja um dos tipos válidos
+            const paymentMethod = data.payment_method === 'MB Way' || 
+                                 data.payment_method === 'Transferência Bancária' || 
+                                 data.payment_method === 'Dinheiro' 
+                                 ? data.payment_method 
+                                 : 'Dinheiro'; // Valor padrão seguro
+            
+            const payment = await paymentService.createPayment({
+              registration_id: registration.id,
+              payment_method: paymentMethod,
               amount: data.amount,
-              form_id: data.form_id,
-            })
+              payment_date: new Date().toISOString(),
+              phone_number: data.phone_number || null,
+              payment_link: null,
+            });
 
-            try {
-              const mbwayResult = await MBWayService.requestPayment({
-                mobileNumber: data.phone_number,
-                amount: data.amount,
-                description: `Pagamento de inscrição - ${data.name}`,
-                orderId: data.form_id || String(payment.id),
-                email: data.email,
-              })
-
-              console.log('Resposta MB Way:', mbwayResult)
-              
-              if (mbwayResult.Success) {
-                toast.success('Pedido de pagamento MB Way enviado! Por favor, verifique o seu telemóvel.')
-              } else {
-                toast.error(`Erro MB Way: ${mbwayResult.Message}`)
+            // Se o método de pagamento for MB Way, faz o pedido de pagamento
+            if (payment && paymentMethod === 'MB Way' && data.phone_number) {
+              try {
+                const mbwayResult = await MBWayService.requestPayment({
+                  mobileNumber: data.phone_number,
+                  amount: data.amount,
+                  description: `Pagamento de inscrição - ${data.name}`,
+                  orderId: data.form_id || String(payment.id || '0'),
+                  email: data.email,
+                })
+                
+                if (mbwayResult.Success) {
+                  toast.success('Pedido de pagamento MB Way enviado! Por favor, verifique o seu telemóvel.')
+                } else {
+                  toast.error(`Erro MB Way: ${mbwayResult.Message}`)
+                }
+              } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+                toast.error(`Erro ao enviar pedido de pagamento MB Way: ${errorMessage}`)
               }
-            } catch (error) {
-              console.error('Erro ao processar MB Way:', error)
-              const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
-              toast.error(`Erro ao enviar pedido de pagamento MB Way: ${errorMessage}`)
             }
-          } else if (data.payment_method === 'MB Way') {
-            console.log('MB Way selecionado mas faltando número de telefone:', {
-              method: data.payment_method,
-              phone: data.phone_number,
-            })
+          } catch (paymentError) {
+            const errorMessage = paymentError instanceof Error ? paymentError.message : 'Erro desconhecido';
+            toast.error(`Erro ao criar pagamento: ${errorMessage}`);
+            // Continue com o fluxo mesmo sem o pagamento
           }
         }
 
@@ -155,10 +174,22 @@ export function RegistrationDialog({
       }
     },
     onSuccess: () => {
+      // Invalidar a query para garantir que os dados sejam atualizados
       queryClient.invalidateQueries({ queryKey: ['registrations'] })
-      onOpenChange(false)
+      
+      // Resetar o formulário
       form.reset()
+      
+      // Fechar o diálogo
+      onOpenChange(false);
+      
+      // Notificar o usuário do sucesso
       toast.success('Inscrição criada com sucesso!')
+      
+      // Chamar o callback para atualizar a tabela
+      if (onRegistrationCreated) {
+        onRegistrationCreated();
+      }
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
@@ -168,24 +199,41 @@ export function RegistrationDialog({
 
   const isPending = isCreating
 
-  async function onSubmit(data: CreateRegistrationFormData) {
-    try {
-      await createRegistration(data)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erro ao salvar inscrição'
-      toast.error(message)
-    }
-  }
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog 
+      open={open} 
+      onOpenChange={onOpenChange}
+    >
       <DialogContent className="sm:max-w-[600px] p-6">
         <DialogHeader className="space-y-2">
           <DialogTitle>Nova inscrição</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6">
+          <form 
+            onSubmit={form.handleSubmit(async (data) => {
+              try {
+                // Verificar se o valor é maior que zero e definir o método de pagamento adequadamente
+                if (data.amount <= 0) {
+                  // Se o valor for 0 ou negativo, não criar pagamento
+                  data = {
+                    ...data,
+                    amount: 0,
+                    payment_method: undefined as any // Tipo necessário para satisfazer o TypeScript
+                  };
+                }
+                
+                // Criar o registro - nota: não duplicar este código, deixar o mutateAsync lidar com isso
+                await createRegistration(data);
+                
+                // Não precisamos fazer nada mais aqui, o evento onSuccess da mutação já lida com o fechamento e notificações
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Erro ao salvar inscrição';
+                toast.error(message);
+              }
+            })}
+            className="mt-6"
+          >
             {/* Registration Section */}
             <div className="space-y-6">
               <div>
@@ -249,7 +297,13 @@ export function RegistrationDialog({
                               const camp = camps.find((c: Camp) => c.id === value)
                               if (camp) {
                                 const price = typeof camp.price === 'string' ? parseFloat(camp.price) : camp.price
-                                form.setValue('amount', price)
+                                form.setValue('amount', price || 0)
+                                
+                                // Se o valor for 0, limpar o método de pagamento
+                                if (price <= 0) {
+                                  form.setValue('payment_method', undefined)
+                                  form.setValue('phone_number', '')
+                                }
                               }
                             }}
                             defaultValue={field.value}

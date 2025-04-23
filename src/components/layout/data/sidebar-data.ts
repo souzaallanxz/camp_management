@@ -85,22 +85,7 @@ export const sidebarData: SidebarData = {
               url: '/settings/appearance',
               icon: IconPalette,
             },
-            {
-              title: 'Notifications',
-              url: '/settings/notifications',
-              icon: IconNotification,
-            },
-            {
-              title: 'Display',
-              url: '/settings/display',
-              icon: IconBrowserCheck,
-            },
           ],
-        },
-        {
-          title: 'Help Center',
-          url: '/help-center',
-          icon: IconHelp,
         },
       ],
     },
@@ -152,7 +137,7 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
 
   return {
     user: {
-      name: user?.email ?? 'User',
+      name: user?.user?.name ?? user?.email ?? 'User',
       email: user?.email ?? '',
       avatar: '/avatars/shadcn.jpg',
     },
@@ -196,11 +181,6 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
                 icon: IconBrowserCheck,
               },
             ],
-          },
-          {
-            title: 'Help Center',
-            url: '/help-center',
-            icon: IconHelp,
           },
         ],
       },

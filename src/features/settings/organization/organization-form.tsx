@@ -19,7 +19,6 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { useCurrentTeam } from '@/features/teams/hooks/use-current-team'
 import { teamService } from '@/features/teams/services/team-service'
-import { supabaseStorage } from '@/lib/supabase-storage'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 const formSchema = z.object({
@@ -53,16 +52,16 @@ export function OrganizationForm() {
     }
 
     try {
-      await teamService.updateTeam(team.id, data)
-      await mutate()
-      setUpdateKey(prev => prev + 1)
-      toast.success('Configurações atualizadas', {
-        description: 'As alterações foram salvas com sucesso.',
+      await teamService.updateTeam(team.id, {
+        name: data.name,
+        logo_url: data.logo_url,
       })
+
+      toast.success('Organização atualizada com sucesso')
+      mutate()
     } catch (error) {
-      toast.error('Falha ao atualizar configurações', {
-        description: error instanceof Error ? error.message : 'Por favor, tente novamente.',
-      })
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Erro ao atualizar organização: ${errorMessage}`)
     }
   }
 
@@ -70,29 +69,34 @@ export function OrganizationForm() {
     const file = event.target.files?.[0]
     if (!file) return
 
+    setIsUploading(true)
+
     try {
-      setIsUploading(true)
-      const publicUrl = await supabaseStorage.uploadFile(file)
-      
-      if (team) {
-        await teamService.updateTeam(team.id, { logo_url: publicUrl })
-        form.setValue('logo_url', publicUrl)
-        await mutate()
-        setUpdateKey(prev => prev + 1)
-        toast.success('Logo atualizado com sucesso', {
-          description: 'O logo da sua organização foi atualizado.',
-        })
+      // Convert file to base64
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = async () => {
+        const base64String = reader.result as string
+
+        // Update team logo_url with base64 string
+        if (team) {
+          await teamService.updateTeam(team.id, {
+            logo_url: base64String,
+          })
+          form.setValue('logo_url', base64String)
+          setUpdateKey(prev => prev + 1)
+          toast.success('Logo atualizada com sucesso')
+          mutate()
+        }
       }
     } catch (error) {
-      toast.error('Falha ao atualizar o logo', {
-        description: error instanceof Error ? error.message : 'Por favor, tente novamente.',
-      })
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Erro ao fazer upload da imagem: ${errorMessage}`)
     } finally {
       setIsUploading(false)
     }
   }
 
-  // Add effect to update form when team data changes
   useEffect(() => {
     if (team) {
       form.reset({
@@ -110,12 +114,14 @@ export function OrganizationForm() {
           name="logo_url"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Logo da Organização</FormLabel>
+              <FormLabel>Logo</FormLabel>
               <FormControl>
-                <div className="flex flex-col gap-4">
-                  <Avatar className="h-24 w-24" key={`avatar-${updateKey}-${field.value}`}>
-                    <AvatarImage src={field.value || ''} alt={team?.name} />
-                    <AvatarFallback>{team?.name?.charAt(0)}</AvatarFallback>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-20 w-20">
+                    <AvatarImage src={field.value} key={updateKey} />
+                    <AvatarFallback>
+                      {team?.name?.charAt(0).toUpperCase()}
+                    </AvatarFallback>
                   </Avatar>
                   <Input
                     type="file"
@@ -126,29 +132,31 @@ export function OrganizationForm() {
                 </div>
               </FormControl>
               <FormDescription>
-                Faça upload de uma imagem para representar sua organização.
+                Faça upload de uma imagem para usar como logo da sua organização.
               </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nome da Organização</FormLabel>
+              <FormLabel>Nome</FormLabel>
               <FormControl>
-                <Input placeholder="Acme Inc." {...field} />
+                <Input placeholder="Nome da organização" {...field} />
               </FormControl>
               <FormDescription>
-                Este é o nome que será exibido em todos os lugares.
+                Este é o nome público da sua organização.
               </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isUploading}>Salvar alterações</Button>
+
+        <Button type="submit">Salvar alterações</Button>
       </form>
     </Form>
   )

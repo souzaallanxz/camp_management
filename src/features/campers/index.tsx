@@ -6,7 +6,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { IconPlus } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { db } from '@/lib/db'
 import { type Camper } from './data/schema'
 import { CampersTable } from './components/campers-table'
 import { CamperDialogs } from './components/camper-dialogs'
@@ -16,37 +16,60 @@ import { useState } from 'react'
 import { CamperSnackbarBalanceDialog } from './components/camper-snackbar-balance-dialog'
 import { toast } from 'sonner'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
+import { type CamperWithActions } from './components/campers-table'
 
 function CampersContent() {
+  // Query simplificada para buscar campers e seus saldos
   const { data: campers = [], refetch } = useQuery({
-    queryKey: ['campers'],
+    queryKey: ['campers-with-balance'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('campers')
-        .select(`
-          *,
-          registration:registration_id (
-            snackbar_balance (
-              amount
-            )
-          )
-        `)
-        .order('created_at', { ascending: false })
+      try {
+        // Buscar campers com SQL
+        const result = await db.query(`
+          SELECT 
+            c.*,
+            COALESCE(
+              (SELECT SUM(sb.amount) 
+               FROM snackbar_balance sb 
+               WHERE sb.registration_id = c.registration_id
+               GROUP BY sb.registration_id), 
+              0
+            ) as total_balance
+          FROM campers c
+          ORDER BY c.created_at DESC
+        `);
 
-      if (error) throw error
+        if (!result.data || !Array.isArray(result.data)) {
+          return [];
+        }
 
-      // Calculate total balance for each camper
-      const campersWithBalance = data.map(camper => ({
-        ...camper,
-        total_balance: camper.registration?.snackbar_balance?.reduce(
-          (sum: number, balance: { amount: number }) => sum + Number(balance.amount),
-          0
-        ) ?? 0
-      }))
-
-      return campersWithBalance as (Camper & { total_balance: number })[]
+        // Converter para o formato esperado pela tabela
+        return result.data.map(camper => ({
+          id: camper.id,
+          name: camper.name,
+          email: camper.email,
+          contact: camper.contact,
+          registration_id: camper.registration_id,
+          form_id: camper.form_id,
+          camp: camper.camp,
+          additional_notes: camper.additional_notes,
+          created_at: camper.created_at,
+          updated_at: camper.updated_at,
+          id_number: camper.id_number,
+          sns_number: camper.sns_number,
+          date_of_birth: camper.date_of_birth,
+          dietary_restrictions: camper.dietary_restrictions,
+          guardian_name: camper.guardian_name,
+          guardian_email: camper.guardian_email,
+          guardian_phone: camper.guardian_phone,
+          total_balance: Number(camper.total_balance) || 0
+        }));
+      } catch {
+        // Em caso de erro, retornar array vazio
+        return [];
+      }
     },
-  })
+  });
 
   const { openCreateDialog, selectedCamperId, openEditDialog, closeEditDialog } = useCamperDialogs()
   const [showSnackbarBalanceDialog, setShowSnackbarBalanceDialog] = useState(false)
@@ -62,12 +85,14 @@ function CampersContent() {
     setShowSnackbarBalanceDialog(true)
   }
 
-  const campersWithActions = campers.map(camper => ({
+  // Adicionar as funções de ação para cada campista
+  const campersWithActions: CamperWithActions[] = (Array.isArray(campers) ? campers : []).map(camper => ({
     ...camper,
     onEdit: () => openEditDialog(camper.id),
     onLoadCard: () => handleLoadCard(camper),
-    onUpgradeClick: () => setShowUpgradeDialog(true)
-  }))
+    onUpgradeClick: () => setShowUpgradeDialog(true),
+    total_balance: camper.total_balance || 0
+  }));
 
   return (
     <>

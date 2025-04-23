@@ -5,8 +5,8 @@ import {
   useCallback,
   useEffect,
 } from 'react'
-import { User } from '@supabase/supabase-js'
-import { authService } from './auth-service'
+import { User } from './auth-service'
+import { signIn, signUp, signOut, getCurrentUser, onAuthStateChange } from './auth-service'
 import type { SignInCredentials, SignUpCredentials } from './types'
 import { toast } from '@/hooks/use-toast'
 
@@ -15,7 +15,23 @@ interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   signIn: (credentials: SignInCredentials) => Promise<void>
-  signUp: (credentials: SignUpCredentials) => Promise<void>
+  signUp: (credentials: SignUpCredentials) => Promise<{
+    user: {
+      id: string
+      email: string
+      name?: string
+      team_id?: string | null
+    }
+    session: {
+      user: {
+        id: string
+        email: string
+        name?: string
+        team_id?: string | null
+      }
+      token: string
+    }
+  }>
   signOut: () => Promise<void>
 }
 
@@ -29,15 +45,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initializeAuth = async () => {
       try {
         setIsLoading(true)
-        const currentUser = await authService.getCurrentUser()
-        
+        const currentUser = await getCurrentUser()
         setUser(currentUser)
       } catch {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load user information.',
-        })
+        // User is not authenticated, that's okay
+        setUser(null)
       } finally {
         setIsLoading(false)
       }
@@ -46,88 +58,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth()
 
     // Subscribe to auth changes
-    const { data: { subscription } } = authService.onAuthStateChange((_event, session) => {
-      
+    const unsubscribe = onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
     })
 
     return () => {
-      subscription.unsubscribe()
+      unsubscribe()
     }
   }, [])
 
-  const signIn = useCallback(async (credentials: SignInCredentials) => {
+  const handleSignIn = useCallback(async (credentials: SignInCredentials) => {
     try {
-      const { user } = await authService.signIn(credentials)
+      const { session } = await signIn(credentials)
+      setUser(session.user)
       
-      setUser(user)
-      toast({
-        title: 'Success',
-        description: 'Successfully signed in.',
-      })
-    } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to sign in. Please check your credentials.',
-      })
-      throw new Error('Failed to sign in')
-    }
-  }, [])
-
-  const signUp = useCallback(async (credentials: SignUpCredentials) => {
-    try {
-      await authService.signUp(credentials)
-      toast({
-        title: 'Success',
-        description: 'Account created successfully.',
-      })
-    } catch {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to create account.',
-      })
-      throw new Error('Failed to create account')
-    }
-  }, [])
-
-  const signOut = useCallback(async () => {
-    try {
-      await authService.signOut()
-      setUser(null)
-      toast({
-        title: 'Success',
-        description: 'Successfully signed out.',
-      })
+      // Definir o token no localStorage
+      localStorage.setItem('token', session.token)
     } catch (error) {
-      // Only show error toast if it's not a missing session error
-      if (!(error instanceof Error && error.message.includes('Auth session missing'))) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to sign out.',
-        })
-        throw error
-      }
-      // If it was a missing session error, still clear the user state
-      setUser(null)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to sign in.',
+      })
+      throw error
     }
   }, [])
 
-  
+  const handleSignUp = useCallback(async (credentials: SignUpCredentials) => {
+    try {
+      const response = await signUp(credentials)
+      setUser(response.session.user)
+      
+      // Definir o token no localStorage
+      localStorage.setItem('token', response.session.token)
+      
+      return response
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to sign up.',
+      })
+      throw error
+    }
+  }, [])
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOut()
+      setUser(null)
+      
+      // Remove token from localStorage
+      localStorage.removeItem('token')
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to sign out.',
+      })
+      throw error
+    }
+  }, [])
+
+  const value = {
+    user,
+    isAuthenticated: !!user,
+    isLoading,
+    signIn: handleSignIn,
+    signUp: handleSignUp,
+    signOut: handleSignOut,
+  }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
-        signIn,
-        signUp,
-        signOut,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )

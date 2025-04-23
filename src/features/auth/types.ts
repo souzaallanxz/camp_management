@@ -12,4 +12,5 @@ export interface SignInCredentials {
 
 export interface SignUpCredentials extends SignInCredentials {
   confirmPassword: string
+  name: string
 } 

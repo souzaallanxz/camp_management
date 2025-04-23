@@ -5,8 +5,13 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { Camper, updateCamperSchema } from '../data/schema'
-import { supabase } from '@/lib/supabase'
+import { db } from '@/lib/db'
 import { Separator } from '@/components/ui/separator'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { format } from 'date-fns'
+import { CalendarIcon } from '@radix-ui/react-icons'
+import { cn } from '@/lib/utils'
 
 interface CamperDetailsProps {
   camperId: string | null
@@ -26,7 +31,7 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
 
       setLoading(true)
       try {
-        const { data, error } = await supabase
+        const { data, error } = await db
           .from('campers')
           .select('*')
           .eq('id', camperId)
@@ -56,6 +61,13 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
     }))
   }
 
+  const handleDateChange = (date: Date | undefined) => {
+    setFormData(prev => ({
+      ...prev,
+      date_of_birth: date
+    }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!camper) return
@@ -63,7 +75,7 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
     try {
       const validatedData = updateCamperSchema.parse(formData)
 
-      const { error } = await supabase
+      const { error } = await db
         .from('campers')
         .update(validatedData)
         .eq('id', camper.id)
@@ -79,151 +91,155 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
     }
   }
 
+  if (!camperId) return null
+
   return (
     <Sheet open={!!camperId} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>Camper Details</SheetTitle>
         </SheetHeader>
-
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <p>Loading...</p>
-          </div>
-        ) : !camper ? (
-          <div className="flex items-center justify-center h-full">
-            <p>Camper not found</p>
-          </div>
-        ) : (
-          <div className="space-y-6 py-6">
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium leading-none">Personal Information</h3>
-              <div className="text-sm text-muted-foreground">
-                View and edit camper information.
-              </div>
+        <Separator className="my-4" />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <label htmlFor="name">Name</label>
+              <Input
+                id="name"
+                name="name"
+                value={formData.name || ''}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+              />
             </div>
-            <Separator />
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid gap-4 text-sm">
-                <div className="grid grid-cols-4 items-center">
-                  <label htmlFor="form_id" className="font-medium">Form ID</label>
-                  <div className="col-span-3">
-                    {isEditing ? (
-                      <Input
-                        id="form_id"
-                        name="form_id"
-                        value={formData.form_id || ''}
-                        onChange={handleInputChange}
-                      />
-                    ) : (
-                      <span>{camper.form_id}</span>
+            <div className="grid gap-2">
+              <label htmlFor="email">Email</label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email || ''}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="contact">Contact</label>
+              <Input
+                id="contact"
+                name="contact"
+                value={formData.contact || ''}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="date_of_birth">Date of Birth</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      'w-full justify-start text-left font-normal',
+                      !formData.date_of_birth && 'text-muted-foreground'
                     )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 items-center">
-                  <label htmlFor="name" className="font-medium">Name</label>
-                  <div className="col-span-3">
-                    {isEditing ? (
-                      <Input
-                        id="name"
-                        name="name"
-                        value={formData.name || ''}
-                        onChange={handleInputChange}
-                      />
+                    disabled={!isEditing}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.date_of_birth ? (
+                      format(new Date(formData.date_of_birth), 'PPP')
                     ) : (
-                      <span>{camper.name}</span>
+                      <span>Pick a date</span>
                     )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 items-center">
-                  <label htmlFor="email" className="font-medium">Email</label>
-                  <div className="col-span-3">
-                    {isEditing ? (
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={formData.email || ''}
-                        onChange={handleInputChange}
-                      />
-                    ) : (
-                      <span>{camper.email}</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 items-center">
-                  <label htmlFor="contact" className="font-medium">Contact</label>
-                  <div className="col-span-3">
-                    {isEditing ? (
-                      <Input
-                        id="contact"
-                        name="contact"
-                        value={formData.contact || ''}
-                        onChange={handleInputChange}
-                      />
-                    ) : (
-                      <span>{camper.contact}</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 items-center">
-                  <label htmlFor="camp" className="font-medium">Camp</label>
-                  <div className="col-span-3">
-                    {isEditing ? (
-                      <Input
-                        id="camp"
-                        name="camp"
-                        value={formData.camp || ''}
-                        onChange={handleInputChange}
-                      />
-                    ) : (
-                      <span>{camper.camp}</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 items-start">
-                  <label htmlFor="additional_notes" className="font-medium">Notes</label>
-                  <div className="col-span-3">
-                    {isEditing ? (
-                      <Textarea
-                        id="additional_notes"
-                        name="additional_notes"
-                        value={formData.additional_notes || ''}
-                        onChange={handleInputChange}
-                      />
-                    ) : (
-                      <span className="whitespace-pre-wrap">{camper.additional_notes}</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 items-center">
-                  <span className="font-medium">Created At</span>
-                  <span className="col-span-3">
-                    {new Date(camper.created_at).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  Save
-                </Button>
-              </div>
-            </form>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.date_of_birth ? new Date(formData.date_of_birth) : undefined}
+                    onSelect={handleDateChange}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="id_number">ID Number</label>
+              <Input
+                id="id_number"
+                name="id_number"
+                value={formData.id_number || ''}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="sns_number">SNS Number</label>
+              <Input
+                id="sns_number"
+                name="sns_number"
+                value={formData.sns_number || ''}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="dietary_restrictions">Dietary Restrictions</label>
+              <Textarea
+                id="dietary_restrictions"
+                name="dietary_restrictions"
+                value={formData.dietary_restrictions || ''}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="guardian_name">Guardian Name</label>
+              <Input
+                id="guardian_name"
+                name="guardian_name"
+                value={formData.guardian_name || ''}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="guardian_email">Guardian Email</label>
+              <Input
+                id="guardian_email"
+                name="guardian_email"
+                type="email"
+                value={formData.guardian_email || ''}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="guardian_phone">Guardian Phone</label>
+              <Input
+                id="guardian_phone"
+                name="guardian_phone"
+                value={formData.guardian_phone || ''}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+              />
+            </div>
           </div>
-        )}
+          <div className="flex justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditing(!isEditing)}
+            >
+              {isEditing ? 'Cancel' : 'Edit'}
+            </Button>
+            {isEditing && (
+              <Button type="submit" disabled={loading}>
+                Save Changes
+              </Button>
+            )}
+          </div>
+        </form>
       </SheetContent>
     </Sheet>
   )

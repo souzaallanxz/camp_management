@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { db } from '@/lib/neon-db'
 import type { CreateTeamDto, Team, TeamTier } from '../types'
 
 export interface UpdateTeamData {
@@ -7,68 +7,183 @@ export interface UpdateTeamData {
   tier?: TeamTier
 }
 
+interface DbError {
+  message: string
+}
+
 export const teamService = {
   async getTeams() {
-    const { data: teams, error } = await supabase
-      .from('teams')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { data: teams, error } = await db.query(
+      'SELECT * FROM teams ORDER BY created_at DESC'
+    )
 
-    if (error) throw error
+    if (error) {
+      throw new Error(`Error fetching teams: ${(error as DbError).message}`)
+    }
 
     return teams as Team[]
   },
 
   async getCurrentUserTeam() {
-    const { data: team, error } = await supabase
-      .rpc('get_current_user_team')
-      .single()
-
-    if (error) {
-      if (error.code === 'PGRST116') { // No rows returned
-        return null
-      }
-      throw error
+    const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('No authenticated user found')
     }
 
-    if (!team) {
+    // Primeiro, busque o team_id do usuário atual
+    const { data: userData, error: userError } = await db.query(
+      `SELECT team_id FROM users WHERE id = $1::uuid`,
+      [token]
+    )
+
+    if (userError) {
+      throw new Error(`Error getting user data: ${(userError as DbError).message}`)
+    }
+
+    if (!userData || userData.length === 0 || !userData[0].team_id) {
+      return null // Usuário não tem equipe
+    }
+
+    // Busque os detalhes da equipe pelo ID
+    const { data: team, error: teamError } = await db.query(
+      `SELECT * FROM teams WHERE id = $1::uuid`,
+      [userData[0].team_id]
+    )
+
+    if (teamError) {
+      throw new Error(`Error getting team data: ${(teamError as DbError).message}`)
+    }
+
+    if (!team || team.length === 0) {
       return null
     }
 
-    return team as Team
+    return team[0] as Team
   },
 
   async createTeam(dto: CreateTeamDto) {
-    const { data: team, error } = await supabase
-      .rpc('create_team_for_current_user', {
-        team_name: dto.name,
-        team_tier: dto.tier ?? 'free'
-      })
-      .single()
+    const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('No authenticated user found')
+    }
 
-    if (error) {
+    // Start a transaction
+    const { error: beginError } = await db.query('BEGIN')
+    if (beginError) {
+      throw new Error(`Error starting transaction: ${(beginError as DbError).message}`)
+    }
+
+    try {
+      // Create the team
+      const { data: team, error: teamError } = await db.query(
+        `INSERT INTO teams (name, tier)
+         VALUES ($1, $2)
+         RETURNING *`,
+        [dto.name, dto.tier ?? 'free']
+      )
+
+      if (teamError) {
+        throw new Error(`Error creating team: ${(teamError as DbError).message}`)
+      }
+
+      if (!team || team.length === 0) {
+        throw new Error('Failed to create team: No data returned')
+      }
+
+      // Atualizar o team_id do usuário
+      const { error: userUpdateError } = await db.query(
+        `UPDATE users SET team_id = $1 WHERE id = $2::uuid`,
+        [team[0].id, token]
+      )
+
+      if (userUpdateError) {
+        throw new Error(`Error updating user team_id: ${(userUpdateError as DbError).message}`)
+      }
+
+      // Commit the transaction
+      const { error: commitError } = await db.query('COMMIT')
+      if (commitError) {
+        throw new Error(`Error committing transaction: ${(commitError as DbError).message}`)
+      }
+
+      return team[0] as Team
+    } catch (error) {
+      // Rollback the transaction on error
+      await db.query('ROLLBACK')
       throw error
     }
-
-    if (!team) {
-      throw new Error('Failed to create team: No data returned')
-    }
-
-    return team as Team
   },
 
   async updateTeam(id: string, data: UpdateTeamData) {
-    const { data: result, error } = await supabase
-      .rpc('update_current_user_team', {
-        p_team_id: id,
-        team_name: data.name || null,
-        team_logo_url: data.logo_url === undefined ? null : data.logo_url,
-        team_tier: data.tier || null
-      })
-      .single()
+    const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('No authenticated user found')
+    }
 
-    if (error) throw error
+    // Verificar se o usuário está associado a esta equipe
+    const { data: userData, error: userError } = await db.query(
+      `SELECT team_id FROM users WHERE id = $1::uuid`,
+      [token]
+    )
 
-    return result as Team
+    if (userError) {
+      throw new Error(`Error checking user data: ${(userError as DbError).message}`)
+    }
+
+    if (!userData || userData.length === 0 || userData[0].team_id !== id) {
+      throw new Error('User is not associated with this team')
+    }
+
+    // Assumimos que o usuário é o proprietário da equipe se ele estiver associado a ela
+    // Em uma implementação mais robusta, você pode adicionar um campo 'role' à tabela users
+    // para distinguir entre proprietários e membros normais
+
+    // Build the update query dynamically based on provided fields
+    const updateFields = []
+    const values = []
+    let paramCount = 1
+
+    if (data.name !== undefined) {
+      updateFields.push(`name = $${paramCount}`)
+      values.push(data.name)
+      paramCount++
+    }
+
+    if (data.logo_url !== undefined) {
+      updateFields.push(`logo_url = $${paramCount}`)
+      values.push(data.logo_url)
+      paramCount++
+    }
+
+    if (data.tier !== undefined) {
+      updateFields.push(`tier = $${paramCount}`)
+      values.push(data.tier)
+      paramCount++
+    }
+
+    if (updateFields.length === 0) {
+      throw new Error('No fields to update')
+    }
+
+    // Add the team ID as the last parameter
+    values.push(id)
+
+    const { data: result, error } = await db.query(
+      `UPDATE teams
+       SET ${updateFields.join(', ')}
+       WHERE id = $${paramCount}
+       RETURNING *`,
+      values
+    )
+
+    if (error) {
+      throw new Error(`Error updating team: ${(error as DbError).message}`)
+    }
+
+    if (!result || result.length === 0) {
+      throw new Error('Failed to update team: No data returned')
+    }
+
+    return result[0] as Team
   }
 } 

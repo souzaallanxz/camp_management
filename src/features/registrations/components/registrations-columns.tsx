@@ -1,16 +1,17 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
 import { Registration } from '../data/schema'
 import { formatCurrency } from '@/lib/utils'
-import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { IconDots, IconEye, IconUserCheck, IconCreditCard } from '@tabler/icons-react'
+import { IconDots, IconEye, IconUserCheck, IconCreditCard, IconCopy } from '@tabler/icons-react'
 import { RegistrationDetailsSheet } from './registration-details-dialog'
 import { RegistrationOnboardDialog } from './registration-onboard-dialog'
 import { SnackbarBalanceDialog } from './snackbar-balance-dialog'
+import { getLatestPaymentLink } from '../services/payment-service'
+import { useToast } from '@/components/ui/use-toast'
 
 export interface RegistrationWithActions extends Registration {
   onRegistrationUpdated: () => void
@@ -20,6 +21,47 @@ export interface RegistrationWithActions extends Registration {
 export interface ActionsProps {
   registration: Registration
   onRegistrationUpdated: () => void
+}
+
+// Component for copy link button
+function CopyLinkButton({ registrationId }: { registrationId: string }) {
+  const { toast } = useToast()
+  
+  const copyPaymentLink = async () => {
+    try {
+      const link = await getLatestPaymentLink(registrationId)
+      if (link) {
+        await navigator.clipboard.writeText(link)
+        toast({
+          title: 'Link copiado',
+          description: 'Link de pagamento copiado para a área de transferência'
+        })
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Sem link',
+          description: 'Não existe link de pagamento para esta inscrição'
+        })
+      }
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Erro ao copiar link de pagamento'
+      })
+    }
+  }
+  
+  return (
+    <Button 
+      variant="ghost" 
+      size="icon" 
+      onClick={copyPaymentLink}
+      title="Copiar link de pagamento"
+    >
+      <IconCopy className="h-4 w-4" />
+    </Button>
+  )
 }
 
 export function Actions({ registration, onRegistrationUpdated }: ActionsProps) {
@@ -178,6 +220,14 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
     ),
     cell: ({ row }) => {
       return <div>{formatCurrency(row.original.total_amount_paid || 0)}</div>
+    }
+  },
+  {
+    id: 'payment_link',
+    header: 'Link',
+    cell: ({ row }) => {
+      const registration = row.original
+      return <CopyLinkButton registrationId={registration.id} />
     }
   },
   {

@@ -14,11 +14,18 @@ const columns: ColumnDef<SnackBarTransactionResponse>[] = [
     accessorKey: 'amount',
     header: () => <div className="text-right">Valor</div>,
     size: 100,
-    cell: ({ row }) => (
-      <div className="text-right tabular-nums font-medium">
-        € {row.original.amount.toFixed(2)}
-      </div>
-    ),
+    cell: ({ row }) => {
+      const amount = row.original.amount
+      const formattedAmount = typeof amount === 'number' 
+        ? amount.toFixed(2) 
+        : parseFloat(String(amount))?.toFixed(2) || '0.00'
+      
+      return (
+        <div className="text-right tabular-nums font-medium">
+          € {formattedAmount}
+        </div>
+      )
+    },
   },
 ]
 
@@ -29,7 +36,11 @@ interface TransactionsTableProps {
 export function TransactionsTable({ data }: TransactionsTableProps) {
   return (
     <div className="max-h-[400px] overflow-auto">
-      <DataTable columns={columns} data={data} />
+      <DataTable 
+        columns={columns} 
+        data={data}
+        emptyMessage="Sem transações para exibir"
+      />
     </div>
   )
 } 

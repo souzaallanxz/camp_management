@@ -15,18 +15,23 @@ import { RegistrationDialogsProvider } from './context/registration-dialogs-cont
 import { Actions } from './components/registrations-columns'
 
 function RegistrationsContent() {
-  const { data: registrations = [], refetch } = useQuery({
+  const { data: registrations = [], refetch, isLoading, error } = useQuery({
     queryKey: ['registrations'],
     queryFn: getRegistrations,
   })
+
+  // Função personalizada para refetch
+  const handleRefetch = () => {
+    refetch();
+  }
 
   const { openCreateDialog } = useRegistrationDialogs()
 
   const registrationsWithActions = registrations.map((registration) => ({
     ...registration,
-    actions: <Actions registration={registration} onRegistrationUpdated={refetch} />,
-    onRegistrationUpdated: refetch
-  })) as RegistrationWithActions[]
+    actions: <Actions registration={registration} onRegistrationUpdated={handleRefetch} />,
+    onRegistrationUpdated: handleRefetch
+  })) as unknown as RegistrationWithActions[]
 
   return (
     <>
@@ -46,20 +51,30 @@ function RegistrationsContent() {
               Gerencie todas as inscrições registradas no sistema.
             </p>
           </div>
-          <Button onClick={openCreateDialog}>
-            <IconPlus className='mr-2 h-4 w-4' />
-            Nova Inscrição
-          </Button>
+          <div>
+            <Button onClick={openCreateDialog}>
+              <IconPlus className='mr-2 h-4 w-4' />
+              Nova Inscrição
+            </Button>
+          </div>
         </div>
 
         <div className='-mx-4 flex-1 overflow-auto px-4 py-1'>
-          <RegistrationsTable data={registrationsWithActions} columns={columns} />
+          {isLoading ? (
+            <div className="text-center p-4">A carregar inscrições...</div>
+          ) : error ? (
+            <div className="text-center p-4 text-red-500">Erro ao carregar inscrições: {error.message}</div>
+          ) : registrationsWithActions.length === 0 ? (
+            <div className="text-center p-4">Não existem inscrições. Clique em "Nova Inscrição" para criar.</div>
+          ) : (
+            <RegistrationsTable data={registrationsWithActions} columns={columns} />
+          )}
         </div>
       </Main>
 
       <RegistrationDialogs
-        onRegistrationDeleted={refetch}
-        onRegistrationUpdated={refetch}
+        onRegistrationDeleted={handleRefetch}
+        onRegistrationUpdated={handleRefetch}
       />
     </>
   )

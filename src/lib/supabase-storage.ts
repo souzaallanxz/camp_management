@@ -1,41 +1,31 @@
-import { supabase } from './supabase'
+import { db } from './db'
 import { v4 as uuidv4 } from 'uuid'
 
-export const supabaseStorage = {
+export const storageService = {
   async uploadFile(file: File, bucket: string = 'team-logos') {
-    try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${uuidv4()}.${fileExt}`
-      const { error: uploadError, data } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file)
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${uuidv4()}.${fileExt}`
+    const { error: uploadError } = await db.storage
+      .from(bucket)
+      .upload(fileName, file)
 
-      if (uploadError) {
-        throw uploadError
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucket)
-        .getPublicUrl(fileName)
-
-      return publicUrl
-    } catch (error) {
-      console.error('Error uploading file:', error)
-      throw error
+    if (uploadError) {
+      throw uploadError
     }
+
+    const { data: { publicUrl } } = db.storage
+      .from(bucket)
+      .getPublicUrl(fileName)
+
+    return publicUrl
   },
 
   async deleteFile(path: string, bucket: string = 'team-logos') {
-    try {
-      const { error } = await supabase.storage
-        .from(bucket)
-        .remove([path])
+    const { error } = await db.storage
+      .from(bucket)
+      .remove([path])
 
-      if (error) {
-        throw error
-      }
-    } catch (error) {
-      console.error('Error deleting file:', error)
+    if (error) {
       throw error
     }
   }

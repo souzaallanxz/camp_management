@@ -20,6 +20,7 @@ import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
 import { useState } from 'react'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
+import { EmptyState } from './components/empty-state'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-PT', {
@@ -79,7 +80,7 @@ function MetricCard({
 }
 
 export default function Dashboard() {
-  const { monthlyPayments, monthlyRegistrations, monthlySnackbar, yearlyCampers, isLoading } = useDashboardMetrics()
+  const { monthlyPayments, monthlyRegistrations, monthlySnackbar, yearlyCampers, isLoading, error } = useDashboardMetrics()
   const permissions = useTeamPermissions()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
 
@@ -102,6 +103,15 @@ export default function Dashboard() {
           <div className='flex items-center space-x-2'>
           </div>
         </div>
+
+        {error && (
+          <EmptyState
+            variant="card"
+            title="Erro ao carregar dados"
+            description="Não foi possível carregar os dados do dashboard. Tente novamente mais tarde."
+          />
+        )}
+
         <Tabs
           orientation='vertical'
           defaultValue='overview'
@@ -223,7 +233,7 @@ export default function Dashboard() {
                   <CardHeader>
                     <CardTitle>Últimas Inscrições</CardTitle>
                     <CardDescription>
-                      {monthlyRegistrations?.total} inscrições este mês
+                      {monthlyRegistrations?.total || 0} inscrições este mês
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

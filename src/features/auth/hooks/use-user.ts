@@ -1,5 +1,5 @@
 import { useAuth } from '../auth-context'
-import { User } from '@supabase/supabase-js'
+import { User } from '../auth-service'
 
 interface UseUserReturn {
   user: User | null
@@ -19,6 +19,6 @@ export const useUser = (): UseUserReturn => {
     user: auth.user,
     isAuthenticated: auth.isAuthenticated,
     isLoading: auth.isLoading,
-    email: auth.user?.user_metadata.email || null,
+    email: auth.user?.email || null,
   }
 } 

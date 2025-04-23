@@ -52,25 +52,54 @@ export function RegistrationOnboardDialog({
   const remainingAmount = Number(campPrice) - Number(totalPaid)
 
   const createCamper = async () => {
-    // Criar o camper com os dados da registration
-    await camperService.create({
-      name: registration.name,
-      email: registration.email,
-      contact: registration.contact,
-      registration_id: registration.id,
-      camp: registration.camp?.name || '',
-      form_id: registration.form_id,
-      additional_notes: null
-    })
+    console.log('Starting camper creation for registration', registration.id);
+    try {
+      // Get camp details from registration
+      const campName = registration.camp?.name || '';
+      const campId = registration.camp?.id || '';
+      
+      // Log the data we're using for creation
+      console.log('Creating camper with data:', {
+        name: registration.name,
+        email: registration.email,
+        contact: registration.contact,
+        registration_id: registration.id,
+        camp: campName,
+        form_id: registration.form_id
+      });
+      
+      // Criar o camper com os dados da registration
+      const newCamper = await camperService.create({
+        name: registration.name,
+        email: registration.email,
+        contact: registration.contact,
+        registration_id: registration.id,
+        camp: campName,
+        form_id: registration.form_id,
+        additional_notes: null
+      });
+      
+      console.log('Camper created successfully:', newCamper);
+      return newCamper;
+    } catch (error) {
+      console.error('Error creating camper:', error);
+      throw error;
+    }
   }
 
   const handleConfirm = async () => {
     try {
       setLoading(true)
+      console.log('Starting onboarding process for registration', registration.id)
+      
       // Criar o camper
       await createCamper()
+      console.log('Camper created successfully')
+      
       // Atualizar o status de onboarding
       await updateOnboardingStatus(registration.id, 'Onboarded')
+      console.log('Registration status updated to Onboarded')
+      
       // Invalidar a query de registrations para atualizar a tabela após todas as operações
       await queryClient.invalidateQueries({ queryKey: ['registrations'] })
       
@@ -78,6 +107,7 @@ export function RegistrationOnboardDialog({
       onSuccess()
       onOpenChange(false)
     } catch (error) {
+      console.error('Error in onboarding process:', error)
       const message = error instanceof Error ? error.message : 'Erro ao atualizar status de onboarding'
       toast.error(message)
     } finally {
@@ -93,6 +123,7 @@ export function RegistrationOnboardDialog({
 
     try {
       setLoading(true)
+      console.log('Starting payment and onboarding process for registration', registration.id)
 
       // If payment method is MB Way, trigger the payment request first
       if (paymentMethod === 'MB Way') {
@@ -106,8 +137,10 @@ export function RegistrationOnboardDialog({
           })
 
           // If we get here, the MB Way request was successful
+          console.log('MB Way payment request sent successfully')
           toast.success('Pedido MB Way enviado. Por favor, confirme o pagamento na sua app.')
         } catch (error) {
+          console.error('Error processing MB Way payment:', error)
           const message = error instanceof Error ? error.message : 'Erro ao processar pagamento MB Way'
           toast.error(message)
           setLoading(false)
@@ -124,12 +157,15 @@ export function RegistrationOnboardDialog({
         payment_link: null,
         phone_number: paymentMethod === 'MB Way' ? phoneNumber : null
       })
+      console.log('Payment record created successfully')
       
       // Criar o camper
       await createCamper()
+      console.log('Camper created successfully')
 
       // Atualizar o status de onboarding
       await updateOnboardingStatus(registration.id, 'Onboarded')
+      console.log('Registration status updated to Onboarded')
       
       // Invalidar a query de registrations para atualizar a tabela após todas as operações
       await queryClient.invalidateQueries({ queryKey: ['registrations'] })
@@ -138,6 +174,7 @@ export function RegistrationOnboardDialog({
       onSuccess()
       onOpenChange(false)
     } catch (error) {
+      console.error('Error in payment and onboarding process:', error)
       const message = error instanceof Error ? error.message : 'Erro ao processar pagamento'
       toast.error(message)
     } finally {
@@ -163,13 +200,20 @@ export function RegistrationOnboardDialog({
 
         {!isPaid && (
           <div className="py-3 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Valor total do campo: {formatCurrency(campPrice)}
-              <br />
-              Valor já pago: {formatCurrency(totalPaid)}
-              <br />
-              <strong>Valor em falta: {formatCurrency(remainingAmount)}</strong>
-            </p>
+            <div className="rounded-lg border p-4 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Valor total do campo</span>
+                <span className="text-sm font-medium">{formatCurrency(campPrice)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Valor já pago</span>
+                <span className="text-sm font-medium">{formatCurrency(totalPaid)}</span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t">
+                <span className="text-sm font-semibold">Valor em falta</span>
+                <span className="text-sm font-semibold text-primary">{formatCurrency(remainingAmount)}</span>
+              </div>
+            </div>
 
             <div className="space-y-3">
               <div className="space-y-1">

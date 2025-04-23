@@ -28,6 +28,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[]
   searchField?: string
   isLoading?: boolean
+  emptyMessage?: string
 }
 
 export function DataTable<TData, TValue>({
@@ -35,6 +36,7 @@ export function DataTable<TData, TValue>({
   data,
   searchField,
   isLoading,
+  emptyMessage = "Nenhum resultado encontrado."
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -121,7 +123,7 @@ export function DataTable<TData, TValue>({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  Nenhum resultado encontrado.
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             )}

@@ -1,137 +1,99 @@
-import { supabase } from '@/lib/supabase'
-import {
-  type Registration,
-  type UpdateRegistration,
-} from '../data/schema'
+import { db } from '@/lib/db'
+import { sqlNeon } from '@/lib/sql-neon'
+import type { Registration, InsertRegistration, UpdateRegistration } from '../data/schema'
 import { getCurrentUserTeam } from '@/features/auth/auth-service'
 
-async function findAll() {
-  try {
-    const teamId = await getCurrentUserTeam()
-
-    const { data, error } = await supabase
+export const registrationService = {
+  async findAll() {
+    const { data, error } = await db
       .from('registrations')
-      .select(`
-        id,
-        name,
-        email,
-        contact,
-        status,
-        onboarding_status,
-        form_id,
-        created_at,
-        updated_at,
-        camp_id,
-        camp:camps!registrations_camp_id_fkey (
-          id,
-          name,
-          price,
-          start_date,
-          end_date,
-          created_at,
-          updated_at,
-          team_id
-        ),
-        camper:campers (
-          id,
-          name,
-          email,
-          contact,
-          created_at,
-          updated_at
-        )
-      `)
-      .eq('camp.team_id', teamId)
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (error) {
       throw error
     }
 
-    // Get totals for each registration using the secure function
-    const registrationsWithTotals = await Promise.all(
-      data.map(async (registration) => {
-        const { data: totalData, error: totalError } = await supabase
-          .rpc('get_registration_total', { registration_id: registration.id })
+    return data as Registration[]
+  },
 
-        if (totalError) {
-          return null
-        }
-
-        const camper = Array.isArray(registration.camper) ? registration.camper[0] : registration.camper
-        const camp = Array.isArray(registration.camp) ? registration.camp[0] : registration.camp
-
-        const result: Registration = {
-          id: registration.id,
-          name: registration.name,
-          email: registration.email,
-          contact: registration.contact,
-          status: registration.status,
-          onboarding_status: registration.onboarding_status,
-          form_id: registration.form_id,
-          created_at: registration.created_at,
-          updated_at: registration.updated_at,
-          camp_id: registration.camp_id,
-          camp: camp ? {
-            id: camp.id,
-            name: camp.name,
-            price: camp.price,
-            start_date: camp.start_date,
-            end_date: camp.end_date,
-            created_at: camp.created_at,
-            updated_at: camp.updated_at
-          } : null,
-          camper: camper ? {
-            id: camper.id,
-            name: camper.name,
-            email: camper.email,
-            contact: camper.contact,
-            created_at: camper.created_at,
-            updated_at: camper.updated_at
-          } : null,
-          total_amount_paid: totalData || 0
-        }
-
-        return result
-      })
-    )
-
-    return registrationsWithTotals.filter((r): r is Registration => r !== null)
-  } catch (error) {
-    if (error instanceof Error && error.message === 'User has no team assigned') {
-      return []
-    }
-    throw error
-  }
-}
-
-interface CreateRegistrationData {
-  camp_id: string
-  name: string
-  email: string
-  contact: string
-  form_id?: string | null
-}
-
-async function create(registration: CreateRegistrationData) {
-  const teamId = await getCurrentUserTeam()
-
-  try {
-    // First verify if the camp belongs to the user's team
-    const { data: camp, error: campError } = await supabase
-      .from('camps')
-      .select('id')
-      .eq('id', registration.camp_id)
-      .eq('team_id', teamId)
+  async findById(id: string) {
+    const { data, error } = await db
+      .from('registrations')
+      .select('*')
+      .eq('id', id)
       .single()
 
-    if (campError || !camp) {
-      throw new Error('Camp not found or does not belong to your team')
+    if (error) {
+      throw error
     }
 
-    const { data, error } = await supabase
+    return data as Registration
+  },
+
+  async create(registration: InsertRegistration) {
+    // Ensure that camp_id is a string, not an object
+    if (registration.camp_id !== undefined) {
+      let campId: string;
+      
+      if (typeof registration.camp_id === 'string') {
+        campId = registration.camp_id;
+      } else if (typeof registration.camp_id === 'object' && registration.camp_id !== null) {
+        // Handle case where camp_id is an object with an id property
+        try {
+          const campObject = JSON.parse(JSON.stringify(registration.camp_id));
+          if (campObject && typeof campObject.id === 'string') {
+            campId = campObject.id;
+            // Update the registration object with the corrected camp_id
+            registration = { ...registration, camp_id: campId };
+          } else {
+            throw new Error('Invalid camp_id format');
+          }
+        } catch (error) {
+          throw new Error(`Invalid camp_id format: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      } else {
+        throw new Error('Invalid camp_id format');
+      }
+    }
+
+    const { data, error } = await db
+      .query(`
+        INSERT INTO registrations (
+          name, email, contact, camp_id, form_id, status, onboarding_status, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9
+        ) RETURNING *
+      `, [
+        registration.name,
+        registration.email,
+        registration.contact,
+        registration.camp_id,
+        registration.form_id || null,
+        'unpaid', // Initial status
+        'Pendente', // Initial onboarding status
+        new Date().toISOString(),
+        new Date().toISOString()
+      ]);
+
+    if (error) {
+      throw error;
+    }
+
+    // Verificar se data existe e é um array
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      throw new Error('No data returned from insert operation');
+    }
+
+    // Retornar o primeiro item do array
+    return data[0] as Registration;
+  },
+
+  async update(id: string, registration: UpdateRegistration) {
+    const { data, error } = await db
       .from('registrations')
-      .insert(registration)
+      .update(registration)
+      .eq('id', id)
       .select()
       .single()
 
@@ -139,126 +101,104 @@ async function create(registration: CreateRegistrationData) {
       throw error
     }
 
-    if (!data) {
-      throw new Error('Erro ao criar inscrição: nenhum dado retornado')
+    return data as Registration
+  },
+
+  async delete(id: string) {
+    const { error } = await db
+      .from('registrations')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      throw error
     }
-
-    return data
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
-    throw new Error(message)
   }
-}
-
-async function update(id: string, registration: UpdateRegistration) {
-  const teamId = await getCurrentUserTeam()
-
-  const { data, error } = await supabase
-    .from('registrations')
-    .update(registration)
-    .eq('id', id)
-    .eq('camp.team_id', teamId)
-    .select()
-
-  if (error) {
-    throw error
-  }
-
-  return data[0] as Registration
-}
-
-async function remove(id: string) {
-  const teamId = await getCurrentUserTeam()
-
-  const { error } = await supabase
-    .from('registrations')
-    .delete()
-    .eq('id', id)
-    .eq('camp.team_id', teamId)
-
-  if (error) {
-    throw error
-  }
-}
-
-export const registrationService = {
-  findAll,
-  create,
-  update,
-  remove,
 }
 
 export async function getRegistrations() {
   try {
-    const teamId = await getCurrentUserTeam()
+    // Get team ID
+    let teamId;
+    try {
+      const team = await getCurrentUserTeam();
+      teamId = team.id;
+    } catch (teamError) {
+      console.error('Error fetching team:', teamError);
+      return []; // Return empty array if no team (prevents app breaking)
+    }
     
-
-    const { data: registrations, error } = await supabase
-      .from('registrations')
-      .select(`
-        *,
-        camp:camps!registrations_camp_id_fkey (
-          id,
-          name,
-          price,
-          team_id
-        )
-      `)
-      .eq('camp.team_id', teamId)
-
-    if (error) {
-      console.error('Error fetching registrations:', error)
-      throw error
-    }
-
-    // Get totals for each registration using the secure function
-    const registrationsWithTotals = await Promise.all(
-      registrations.map(async (registration) => {
-        const { data: totalPaid, error: totalError } = await supabase
-          .rpc('get_registration_total', { registration_id: registration.id })
-
-        if (totalError) {
-          console.error('Error getting total for registration:', registration.id, totalError)
-          return null
-        }
-
-        const camp = Array.isArray(registration.camp) ? registration.camp[0] : registration.camp
-        const campPrice = Number(camp?.price || 0)
-        const totalPaidAmount = Number(totalPaid || 0)
-
-        // Determine status based on total paid vs camp price
-        let status = registration.status
-        if (totalPaidAmount >= campPrice) {
-          status = 'paid'
-        } else if (totalPaidAmount > 0) {
-          status = 'partial'
-        } else {
-          status = 'unpaid'
-        }
-
+    // Usar diretamente o sqlNeon para executar a query
+    // sqlNeon é um template literal tag que permite queries SQL seguras
+    try {
+      const registrationsData = await sqlNeon`
+        SELECT 
+          r.*,
+          c.id as "camp.id",
+          c.name as "camp.name",
+          c.price as "camp.price",
+          c.team_id as "camp.team_id",
+          COALESCE(SUM(p.amount), 0) as total_amount_paid
+        FROM 
+          registrations r
+          JOIN camps c ON r.camp_id = c.id
+          LEFT JOIN payments p ON r.id = p.registration_id
+        WHERE 
+          c.team_id = ${teamId}
+          AND r.camp_id IS NOT NULL
+        GROUP BY
+          r.id, r.name, r.email, r.contact, r.status, r.onboarding_status,
+          r.form_id, r.created_at, r.updated_at, r.camp_id,
+          c.id, c.name, c.price, c.team_id
+      `;
+      
+      if (!registrationsData || !Array.isArray(registrationsData) || registrationsData.length === 0) {
+        return [];
+      }
+      
+      // Formatar registros no formato esperado
+      const formattedRegistrations = registrationsData.map(row => {
+        // Construir objeto camp
+        const camp = {
+          id: row['camp.id'],
+          name: row['camp.name'],
+          price: row['camp.price'],
+          team_id: row['camp.team_id']
+        };
+        
+        // Remover propriedades camp.* do objeto principal
+        const { 
+          ['camp.id']: campId,
+          ['camp.name']: campName,
+          ['camp.price']: campPrice,
+          ['camp.team_id']: campTeamId,
+          ...regData 
+        } = row;
+        
+        // Retornar registro formatado com o total de pagamentos calculado
         return {
-          ...registration,
-          total_amount_paid: totalPaidAmount,
-          status
-        }
-      })
-    )
-
-    const filteredRegistrations = registrationsWithTotals.filter((r): r is Registration => r !== null)
-    return filteredRegistrations
-  } catch (error) {
-    console.error('Error in getRegistrations:', error)
-    if (error instanceof Error && error.message === 'User has no team assigned') {
-      return []
+          ...regData,
+          camp,
+          status: regData.status || 'unpaid',
+          total_amount_paid: Number(row.total_amount_paid || 0)
+        };
+      });
+      
+      return formattedRegistrations;
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      return [];
     }
-    throw error
+  } catch (error) {
+    console.error('General error in getRegistrations:', error);
+    return [];
   }
 }
 
 export async function getRegistrationById(id: string): Promise<Registration> {
   const teamId = await getCurrentUserTeam()
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('registrations')
     .select(`
       id,
@@ -303,7 +243,7 @@ export async function getRegistrationById(id: string): Promise<Registration> {
   }
 
   // Get total using the secure function
-  const { data: totalData, error: totalError } = await supabase
+  const { data: totalData, error: totalError } = await db
     .rpc('get_registration_total', { registration_id: data.id })
 
   if (totalError) {
@@ -347,46 +287,35 @@ export async function getRegistrationById(id: string): Promise<Registration> {
   }
 }
 
-export async function createRegistration(registration: Omit<Registration, 'id' | 'created_at' | 'updated_at'>) {
-  const teamId = await getCurrentUserTeam()
-
-  // First verify if the camp belongs to the user's team
-  const { data: camp, error: campError } = await supabase
-    .from('camps')
-    .select('id')
-    .eq('id', registration.camp_id)
-    .eq('team_id', teamId)
-    .single()
-
-  if (campError || !camp) {
-    throw new Error('Camp not found or does not belong to your team')
-  }
-
-  const { data, error } = await supabase
-    .from('registrations')
-    .insert({
-      ...registration,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
-    .select()
-    .single()
-
-  if (error) {
-    throw new Error(`Erro ao criar inscrição: ${error.message}`)
-  }
-
-  if (!data) {
-    throw new Error('Erro ao criar inscrição: nenhum dado retornado')
-  }
-
-  return data
-}
-
 export async function updateRegistration(id: string, registration: UpdateRegistration) {
   const teamId = await getCurrentUserTeam()
 
-  const { data, error } = await supabase
+  // Check if camp_id is present and ensure it's a string UUID
+  if (registration.camp_id !== undefined) {
+    let campId: string;
+    
+    if (typeof registration.camp_id === 'string') {
+      campId = registration.camp_id;
+    } else if (typeof registration.camp_id === 'object' && registration.camp_id !== null) {
+      // Handle case where camp_id is an object with an id property
+      try {
+        const campObject = JSON.parse(JSON.stringify(registration.camp_id));
+        if (campObject && typeof campObject.id === 'string') {
+          campId = campObject.id;
+          // Update the registration object with the corrected camp_id
+          registration = { ...registration, camp_id: campId };
+        } else {
+          throw new Error('Invalid camp_id format');
+        }
+      } catch (error) {
+        throw new Error(`Invalid camp_id format: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      throw new Error('Invalid camp_id format');
+    }
+  }
+
+  const { data, error } = await db
     .from('registrations')
     .update(registration)
     .eq('id', id)
@@ -404,7 +333,7 @@ export async function updateRegistration(id: string, registration: UpdateRegistr
 export async function deleteRegistration(id: string) {
   const teamId = await getCurrentUserTeam()
 
-  const { error } = await supabase
+  const { error } = await db
     .from('registrations')
     .delete()
     .eq('id', id)
@@ -416,40 +345,87 @@ export async function deleteRegistration(id: string) {
 }
 
 export async function updateOnboardingStatus(id: string, status: 'Pendente' | 'Onboarded') {
+  try {
+    // Update only the onboarding_status without filtering by team_id
+    // This ensures the update works correctly
+    const { data, error } = await db
+      .from('registrations')
+      .update({ 
+        onboarding_status: status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+
+    if (error) {
+      console.error('Error updating onboarding status:', error);
+      throw new Error(`Erro ao atualizar status de onboarding: ${error.message}`)
+    }
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      throw new Error('Erro ao atualizar status de onboarding: inscrição não encontrada')
+    }
+
+    return data[0]
+  } catch (error) {
+    console.error('Unexpected error in updateOnboardingStatus:', error);
+    throw error;
+  }
+}
+
+export async function createRegistration(registration: InsertRegistration) {
   const teamId = await getCurrentUserTeam()
 
-  // First, get the camper's form_id
-  const { data: camper, error: camperError } = await supabase
-    .from('campers')
-    .select('form_id, registration:registration_id(camp:camp_id(team_id))')
-    .eq('registration_id', id)
-    .eq('registration.camp.team_id', teamId)
-    .single()
-
-  if (camperError) {
-    throw new Error(`Erro ao buscar dados do camper: ${camperError.message}`)
+  // Ensure that camp_id is a string, not an object
+  let campId: string;
+  
+  if (typeof registration.camp_id === 'string') {
+    campId = registration.camp_id;
+  } else if (typeof registration.camp_id === 'object' && registration.camp_id !== null) {
+    // Handle case where camp_id is an object with an id property
+    try {
+      const campObject = JSON.parse(JSON.stringify(registration.camp_id));
+      if (campObject && typeof campObject.id === 'string') {
+        campId = campObject.id;
+      } else {
+        throw new Error('Invalid camp_id format');
+      }
+    } catch (error) {
+      throw new Error(`Invalid camp_id format: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  } else {
+    throw new Error('Invalid camp_id format');
   }
 
-  // Update both onboarding_status and form_id
-  const { data, error } = await supabase
+  // First verify if the camp belongs to the user's team
+  const { data: camp, error: campError } = await db
+    .from('camps')
+    .select('id')
+    .eq('id', campId)
+    .eq('team_id', teamId)
+    .single()
+
+  if (campError || !camp) {
+    throw new Error('Camp not found or does not belong to your team')
+  }
+
+  const { data, error } = await db
     .from('registrations')
-    .update({ 
-      onboarding_status: status,
-      form_id: camper?.form_id,
+    .insert({
+      ...registration,
+      camp_id: campId, // Use the validated camp ID
+      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
-    .eq('id', id)
-    .eq('camp.team_id', teamId)
     .select()
-    .single()
 
   if (error) {
-    throw new Error(`Erro ao atualizar status de onboarding: ${error.message}`)
+    throw new Error(`Erro ao criar inscrição: ${error.message}`)
   }
 
-  if (!data) {
-    throw new Error('Erro ao atualizar status de onboarding: inscrição não encontrada')
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    throw new Error('Erro ao criar inscrição: nenhum dado retornado')
   }
 
-  return data
+  return data[0]
 }

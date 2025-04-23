@@ -23,6 +23,7 @@ import { Route as auth500Import } from './routes/(auth)/500'
 import { Route as AuthenticatedSnackBarIndexImport } from './routes/_authenticated/snack-bar/index'
 import { Route as AuthenticatedRegistrationsIndexImport } from './routes/_authenticated/registrations/index'
 import { Route as AuthenticatedCampersIndexImport } from './routes/_authenticated/campers/index'
+import { Route as AuthenticatedCampersDebugImport } from './routes/_authenticated/campers/debug'
 
 // Create Virtual Routes
 
@@ -344,6 +345,12 @@ const AuthenticatedSettingsAccountLazyRoute =
     ),
   )
 
+const AuthenticatedCampersDebugRoute = AuthenticatedCampersDebugImport.update({
+  id: '/campers/debug',
+  path: '/campers/debug',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
@@ -458,6 +465,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/campers/debug': {
+      id: '/_authenticated/campers/debug'
+      path: '/campers/debug'
+      fullPath: '/campers/debug'
+      preLoaderRoute: typeof AuthenticatedCampersDebugImport
       parentRoute: typeof AuthenticatedRouteImport
     }
     '/_authenticated/settings/account': {
@@ -620,6 +634,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSnackBarRoute: typeof AuthenticatedSnackBarRouteWithChildren
   AuthenticatedSettingsRouteLazyRoute: typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedCampersDebugRoute: typeof AuthenticatedCampersDebugRoute
   AuthenticatedCampersIndexRoute: typeof AuthenticatedCampersIndexRoute
   AuthenticatedRegistrationsIndexRoute: typeof AuthenticatedRegistrationsIndexRoute
   AuthenticatedAppsIndexLazyRoute: typeof AuthenticatedAppsIndexLazyRoute
@@ -635,6 +650,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteLazyRoute:
     AuthenticatedSettingsRouteLazyRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedCampersDebugRoute: AuthenticatedCampersDebugRoute,
   AuthenticatedCampersIndexRoute: AuthenticatedCampersIndexRoute,
   AuthenticatedRegistrationsIndexRoute: AuthenticatedRegistrationsIndexRoute,
   AuthenticatedAppsIndexLazyRoute: AuthenticatedAppsIndexLazyRoute,
@@ -663,6 +679,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404LazyRoute
   '/503': typeof errors503LazyRoute
   '/': typeof AuthenticatedIndexRoute
+  '/campers/debug': typeof AuthenticatedCampersDebugRoute
   '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
   '/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
@@ -693,6 +710,7 @@ export interface FileRoutesByTo {
   '/404': typeof errors404LazyRoute
   '/503': typeof errors503LazyRoute
   '/': typeof AuthenticatedIndexRoute
+  '/campers/debug': typeof AuthenticatedCampersDebugRoute
   '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
   '/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
@@ -728,6 +746,7 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500LazyRoute
   '/(errors)/503': typeof errors503LazyRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/campers/debug': typeof AuthenticatedCampersDebugRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
   '/_authenticated/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
@@ -763,6 +782,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/503'
     | '/'
+    | '/campers/debug'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/billing'
@@ -792,6 +812,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/503'
     | '/'
+    | '/campers/debug'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/billing'
@@ -825,6 +846,7 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/'
+    | '/_authenticated/campers/debug'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/billing'
@@ -904,6 +926,7 @@ export const routeTree = rootRoute
         "/_authenticated/snack-bar",
         "/_authenticated/settings",
         "/_authenticated/",
+        "/_authenticated/campers/debug",
         "/_authenticated/campers/",
         "/_authenticated/registrations/",
         "/_authenticated/apps/",
@@ -972,6 +995,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/": {
       "filePath": "_authenticated/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/campers/debug": {
+      "filePath": "_authenticated/campers/debug.tsx",
       "parent": "/_authenticated"
     },
     "/_authenticated/settings/account": {

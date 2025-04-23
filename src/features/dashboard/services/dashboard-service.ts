@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { db } from '@/lib/db'
 
 export interface MetricData {
   total: number
@@ -19,6 +19,7 @@ export interface RecentRegistration {
   email: string
   totalPaid: number
   createdAt: string
+  campName: string
 }
 
 interface RawCampPaymentsData {
@@ -34,98 +35,244 @@ interface RawRecentRegistration {
   email: string
   total_paid: number
   created_at: string
+  camp_name: string
 }
 
 export const dashboardService = {
   async getMonthlyPayments(): Promise<MetricData> {
     const now = new Date()
-    const { data, error } = await supabase.rpc('get_team_monthly_payments', {
-      p_year: now.getFullYear(),
-      p_month: now.getMonth() + 1
-    })
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth() + 1
 
-    if (error) throw error
+    // Get current month's total
+    const { data: currentData, error: currentError } = await db.query(
+      `SELECT COALESCE(SUM(amount), 0) as total_amount
+       FROM payments p
+       JOIN registrations r ON p.registration_id = r.id
+       JOIN camps c ON r.camp_id = c.id
+       WHERE EXTRACT(YEAR FROM payment_date) = $1
+       AND EXTRACT(MONTH FROM payment_date) = $2`,
+      [currentYear, currentMonth]
+    )
+
+    if (currentError) {
+      throw new Error(`Error getting current month payments: ${String(currentError)}`)
+    }
+
+    // Get previous month's total
+    const { data: previousData, error: previousError } = await db.query(
+      `SELECT COALESCE(SUM(amount), 0) as previous_month_total
+       FROM payments p
+       JOIN registrations r ON p.registration_id = r.id
+       JOIN camps c ON r.camp_id = c.id
+       WHERE EXTRACT(YEAR FROM payment_date) = $1
+       AND EXTRACT(MONTH FROM payment_date) = $2`,
+      [currentMonth === 1 ? currentYear - 1 : currentYear, currentMonth === 1 ? 12 : currentMonth - 1]
+    )
+
+    if (previousError) {
+      throw new Error(`Error getting previous month payments: ${String(previousError)}`)
+    }
+
+    const total = Number(currentData?.[0]?.total_amount) || 0
+    const previousTotal = Number(previousData?.[0]?.previous_month_total) || 0
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100
 
     return {
-      total: Number(data[0].total_amount) || 0,
-      previousTotal: Number(data[0].previous_month_total) || 0,
-      percentageChange: data[0].percentage_change
+      total,
+      previousTotal,
+      percentageChange
     }
   },
 
   async getMonthlyRegistrations(): Promise<MetricData> {
     const now = new Date()
-    const { data, error } = await supabase.rpc('get_team_monthly_registrations', {
-      p_year: now.getFullYear(),
-      p_month: now.getMonth() + 1
-    })
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth() + 1
 
-    if (error) throw error
+    // Get current month's total
+    const { data: currentData, error: currentError } = await db.query(
+      `SELECT COUNT(*) as total_count
+       FROM registrations r
+       JOIN camps c ON r.camp_id = c.id
+       WHERE EXTRACT(YEAR FROM r.created_at) = $1
+       AND EXTRACT(MONTH FROM r.created_at) = $2`,
+      [currentYear, currentMonth]
+    )
+
+    if (currentError) {
+      throw new Error(`Error getting current month registrations: ${String(currentError)}`)
+    }
+
+    // Get previous month's total
+    const { data: previousData, error: previousError } = await db.query(
+      `SELECT COUNT(*) as previous_month_count
+       FROM registrations r
+       JOIN camps c ON r.camp_id = c.id
+       WHERE EXTRACT(YEAR FROM r.created_at) = $1
+       AND EXTRACT(MONTH FROM r.created_at) = $2`,
+      [currentMonth === 1 ? currentYear - 1 : currentYear, currentMonth === 1 ? 12 : currentMonth - 1]
+    )
+
+    if (previousError) {
+      throw new Error(`Error getting previous month registrations: ${String(previousError)}`)
+    }
+
+    const total = Number(currentData?.[0]?.total_count) || 0
+    const previousTotal = Number(previousData?.[0]?.previous_month_count) || 0
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100
 
     return {
-      total: Number(data[0].total_count) || 0,
-      previousTotal: Number(data[0].previous_month_count) || 0,
-      percentageChange: data[0].percentage_change
+      total,
+      previousTotal,
+      percentageChange
     }
   },
 
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
     const now = new Date()
-    const { data, error } = await supabase.rpc('get_team_monthly_snackbar_transactions', {
-      p_year: now.getFullYear(),
-      p_month: now.getMonth() + 1
-    })
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth() + 1
 
-    if (error) throw error
+    // Get current month's total
+    const { data: currentData, error: currentError } = await db.query(
+      `SELECT COALESCE(SUM(amount), 0) as total_amount
+       FROM snackbar_balance sb
+       JOIN registrations r ON sb.registration_id = r.id
+       JOIN camps camp ON r.camp_id = camp.id
+       WHERE EXTRACT(YEAR FROM sb.created_at) = $1
+       AND EXTRACT(MONTH FROM sb.created_at) = $2`,
+      [currentYear, currentMonth]
+    )
+
+    if (currentError) {
+      throw new Error(`Error getting current month snackbar transactions: ${String(currentError)}`)
+    }
+
+    // Get previous month's total
+    const { data: previousData, error: previousError } = await db.query(
+      `SELECT COALESCE(SUM(amount), 0) as previous_month_total
+       FROM snackbar_balance sb
+       JOIN registrations r ON sb.registration_id = r.id
+       JOIN camps camp ON r.camp_id = camp.id
+       WHERE EXTRACT(YEAR FROM sb.created_at) = $1
+       AND EXTRACT(MONTH FROM sb.created_at) = $2`,
+      [currentMonth === 1 ? currentYear - 1 : currentYear, currentMonth === 1 ? 12 : currentMonth - 1]
+    )
+
+    if (previousError) {
+      throw new Error(`Error getting previous month snackbar transactions: ${String(previousError)}`)
+    }
+
+    const total = Number(currentData?.[0]?.total_amount) || 0
+    const previousTotal = Number(previousData?.[0]?.previous_month_total) || 0
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100
 
     return {
-      total: Number(data[0].total_amount) || 0,
-      previousTotal: Number(data[0].previous_month_total) || 0,
-      percentageChange: data[0].percentage_change
+      total,
+      previousTotal,
+      percentageChange
     }
   },
 
   async getYearlyCampers(): Promise<MetricData> {
     const now = new Date()
-    const { data, error } = await supabase.rpc('get_team_yearly_campers', {
-      p_year: now.getFullYear()
-    })
+    const currentYear = now.getFullYear()
 
-    if (error) throw error
+    // Get current year's total
+    const { data: currentData, error: currentError } = await db.query(
+      `SELECT COUNT(*) as total_count
+       FROM campers c
+       JOIN registrations r ON c.registration_id = r.id
+       JOIN camps camp ON r.camp_id = camp.id
+       WHERE EXTRACT(YEAR FROM c.created_at) = $1`,
+      [currentYear]
+    )
+
+    if (currentError) {
+      throw new Error(`Error getting current year campers: ${String(currentError)}`)
+    }
+
+    // Get previous year's total
+    const { data: previousData, error: previousError } = await db.query(
+      `SELECT COUNT(*) as previous_year_count
+       FROM campers c
+       JOIN registrations r ON c.registration_id = r.id
+       JOIN camps camp ON r.camp_id = camp.id
+       WHERE EXTRACT(YEAR FROM c.created_at) = $1`,
+      [currentYear - 1]
+    )
+
+    if (previousError) {
+      throw new Error(`Error getting previous year campers: ${String(previousError)}`)
+    }
+
+    const total = Number(currentData?.[0]?.total_count) || 0
+    const previousTotal = Number(previousData?.[0]?.previous_year_count) || 0
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100
 
     return {
-      total: Number(data[0].total_count) || 0,
-      previousTotal: Number(data[0].previous_year_count) || 0,
-      percentageChange: data[0].percentage_change
+      total,
+      previousTotal,
+      percentageChange
     }
   },
 
   async getCampPayments(): Promise<CampPaymentsData[]> {
-    const { data, error } = await supabase.rpc('get_team_camp_payments')
+    const { data, error } = await db.query(
+      `SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COUNT(DISTINCT p.id) as total_payments,
+        COUNT(DISTINCT r.id) as total_registrations
+       FROM camps c
+       LEFT JOIN registrations r ON c.id = r.camp_id
+       LEFT JOIN payments p ON r.id = p.registration_id
+       GROUP BY c.id, c.name
+       ORDER BY c.created_at DESC`
+    )
 
-    if (error) throw error
+    if (error) {
+      throw new Error(`Error getting camp payments: ${String(error)}`)
+    }
 
     return (data as RawCampPaymentsData[]).map(camp => ({
       campId: camp.camp_id,
       campName: camp.camp_name,
-      totalPayments: Number(camp.total_payments),
-      totalRegistrations: Number(camp.total_registrations)
+      totalPayments: Number(camp.total_payments) || 0,
+      totalRegistrations: Number(camp.total_registrations) || 0
     }))
   },
 
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
-    const { data, error } = await supabase.rpc('get_team_recent_registrations', {
-      p_limit: limit
-    })
+    const { data, error } = await db.query(
+      `SELECT 
+        r.id, 
+        r.name, 
+        r.email, 
+        r.created_at,
+        c.name as camp_name,
+        COALESCE(SUM(p.amount), 0) as total_paid
+       FROM registrations r
+       JOIN camps c ON r.camp_id = c.id
+       LEFT JOIN payments p ON r.id = p.registration_id
+       GROUP BY r.id, r.name, r.email, r.created_at, c.name
+       ORDER BY r.created_at DESC
+       LIMIT $1`,
+      [limit]
+    )
 
-    if (error) throw error
+    if (error) {
+      throw new Error(`Error getting recent registrations: ${String(error)}`)
+    }
 
     return (data as RawRecentRegistration[]).map(reg => ({
       id: reg.id,
       name: reg.name,
       email: reg.email,
-      totalPaid: Number(reg.total_paid),
-      createdAt: reg.created_at
+      totalPaid: Number(reg.total_paid) || 0,
+      createdAt: new Date(reg.created_at).toISOString(),
+      campName: reg.camp_name
     }))
   }
 } 

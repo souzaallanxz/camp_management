@@ -1,7 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   BadgeCheck,
-  Bell,
+
   ChevronsUpDown,
   CreditCard,
   LogOut,
@@ -45,12 +45,12 @@ export function NavUser() {
 
   // Get user initials for avatar fallback
   const getInitials = () => {
-    const name = user?.user_metadata?.name
+    const name = user?.name
     if (!name) return 'U'
     return name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
   }
 
-  const userName = user?.user_metadata?.name || user?.email || 'User'
+  const userName = user?.name || user?.email || 'User'
 
   return (
     <SidebarMenu>
@@ -93,7 +93,7 @@ export function NavUser() {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link to='/settings/'>
+                <Link to='/settings'>
                   <BadgeCheck />
                   Perfil
                 </Link>

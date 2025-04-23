@@ -78,4 +78,15 @@ export const snackbarBalanceSchema = z.object({
   updated_at: z.string().transform((str) => new Date(str))
 })
 
-export type SnackbarBalance = z.infer<typeof snackbarBalanceSchema> 
+export type SnackbarBalance = z.infer<typeof snackbarBalanceSchema>
+
+export const snackBarTransactionSchema = z.object({
+  id: z.string().uuid(),
+  camper_id: z.string().uuid(),
+  amount: z.number(),
+  type: z.enum(['credit', 'debit']),
+  description: z.string().optional().nullable(),
+  created_at: z.string().or(z.date())
+})
+
+export type SnackBarTransaction = z.infer<typeof snackBarTransactionSchema> 

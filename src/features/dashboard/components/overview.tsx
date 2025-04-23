@@ -3,6 +3,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, TooltipProps
 import { dashboardService, CampPaymentsData } from '../services/dashboard-service'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from './empty-state'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-PT', {
@@ -47,13 +48,33 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 }
 
 export function Overview() {
-  const { data: campPayments, isLoading } = useQuery({
+  const { data: campPayments, isLoading, error } = useQuery({
     queryKey: ['dashboard', 'camp-payments'],
     queryFn: () => dashboardService.getCampPayments()
   })
 
   if (isLoading) {
     return <Skeleton className="w-full h-[350px]" />
+  }
+
+  if (error) {
+    return (
+      <EmptyState 
+        variant="alert"
+        title="Erro"
+        description="Não foi possível carregar os dados. Por favor, tente novamente mais tarde."
+      />
+    )
+  }
+
+  if (!campPayments || campPayments.length === 0) {
+    return (
+      <EmptyState 
+        variant="alert"
+        title="Sem dados"
+        description="Não existem acampamentos com dados para mostrar."
+      />
+    )
   }
 
   return (
