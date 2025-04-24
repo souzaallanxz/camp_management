@@ -1,40 +1,70 @@
-import React, { useState } from 'react'
-import useDialogState from '@/hooks/use-dialog-state'
+import React, { createContext, useContext, useState } from 'react'
 import { User } from '../data/schema'
 
-type UsersDialogType = 'invite' | 'add' | 'edit' | 'delete'
-
-interface UsersContextType {
-  open: UsersDialogType | null
-  setOpen: (str: UsersDialogType | null) => void
-  currentRow: User | null
-  setCurrentRow: React.Dispatch<React.SetStateAction<User | null>>
+interface UsersDialogsContextProps {
+  isInviteDialogOpen: boolean
+  isEditDialogOpen: boolean
+  isDeleteDialogOpen: boolean
+  selectedUser: User | null
+  openInviteDialog: () => void
+  closeInviteDialog: () => void
+  openEditDialog: (user: User) => void
+  closeEditDialog: () => void
+  openDeleteDialog: (user: User) => void
+  closeDeleteDialog: () => void
 }
 
-const UsersContext = React.createContext<UsersContextType | null>(null)
+const UsersDialogsContext = createContext<UsersDialogsContextProps | undefined>(undefined)
 
-interface Props {
+export function useUsersDialogs() {
+  const context = useContext(UsersDialogsContext)
+  if (!context) {
+    throw new Error('useUsersDialogs must be used within UsersProvider')
+  }
+  return context
+}
+
+interface UsersProviderProps {
   children: React.ReactNode
 }
 
-export default function UsersProvider({ children }: Props) {
-  const [open, setOpen] = useDialogState<UsersDialogType>(null)
-  const [currentRow, setCurrentRow] = useState<User | null>(null)
+export default function UsersProvider({ children }: UsersProviderProps) {
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+
+  const openInviteDialog = () => setIsInviteDialogOpen(true)
+  const closeInviteDialog = () => setIsInviteDialogOpen(false)
+
+  const openEditDialog = (user: User) => {
+    setSelectedUser(user)
+    setIsEditDialogOpen(true)
+  }
+  const closeEditDialog = () => setIsEditDialogOpen(false)
+
+  const openDeleteDialog = (user: User) => {
+    setSelectedUser(user)
+    setIsDeleteDialogOpen(true)
+  }
+  const closeDeleteDialog = () => setIsDeleteDialogOpen(false)
 
   return (
-    <UsersContext value={{ open, setOpen, currentRow, setCurrentRow }}>
+    <UsersDialogsContext.Provider
+      value={{
+        isInviteDialogOpen,
+        isEditDialogOpen,
+        isDeleteDialogOpen,
+        selectedUser,
+        openInviteDialog,
+        closeInviteDialog,
+        openEditDialog,
+        closeEditDialog,
+        openDeleteDialog,
+        closeDeleteDialog,
+      }}
+    >
       {children}
-    </UsersContext>
+    </UsersDialogsContext.Provider>
   )
-}
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useUsers = () => {
-  const usersContext = React.useContext(UsersContext)
-
-  if (!usersContext) {
-    throw new Error('useUsers has to be used within <UsersContext>')
-  }
-
-  return usersContext
 }

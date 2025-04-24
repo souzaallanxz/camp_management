@@ -94,39 +94,19 @@ export async function getCurrentUser() {
 }
 
 export async function getCurrentUserTeam() {
-  console.log('getCurrentUserTeam called');
-  
   try {
     const user = await getCurrentUser();
-    console.log('getCurrentUserTeam: User retrieved:', user);
     
     if (!user.team_id) {
-      console.error('getCurrentUserTeam: User has no team assigned');
-      throw new Error('User has no team assigned');
+      // Return null if user has no team_id, don't throw an error
+      return null;
     }
     
-    console.log('getCurrentUserTeam: Querying for team with ID:', user.team_id);
-    
-    const result = await sqlNeon`
-      SELECT t.id, t.name
-      FROM public.teams t
-      WHERE t.id = ${user.team_id}::uuid
-    `;
-    
-    console.log('getCurrentUserTeam: Query result:', result);
-    
-    const team = result[0];
-    
-    if (!team) {
-      console.error('getCurrentUserTeam: Team not found');
-      throw new Error('Team not found');
-    }
-    
-    console.log('getCurrentUserTeam: Team found:', team);
-    return team;
-  } catch (error) {
-    console.error('getCurrentUserTeam error:', error);
-    throw error;
+    // Just return the team_id directly as that's what the user service expects
+    return user.team_id;
+  } catch {
+    // Return null instead of throwing an error
+    return null;
   }
 }
 
@@ -185,5 +165,24 @@ export async function signUp({ email, password, name }: SignUpCredentials) {
       }, 
       token 
     } 
+  }
+}
+
+// Nova função para ajudar a debugar o ID do time
+export async function logCurrentUserTeamId() {
+  try {
+    const user = await getCurrentUser();
+    const team_id = user.team_id;
+    
+    // Log do ID do time no console para facilitar debug
+    console.log('='.repeat(50));
+    console.log('ID do time do usuário atual:', team_id);
+    console.log(`Para testar com esse team_id use: ${window.location.origin}/users?team_id=${team_id}`);
+    console.log('='.repeat(50));
+    
+    return team_id;
+  } catch {
+    console.log('Não foi possível obter o ID do time do usuário');
+    return null;
   }
 } 

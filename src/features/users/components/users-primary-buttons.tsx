@@ -1,20 +1,15 @@
-import { IconMailPlus, IconUserPlus } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
-import { useUsers } from '../context/users-context'
+import { IconUserPlus } from '@tabler/icons-react'
+import { useUsersDialogs } from '../context/users-context'
 
 export function UsersPrimaryButtons() {
-  const { setOpen } = useUsers()
+  const { openInviteDialog } = useUsersDialogs()
+
   return (
-    <div className='flex gap-2'>
-      <Button
-        variant='outline'
-        className='space-x-1'
-        onClick={() => setOpen('invite')}
-      >
-        <span>Invite User</span> <IconMailPlus size={18} />
-      </Button>
-      <Button className='space-x-1' onClick={() => setOpen('add')}>
-        <span>Add User</span> <IconUserPlus size={18} />
+    <div className='flex items-center gap-2'>
+      <Button onClick={openInviteDialog}>
+        <IconUserPlus className='mr-2 h-4 w-4' />
+        Adicionar Usuário
       </Button>
     </div>
   )

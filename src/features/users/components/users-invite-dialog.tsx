@@ -22,60 +22,87 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { SelectDropdown } from '@/components/select-dropdown'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { userTypes } from '../data/data'
+import { createUserWithInvitation } from '../services/user-service'
+import { UserRole } from '../data/schema'
 
 const formSchema = z.object({
+  firstName: z.string().min(1, { message: 'First name is required.' }),
+  lastName: z.string().min(1, { message: 'Last name is required.' }),
   email: z
     .string()
     .min(1, { message: 'Email is required.' })
     .email({ message: 'Email is invalid.' }),
-  role: z.string().min(1, { message: 'Role is required.' }),
-  desc: z.string().optional(),
+  role: z.enum(['superadmin', 'admin', 'contributor', 'cashier', 'manager'] as const),
 })
 type UserInviteForm = z.infer<typeof formSchema>
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onUserAdded?: () => void
 }
 
-export function UsersInviteDialog({ open, onOpenChange }: Props) {
+export function UsersInviteDialog({ open, onOpenChange, onUserAdded }: Props) {
   const form = useForm<UserInviteForm>({
     resolver: zodResolver(formSchema),
-    defaultValues: { email: '', role: '', desc: '' },
+    defaultValues: { 
+      firstName: '',
+      lastName: '',
+      email: '',
+      role: 'contributor' as UserRole
+    },
   })
 
-  const onSubmit = (values: UserInviteForm) => {
-    form.reset()
-    toast({
-      title: 'You submitted the following values:',
-      description: (
-        <pre className='mt-2 w-[340px] rounded-md bg-slate-950 p-4'>
-          <code className='text-white'>{JSON.stringify(values, null, 2)}</code>
-        </pre>
-      ),
-    })
-    onOpenChange(false)
+  const onSubmit = async (values: UserInviteForm) => {
+    try {
+      const { firstName, lastName, email, role } = values;
+      await createUserWithInvitation({ firstName, lastName, email, role })
+      
+      toast({
+        title: 'User invited',
+        description: `Invitation email has been sent to ${values.email}`,
+      })
+      
+      if (onUserAdded) {
+        onUserAdded()
+      }
+      
+      form.reset()
+      onOpenChange(false)
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to invite user. Please try again.',
+        variant: 'destructive',
+      })
+    }
   }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(state) => {
-        form.reset()
+        if (!state) {
+          form.reset()
+        }
         onOpenChange(state)
       }}
     >
-      <DialogContent className='sm:max-w-md'>
+      <DialogContent className='sm:max-w-lg'>
         <DialogHeader className='text-left'>
           <DialogTitle className='flex items-center gap-2'>
-            <IconMailPlus /> Invite User
+            <IconMailPlus /> Invite New User
           </DialogTitle>
           <DialogDescription>
-            Invite new user to join your team by sending them an email
-            invitation. Assign a role to define their access level.
+            Invite a new user to your team. An invitation email will be sent to set up their password.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -84,6 +111,34 @@ export function UsersInviteDialog({ open, onOpenChange }: Props) {
             onSubmit={form.handleSubmit(onSubmit)}
             className='space-y-4'
           >
+            <div className='grid grid-cols-2 gap-4'>
+              <FormField
+                control={form.control}
+                name='firstName'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder='John' {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name='lastName'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder='Doe' {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name='email'
@@ -93,7 +148,7 @@ export function UsersInviteDialog({ open, onOpenChange }: Props) {
                   <FormControl>
                     <Input
                       type='email'
-                      placeholder='eg: john.doe@gmail.com'
+                      placeholder='john.doe@example.com'
                       {...field}
                     />
                   </FormControl>
@@ -105,34 +160,28 @@ export function UsersInviteDialog({ open, onOpenChange }: Props) {
               control={form.control}
               name='role'
               render={({ field }) => (
-                <FormItem className='space-y-1'>
+                <FormItem>
                   <FormLabel>Role</FormLabel>
-                  <SelectDropdown
+                  <Select
                     defaultValue={field.value}
                     onValueChange={field.onChange}
-                    placeholder='Select a role'
-                    items={userTypes.map(({ label, value }) => ({
-                      label,
-                      value,
-                    }))}
-                  />
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='desc'
-              render={({ field }) => (
-                <FormItem className=''>
-                  <FormLabel>Description (optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      className='resize-none'
-                      placeholder='Add a personal note to your invitation (optional)'
-                      {...field}
-                    />
-                  </FormControl>
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder='Select a role' />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {userTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          <div className='flex items-center gap-2'>
+                            {type.icon && <type.icon size={16} />}
+                            <span>{type.label}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -144,7 +193,7 @@ export function UsersInviteDialog({ open, onOpenChange }: Props) {
             <Button variant='outline'>Cancel</Button>
           </DialogClose>
           <Button type='submit' form='user-invite-form'>
-            Invite <IconSend />
+            Invite User <IconSend className="ml-2 h-4 w-4" />
           </Button>
         </DialogFooter>
       </DialogContent>

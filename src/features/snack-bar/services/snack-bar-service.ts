@@ -8,39 +8,44 @@ import type {
 export const snackBarService = {
   async getCurrentCamp() {
     const today = new Date().toISOString()
-    console.log('Buscando acampamento atual para a data:', today)
     
     try {
       // Usar SQL direto em vez de ORM com lte/gte
       const { data, error } = await db.query(`
         SELECT * FROM camps 
         WHERE start_date <= $1 AND end_date >= $1
+        AND team_id = (
+          SELECT team_id FROM auth.users 
+          WHERE auth.users.id = auth.uid()
+        )
         LIMIT 1
       `, [today])
 
-      console.log('Resultado da consulta de acampamento:', { data, error })
-
       if (error) {
-        console.error('Erro ao buscar acampamento:', error)
         return null
       }
 
       // Se não encontrou nenhum acampamento, retorna null
       if (!data || data.length === 0) {
-        console.log('Nenhum acampamento encontrado')
         return null
       }
       
       return data[0]
     } catch (e) {
-      console.error('Exceção ao buscar acampamento:', e)
       return null
     }
   },
 
   async getCampers(): Promise<CamperWithBalance[]> {
     try {
-      // Usar SQL direto em vez do ORM
+      // Primeiro obter o acampamento atual
+      const currentCamp = await this.getCurrentCamp();
+      
+      if (!currentCamp) {
+        return [];
+      }
+      
+      // Usar SQL direto com filtro para o acampamento atual e equipe do usuário
       const { data, error } = await db.query(`
         SELECT 
           c.id,
@@ -50,74 +55,21 @@ export const snackBarService = {
           r.camp_id
         FROM campers c
         JOIN registrations r ON c.registration_id = r.id
-      `)
+        JOIN camps camp ON r.camp_id = camp.id
+        WHERE r.camp_id = $1
+        AND camp.team_id = (
+          SELECT team_id FROM auth.users 
+          WHERE auth.users.id = auth.uid()
+        )
+        ORDER BY c.name ASC
+      `, [currentCamp.id])
 
       if (error) {
-        console.error('Erro ao buscar campistas:', error)
-        // Retornar campistas simulados 
-        return [
-          {
-            id: '1',
-            name: 'João Silva',
-            snack_bar_balance: 50,
-            registration: {
-              id: '1',
-              camp_id: '123e4567-e89b-12d3-a456-426614174000'
-            }
-          },
-          {
-            id: '2',
-            name: 'Maria Oliveira',
-            snack_bar_balance: 35.5,
-            registration: {
-              id: '2',
-              camp_id: '123e4567-e89b-12d3-a456-426614174000'
-            }
-          },
-          {
-            id: '3',
-            name: 'Carlos Santos',
-            snack_bar_balance: 20,
-            registration: {
-              id: '3',
-              camp_id: '123e4567-e89b-12d3-a456-426614174000'
-            }
-          }
-        ]
+        return [];
       }
 
       if (!data || data.length === 0) {
-        console.log('Nenhum campista encontrado, retornando simulados')
-        // Retornar campistas simulados 
-        return [
-          {
-            id: '1',
-            name: 'João Silva',
-            snack_bar_balance: 50,
-            registration: {
-              id: '1',
-              camp_id: '123e4567-e89b-12d3-a456-426614174000'
-            }
-          },
-          {
-            id: '2',
-            name: 'Maria Oliveira',
-            snack_bar_balance: 35.5,
-            registration: {
-              id: '2',
-              camp_id: '123e4567-e89b-12d3-a456-426614174000'
-            }
-          },
-          {
-            id: '3',
-            name: 'Carlos Santos',
-            snack_bar_balance: 20,
-            registration: {
-              id: '3',
-              camp_id: '123e4567-e89b-12d3-a456-426614174000'
-            }
-          }
-        ]
+        return [];
       }
       
       return data.map(camper => ({
@@ -128,39 +80,9 @@ export const snackBarService = {
           id: camper.registration_id,
           camp_id: camper.camp_id
         }
-      })) as CamperWithBalance[]
+      })) as CamperWithBalance[];
     } catch (e) {
-      console.error('Exceção ao buscar campistas:', e)
-      // Retornar campistas simulados em caso de erro
-      return [
-        {
-          id: '1',
-          name: 'João Silva',
-          snack_bar_balance: 50,
-          registration: {
-            id: '1',
-            camp_id: '123e4567-e89b-12d3-a456-426614174000'
-          }
-        },
-        {
-          id: '2',
-          name: 'Maria Oliveira',
-          snack_bar_balance: 35.5,
-          registration: {
-            id: '2',
-            camp_id: '123e4567-e89b-12d3-a456-426614174000'
-          }
-        },
-        {
-          id: '3',
-          name: 'Carlos Santos',
-          snack_bar_balance: 20,
-          registration: {
-            id: '3',
-            camp_id: '123e4567-e89b-12d3-a456-426614174000'
-          }
-        }
-      ]
+      return [];
     }
   },
 
@@ -226,7 +148,6 @@ export const snackBarService = {
   async getCamperTransactions(camper_id: string): Promise<SnackBarTransactionResponse[]> {
     try {
       if (!camper_id) {
-        console.log('ID do campista não fornecido')
         return []
       }
       
@@ -243,18 +164,15 @@ export const snackBarService = {
       `, [camper_id])
 
       if (error) {
-        console.error('Erro ao buscar transações do campista:', error)
         return []
       }
 
       if (!data || data.length === 0) {
-        console.log('Nenhuma transação encontrada para o campista')
         return []
       }
       
       return data as SnackBarTransactionResponse[]
     } catch (e) {
-      console.error('Exceção ao buscar transações do campista:', e)
       return []
     }
   },
@@ -262,7 +180,6 @@ export const snackBarService = {
   async deductBalance(transaction: SnackBarTransaction) {
     try {
       if (!transaction.camper_id) {
-        console.log('ID do campista não fornecido')
         return
       }
       
@@ -284,7 +201,6 @@ export const snackBarService = {
       `, [transaction.camper_id, transaction.amount])
       
       if (insertError) {
-        console.error('Erro ao inserir transação:', insertError)
         return
       }
       
@@ -296,12 +212,10 @@ export const snackBarService = {
       `, [newBalance, transaction.camper_id])
       
       if (updateError) {
-        console.error('Erro ao atualizar saldo:', updateError)
         return
       }
       
     } catch (e) {
-      console.error('Exceção ao deduzir saldo:', e)
       // Simular sucesso mesmo com exceção
       return
     }
@@ -310,7 +224,6 @@ export const snackBarService = {
   async getCamperBalance(camperId: string) {
     try {
       if (!camperId) {
-        console.log('ID do campista não fornecido')
         return 0
       }
       
@@ -325,12 +238,10 @@ export const snackBarService = {
       `, [camperId])
 
       if (error) {
-        console.error('Erro ao buscar saldo do campista:', error)
         return 0
       }
 
       if (!data || data.length === 0) {
-        console.log('Campista não encontrado')
         return 0
       }
       
@@ -338,7 +249,6 @@ export const snackBarService = {
       const balance = data[0].snack_bar_balance
       return typeof balance === 'number' ? balance : parseFloat(balance) || 0
     } catch (e) {
-      console.error('Exceção ao buscar saldo:', e)
       return 0
     }
   },
@@ -348,7 +258,6 @@ export const snackBarService = {
       const currentCamp = await this.getCurrentCamp()
       
       if (!currentCamp) {
-        console.log('Nenhum acampamento encontrado para buscar transações')
         return [] // Retorna lista vazia se não houver acampamento
       }
       
@@ -372,12 +281,10 @@ export const snackBarService = {
       `, [currentCamp.id])
 
       if (error) {
-        console.error('Erro ao buscar transações:', error)
         return []
       }
 
       if (!data || data.length === 0) {
-        console.log('Nenhuma transação encontrada')
         return []
       }
 
@@ -400,7 +307,6 @@ export const snackBarService = {
         return response
       })
     } catch (e) {
-      console.error('Exceção ao buscar transações:', e)
       return []
     }
   }

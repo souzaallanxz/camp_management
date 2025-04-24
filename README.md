@@ -32,6 +32,47 @@ I've been creating dashboard UIs at work and for my personal projects. I always 
 
 **Icons:** [Tabler Icons](https://tabler.io/icons)
 
+## Sistema de Recuperação de Senha
+
+O sistema de recuperação de senha utiliza a API da [Resend](https://resend.com) para envio de emails. 
+
+### Configuração da API Resend
+
+1. Crie uma conta no [Resend](https://resend.com)
+2. Obtenha uma chave de API no painel do Resend
+3. Configure sua chave de API no arquivo `.env`:
+
+```
+VITE_RESEND_API_KEY=sua_chave_api_resend
+```
+
+### Modo de Desenvolvimento
+
+Em ambiente de desenvolvimento, sem a chave da API configurada, o sistema usa um fallback local:
+
+- Os emails são simulados e não enviados de fato
+- Os links de recuperação são exibidos no console do navegador
+- Os dados dos emails são armazenados no localStorage para referência
+
+### Fluxo de Recuperação de Senha
+
+1. Usuário acessa a página de "Esqueceu a senha"
+2. Insere seu email de cadastro
+3. Um token de recuperação é gerado (válido por 1 hora)
+4. Um email com link de recuperação é enviado para o usuário
+5. Ao clicar no link, o usuário é redirecionado para a página de redefinição de senha
+6. O token é validado e, se válido, o usuário pode definir uma nova senha
+7. Após redefinir, o token é invalidado e o usuário pode fazer login com a nova senha
+
+### Configurações Adicionais
+
+O sistema de tokens possui algumas configurações que podem ser ajustadas no arquivo `src/services/token.service.ts`:
+
+- `tokenExpirationTime`: Tempo de validade do token (padrão: 1 hora)
+- `secretKey`: Chave secreta para assinatura dos tokens (recomendável configurar no .env em produção)
+
+Para configurar a origem dos emails, edite o parâmetro `from` no serviço de email em `src/services/email.service.ts`.
+
 ## Run Locally
 
 Clone the project

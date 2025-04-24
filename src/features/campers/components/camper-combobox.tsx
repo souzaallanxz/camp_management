@@ -30,38 +30,7 @@ export function CamperCombobox({ value, onValueChange }: CamperComboboxProps) {
     queryFn: () => snackBarService.getCampers(),
   })
 
-  // Dados simulados para exibição quando não há campistas
-  const fakeCampers = campers.length > 0 ? campers : [
-    {
-      id: '1',
-      name: 'João Silva',
-      snack_bar_balance: 50,
-      registration: {
-        id: '1',
-        camp_id: '123e4567-e89b-12d3-a456-426614174000'
-      }
-    },
-    {
-      id: '2',
-      name: 'Maria Oliveira',
-      snack_bar_balance: 35.5,
-      registration: {
-        id: '2',
-        camp_id: '123e4567-e89b-12d3-a456-426614174000'
-      }
-    },
-    {
-      id: '3',
-      name: 'Carlos Santos',
-      snack_bar_balance: 20,
-      registration: {
-        id: '3',
-        camp_id: '123e4567-e89b-12d3-a456-426614174000'
-      }
-    }
-  ]
-
-  const selectedCamper = fakeCampers?.find((camper) => camper.id === value)
+  const selectedCamper = campers?.find((camper) => camper.id === value)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -81,7 +50,7 @@ export function CamperCombobox({ value, onValueChange }: CamperComboboxProps) {
           <CommandInput placeholder="Procurar campista..." className="h-9" />
           <CommandEmpty>Nenhum campista encontrado.</CommandEmpty>
           <CommandGroup className="max-h-[200px] overflow-auto">
-            {fakeCampers?.map((camper) => (
+            {campers?.map((camper) => (
               <CommandItem
                 key={camper.id}
                 value={camper.name}

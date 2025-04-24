@@ -33,12 +33,12 @@ export function ProfileDropdown() {
 
   // Get user initials for avatar fallback
   const getInitials = () => {
-    const name = user?.user_metadata?.name
+    const name = user?.name || ''
     if (!name) return 'U'
     return name.split(' ').map((n: string) => n[0]).join('').toUpperCase()
   }
 
-  const userName = user?.user_metadata?.name || user?.email || 'User'
+  const userName = user?.name || user?.email || 'User'
 
   return (
     <DropdownMenu modal={false}>

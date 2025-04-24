@@ -1,4 +1,5 @@
 import { StrictMode } from 'react'
+
 import ReactDOM from 'react-dom/client'
 import { AxiosError } from 'axios'
 import {
@@ -19,9 +20,6 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        // eslint-disable-next-line no-console
-        if (import.meta.env.DEV) console.log({ failureCount, error })
-
         if (failureCount >= 0 && import.meta.env.DEV) return false
         if (failureCount > 3 && import.meta.env.PROD) return false
 

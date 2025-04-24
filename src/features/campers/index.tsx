@@ -17,6 +17,7 @@ import { CamperSnackbarBalanceDialog } from './components/camper-snackbar-balanc
 import { toast } from 'sonner'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { type CamperWithActions } from './components/campers-table'
+import { getCurrentUser } from '@/features/auth/auth-service'
 
 function CampersContent() {
   // Query simplificada para buscar campers e seus saldos
@@ -24,7 +25,14 @@ function CampersContent() {
     queryKey: ['campers-with-balance'],
     queryFn: async () => {
       try {
-        // Buscar campers com SQL
+        // Get the current user's team ID
+        const user = await getCurrentUser();
+        
+        if (!user || !user.team_id) {
+          return [];
+        }
+
+        // Buscar campers com SQL, filtrando pelo team_id
         const result = await db.query(`
           SELECT 
             c.*,
@@ -36,8 +44,11 @@ function CampersContent() {
               0
             ) as total_balance
           FROM campers c
+          JOIN registrations r ON c.registration_id = r.id
+          JOIN camps camp ON r.camp_id = camp.id
+          WHERE camp.team_id = $1
           ORDER BY c.created_at DESC
-        `);
+        `, [user.team_id]);
 
         if (!result.data || !Array.isArray(result.data)) {
           return [];

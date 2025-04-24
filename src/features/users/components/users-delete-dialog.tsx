@@ -1,86 +1,81 @@
 'use client'
 
-import { useState } from 'react'
-import { IconAlertTriangle } from '@tabler/icons-react'
 import { toast } from '@/hooks/use-toast'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { ConfirmDialog } from '@/components/confirm-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { User } from '../data/schema'
+import { deleteUser } from '../services/user-service'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  currentRow: User
+  onUserDeleted?: () => void
+  user?: User
 }
 
-export function UsersDeleteDialog({ open, onOpenChange, currentRow }: Props) {
-  const [value, setValue] = useState('')
+export function UsersDeleteDialog({
+  open,
+  onOpenChange,
+  onUserDeleted,
+  user,
+}: Props) {
+  if (!user) {
+    return null;
+  }
 
-  const handleDelete = () => {
-    if (value.trim() !== currentRow.username) return
-
-    onOpenChange(false)
-    toast({
-      title: 'The following user has been deleted:',
-      description: (
-        <pre className='mt-2 w-[340px] rounded-md bg-slate-950 p-4'>
-          <code className='text-white'>
-            {JSON.stringify(currentRow, null, 2)}
-          </code>
-        </pre>
-      ),
-    })
+  const handleDelete = async () => {
+    try {
+      await deleteUser(user.id)
+      toast({
+        title: 'User deleted',
+        description: `The user ${user.firstName} ${user.lastName} has been deleted successfully.`,
+      })
+      
+      if (onUserDeleted) {
+        onUserDeleted()
+      }
+      
+      onOpenChange(false)
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete user. Please try again.',
+        variant: 'destructive',
+      })
+    }
   }
 
   return (
-    <ConfirmDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      handleConfirm={handleDelete}
-      disabled={value.trim() !== currentRow.username}
-      title={
-        <span className='text-destructive'>
-          <IconAlertTriangle
-            className='mr-1 inline-block stroke-destructive'
-            size={18}
-          />{' '}
-          Delete User
-        </span>
-      }
-      desc={
-        <div className='space-y-4'>
-          <p className='mb-2'>
-            Are you sure you want to delete{' '}
-            <span className='font-bold'>{currentRow.username}</span>?
-            <br />
-            This action will permanently remove the user with the role of{' '}
-            <span className='font-bold'>
-              {currentRow.role.toUpperCase()}
-            </span>{' '}
-            from the system. This cannot be undone.
-          </p>
-
-          <Label className='my-2'>
-            Username:
-            <Input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder='Enter username to confirm deletion.'
-            />
-          </Label>
-
-          <Alert variant='destructive'>
-            <AlertTitle>Warning!</AlertTitle>
-            <AlertDescription>
-              Please be carefull, this operation can not be rolled back.
-            </AlertDescription>
-          </Alert>
-        </div>
-      }
-      confirmText='Delete'
-      destructive
-    />
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action will permanently delete the user{' '}
+            <strong>
+              {user.firstName} {user.lastName}
+            </strong>{' '}
+            with email <strong>{user.email}</strong>. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            className='bg-destructive text-destructive-foreground hover:bg-destructive/90'
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

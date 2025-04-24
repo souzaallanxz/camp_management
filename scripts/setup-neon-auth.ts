@@ -6,8 +6,6 @@ const sqlNeon = neon(env.VITE_NEON_DB_URL)
 
 async function setupNeonAuth() {
   try {
-    console.log('Setting up Neon Auth...')
-
     // Check if neon_auth schema exists
     const { data: schemaExists, error: schemaError } = await sqlNeon.query(
       `SELECT EXISTS (
@@ -20,8 +18,6 @@ async function setupNeonAuth() {
     }
 
     if (!schemaExists || !schemaExists[0].exists) {
-      console.log('neon_auth schema does not exist. Please set up Neon Auth in the Neon Console first.')
-      console.log('Visit: https://console.neon.tech to set up Neon Auth')
       return
     }
 
@@ -38,8 +34,6 @@ async function setupNeonAuth() {
     }
 
     if (!tableExists || !tableExists[0].exists) {
-      console.log('users_sync table does not exist. Please set up Neon Auth in the Neon Console first.')
-      console.log('Visit: https://console.neon.tech to set up Neon Auth')
       return
     }
 
@@ -60,9 +54,7 @@ async function setupNeonAuth() {
     )
 
     if (insertError) {
-      console.error('Error creating test user:', insertError)
-    } else {
-      console.log('Test user created successfully')
+      throw insertError
     }
 
     // Create a test team
@@ -74,8 +66,10 @@ async function setupNeonAuth() {
     )
 
     if (teamError) {
-      console.error('Error creating test team:', teamError)
-    } else if (teamData && teamData.length > 0) {
+      throw teamError
+    }
+
+    if (teamData && teamData.length > 0) {
       const teamId = teamData[0].id
 
       // Associate the test user with the test team
@@ -87,17 +81,14 @@ async function setupNeonAuth() {
       )
 
       if (userTeamError) {
-        console.error('Error associating user with team:', userTeamError)
-      } else {
-        console.log('User associated with team successfully')
+        throw userTeamError
       }
     }
 
-    console.log('Neon Auth setup completed')
   } catch (error) {
-    console.error('Error setting up Neon Auth:', error)
+    process.exit(1)
   }
 }
 
 // Run the setup
-setupNeonAuth() 
+setupNeonAuth()

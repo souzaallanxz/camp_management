@@ -4,7 +4,6 @@ config();
 import { neon } from '@neondatabase/serverless';
 import { env } from '../src/env';
 
-console.log('Environment variables:', {
   VITE_NEON_DB_URL: process.env.VITE_NEON_DB_URL,
   NODE_ENV: process.env.NODE_ENV
 });
@@ -13,7 +12,6 @@ const sqlNeon = neon(env.VITE_NEON_DB_URL);
 
 async function main() {
   try {
-    console.log('Starting database migration...');
 
     // Set search path to public
     await sqlNeon.query(`SET search_path TO public`);
@@ -88,8 +86,7 @@ async function main() {
     }
 
     if (!schemaExists || !schemaExists[0].exists) {
-      console.log('neon_auth schema does not exist. Please set up Neon Auth in the Neon Console first.');
-      console.log('Visit: https://console.neon.tech to set up Neon Auth');
+      process.exit(1);
     } else {
       // Check if users_sync table exists
       const { data: tableExists, error: tableError } = await sqlNeon.query(
@@ -104,8 +101,7 @@ async function main() {
       }
 
       if (!tableExists || !tableExists[0].exists) {
-        console.log('users_sync table does not exist. Please set up Neon Auth in the Neon Console first.');
-        console.log('Visit: https://console.neon.tech to set up Neon Auth');
+        process.exit(1);
       } else {
         // Add foreign key constraint to user_teams.user_id if it doesn't exist
         try {
@@ -116,19 +112,15 @@ async function main() {
             REFERENCES neon_auth.users_sync(id) 
             ON DELETE CASCADE
           `);
-          console.log('Added foreign key constraint to user_teams.user_id');
         } catch (error) {
           // Ignore error if constraint already exists
-          console.log('Foreign key constraint already exists or could not be added');
         }
       }
     }
 
-    console.log('Database tables have been successfully recreated!');
   } catch (error) {
-    console.error('Error during migration:', error);
     process.exit(1);
   }
 }
 
-main(); 
+main();

@@ -25,12 +25,6 @@ export class MBWayService {
       // Ensure orderId is a string and has max 15 chars
       const formattedOrderId = String(data.orderId).slice(0, 15)
 
-      console.log('Enviando requisição MB Way:', {
-        mobileNumber: formattedMobileNumber,
-        amount: data.amount.toFixed(2),
-        orderId: formattedOrderId,
-      })
-
       const response = await fetch('https://api.ifthenpay.com/spg/payment/mbway', {
         method: 'POST',
         headers: {
@@ -45,10 +39,7 @@ export class MBWayService {
         }),
       })
 
-      console.log('Status da resposta MB Way:', response.status)
-
       const responseText = await response.text()
-      console.log('Resposta MB Way (texto):', responseText)
 
       if (!response.ok) {
         throw new Error(`Erro ao processar pagamento MB Way: ${response.status} - ${responseText}`)
@@ -73,8 +64,7 @@ export class MBWayService {
 
       return result
     } catch (error) {
-      console.error('Erro no serviço MB Way:', error)
       throw error // Propagate the original error instead of creating a new one
     }
   }
-} 
+}

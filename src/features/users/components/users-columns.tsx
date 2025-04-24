@@ -1,9 +1,7 @@
 import { ColumnDef } from '@tanstack/react-table'
-import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import LongText from '@/components/long-text'
-import { callTypes, userTypes } from '../data/data'
+import { userTypes, userStatuses } from '../data/data'
 import { User } from '../data/schema'
 import { DataTableColumnHeader } from './data-table-column-header'
 import { DataTableRowActions } from './data-table-row-actions'
@@ -15,19 +13,14 @@ export const columns: ColumnDef<User>[] = [
       <Checkbox
         checked={
           table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && 'indeterminate')
+          (table.getIsSomePageRowsSelected() && 'indeterminate') ||
+          false
         }
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         aria-label='Select all'
         className='translate-y-[2px]'
       />
     ),
-    meta: {
-      className: cn(
-        'sticky md:table-cell left-0 z-10 rounded-tl',
-        'bg-background transition-colors duration-200 group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted'
-      ),
-    },
     cell: ({ row }) => (
       <Checkbox
         checked={row.getIsSelected()}
@@ -40,33 +33,46 @@ export const columns: ColumnDef<User>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: 'username',
+    accessorKey: 'firstName',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Username' />
-    ),
-    cell: ({ row }) => (
-      <LongText className='max-w-36'>{row.getValue('username')}</LongText>
-    ),
-    meta: {
-      className: cn(
-        'drop-shadow-[0_1px_2px_rgb(0_0_0_/_0.1)] dark:drop-shadow-[0_1px_2px_rgb(255_255_255_/_0.1)] lg:drop-shadow-none',
-        'bg-background transition-colors duration-200 group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted',
-        'sticky left-6 md:table-cell'
-      ),
-    },
-    enableHiding: false,
-  },
-  {
-    id: 'fullName',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Name' />
+      <DataTableColumnHeader column={column} title='First Name' />
     ),
     cell: ({ row }) => {
-      const { firstName, lastName } = row.original
-      const fullName = `${firstName} ${lastName}`
-      return <LongText className='max-w-36'>{fullName}</LongText>
+      const firstName = row.getValue('firstName') as string
+      return <LongText className='max-w-36'>{firstName || '-'}</LongText>
     },
-    meta: { className: 'w-36' },
+    filterFn: (row, id, value) => {
+      const firstName = row.getValue('firstName') as string
+      const lastName = row.getValue('lastName') as string
+      const email = row.getValue('email') as string
+      const searchValue = value.toLowerCase()
+      return (
+        firstName?.toLowerCase().includes(searchValue) ||
+        lastName?.toLowerCase().includes(searchValue) ||
+        email?.toLowerCase().includes(searchValue)
+      )
+    },
+  },
+  {
+    accessorKey: 'lastName',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title='Last Name' />
+    ),
+    cell: ({ row }) => {
+      const lastName = row.getValue('lastName') as string
+      return <LongText className='max-w-36'>{lastName || '-'}</LongText>
+    },
+    filterFn: (row, id, value) => {
+      const firstName = row.getValue('firstName') as string
+      const lastName = row.getValue('lastName') as string
+      const email = row.getValue('email') as string
+      const searchValue = value.toLowerCase()
+      return (
+        firstName?.toLowerCase().includes(searchValue) ||
+        lastName?.toLowerCase().includes(searchValue) ||
+        email?.toLowerCase().includes(searchValue)
+      )
+    },
   },
   {
     accessorKey: 'email',
@@ -76,14 +82,17 @@ export const columns: ColumnDef<User>[] = [
     cell: ({ row }) => (
       <div className='w-fit text-nowrap'>{row.getValue('email')}</div>
     ),
-  },
-  {
-    accessorKey: 'phoneNumber',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title='Phone Number' />
-    ),
-    cell: ({ row }) => <div>{row.getValue('phoneNumber')}</div>,
-    enableSorting: false,
+    filterFn: (row, id, value) => {
+      const firstName = row.getValue('firstName') as string
+      const lastName = row.getValue('lastName') as string
+      const email = row.getValue('email') as string
+      const searchValue = value.toLowerCase()
+      return (
+        firstName?.toLowerCase().includes(searchValue) ||
+        lastName?.toLowerCase().includes(searchValue) ||
+        email?.toLowerCase().includes(searchValue)
+      )
+    },
   },
   {
     accessorKey: 'status',
@@ -91,21 +100,26 @@ export const columns: ColumnDef<User>[] = [
       <DataTableColumnHeader column={column} title='Status' />
     ),
     cell: ({ row }) => {
-      const { status } = row.original
-      const badgeColor = callTypes.get(status)
+      const status = userStatuses.find(
+        (status) => status.value === row.getValue('status')
+      )
+
+      if (!status) {
+        return null
+      }
+
       return (
-        <div className='flex space-x-2'>
-          <Badge variant='outline' className={cn('capitalize', badgeColor)}>
-            {row.getValue('status')}
-          </Badge>
+        <div className='flex w-[100px] items-center'>
+          {status.icon && (
+            <status.icon className='mr-2 h-4 w-4 text-muted-foreground' />
+          )}
+          <span>{status.label}</span>
         </div>
       )
     },
     filterFn: (row, id, value) => {
       return value.includes(row.getValue(id))
     },
-    enableHiding: false,
-    enableSorting: false,
   },
   {
     accessorKey: 'role',
@@ -137,6 +151,6 @@ export const columns: ColumnDef<User>[] = [
   },
   {
     id: 'actions',
-    cell: DataTableRowActions,
+    cell: ({ row }) => <DataTableRowActions user={row.original} />,
   },
 ]

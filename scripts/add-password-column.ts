@@ -21,7 +21,6 @@ async function addPasswordColumn() {
     const exists = columnExists[0]?.exists || false
     
     if (exists) {
-      console.log('A coluna password_hash já existe na tabela users')
       return
     }
     
@@ -31,9 +30,7 @@ async function addPasswordColumn() {
       ADD COLUMN password_hash TEXT
     `
     
-    console.log('Coluna password_hash adicionada com sucesso à tabela users')
   } catch (error) {
-    console.error('Erro ao adicionar coluna password_hash:', error)
     process.exit(1)
   }
 }

@@ -1,50 +1,48 @@
-import { useUsers } from '../context/users-context'
 import { UsersActionDialog } from './users-action-dialog'
 import { UsersDeleteDialog } from './users-delete-dialog'
 import { UsersInviteDialog } from './users-invite-dialog'
+import { useUsersDialogs } from '../context/users-context'
 
-export function UsersDialogs() {
-  const { open, setOpen, currentRow, setCurrentRow } = useUsers()
+interface UsersDialogsProps {
+  onUserUpdated: () => void
+}
+
+export function UsersDialogs({ onUserUpdated }: UsersDialogsProps) {
+  const {
+    isInviteDialogOpen,
+    closeInviteDialog,
+    isEditDialogOpen,
+    closeEditDialog,
+    isDeleteDialogOpen,
+    closeDeleteDialog,
+    selectedUser
+  } = useUsersDialogs()
+
   return (
     <>
-      <UsersActionDialog
-        key='user-add'
-        open={open === 'add'}
-        onOpenChange={() => setOpen('add')}
-      />
-
       <UsersInviteDialog
-        key='user-invite'
-        open={open === 'invite'}
-        onOpenChange={() => setOpen('invite')}
+        open={isInviteDialogOpen}
+        onOpenChange={closeInviteDialog}
+        onUserAdded={onUserUpdated}
       />
 
-      {currentRow && (
-        <>
-          <UsersActionDialog
-            key={`user-edit-${currentRow.id}`}
-            open={open === 'edit'}
-            onOpenChange={() => {
-              setOpen('edit')
-              setTimeout(() => {
-                setCurrentRow(null)
-              }, 500)
-            }}
-            currentRow={currentRow}
-          />
+      {selectedUser && isEditDialogOpen && (
+        <UsersActionDialog
+          open={isEditDialogOpen}
+          onOpenChange={closeEditDialog}
+          onUserUpdated={onUserUpdated}
+          mode="edit"
+          initialData={selectedUser}
+        />
+      )}
 
-          <UsersDeleteDialog
-            key={`user-delete-${currentRow.id}`}
-            open={open === 'delete'}
-            onOpenChange={() => {
-              setOpen('delete')
-              setTimeout(() => {
-                setCurrentRow(null)
-              }, 500)
-            }}
-            currentRow={currentRow}
-          />
-        </>
+      {selectedUser && isDeleteDialogOpen && (
+        <UsersDeleteDialog
+          open={isDeleteDialogOpen}
+          onOpenChange={closeDeleteDialog}
+          onUserDeleted={onUserUpdated}
+          user={selectedUser}
+        />
       )}
     </>
   )

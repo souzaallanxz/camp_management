@@ -154,15 +154,26 @@ export const db = {
             return { data: [], error: null }; 
           }
           
-          // Get keys from first row
-          const keys = Object.keys(rows[0] as Record<string, unknown>);
+          // Get the object to be inserted
+          const rowObjects = rows.map(row => row as Record<string, unknown>);
+          
+          // For users table - remove id and let the database use DEFAULT gen_random_uuid()
+          if (table === 'users') {
+            rowObjects.forEach(rowObj => {
+              if ('id' in rowObj) {
+                delete rowObj.id;
+              }
+            });
+          }
+          
+          // Get keys from first row after potential id removal
+          const keys = Object.keys(rowObjects[0]);
           
           // Generate placeholders for each row
           const placeholders: string[] = [];
           const values: unknown[] = [];
           
-          rows.forEach((row) => {
-            const rowObj = row as Record<string, unknown>;
+          rowObjects.forEach((rowObj) => {
             const rowPlaceholders: string[] = [];
             
             keys.forEach((key) => {

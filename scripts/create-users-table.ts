@@ -8,7 +8,6 @@ const sql = neon(process.env.VITE_NEON_DB_URL!)
 
 async function createUsersTable() {
   try {
-    console.log('Creating users table...')
 
     // Create users table
     await sql`
@@ -50,9 +49,7 @@ async function createUsersTable() {
         EXECUTE FUNCTION update_users_updated_at()
     `
 
-    console.log('users table created successfully!')
   } catch (error) {
-    console.error('Error creating users table:', error)
     process.exit(1)
   }
 }

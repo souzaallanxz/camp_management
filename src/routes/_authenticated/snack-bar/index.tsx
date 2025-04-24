@@ -52,17 +52,6 @@ export default function SnackBarPage() {
     queryFn: () => snackBarService.getCurrentCamp(),
   })
 
-  // Acampamento simulado para garantir o funcionamento da página
-  const fakeCamp = {
-    id: '123e4567-e89b-12d3-a456-426614174000',
-    name: 'Acampamento Atual',
-    start_date: '2023-06-01',
-    end_date: '2023-12-31'
-  }
-
-  // Usamos o acampamento real se existir, ou o simulado como fallback
-  const activeCamp = currentCamp || fakeCamp
-
   const { data: balance = 0 } = useQuery({
     queryKey: ['camper-balance', selectedCamperId],
     queryFn: () => snackBarService.getCamperBalance(selectedCamperId),
@@ -109,6 +98,38 @@ export default function SnackBarPage() {
       )
     },
   })
+
+  // Verificar se existe um acampamento ativo
+  if (!isLoading && !currentCamp) {
+    return (
+      <>
+        <Header fixed>
+          <Search />
+          <div className="ml-auto flex items-center space-x-4">
+            <ThemeSwitch />
+            <ProfileDropdown />
+          </div>
+        </Header>
+
+        <Main>
+          <div className="flex flex-col items-center justify-center h-full space-y-4">
+            <h2 className="text-2xl font-bold tracking-tight">
+              Nenhum acampamento ativo
+            </h2>
+            <p className="text-muted-foreground text-center max-w-md">
+              Não existem acampamentos a decorrer atualmente. O snack bar está disponível apenas durante acampamentos ativos.
+            </p>
+            <Button variant="outline" onClick={() => navigate({ to: '/' })}>
+              Voltar ao Dashboard
+            </Button>
+          </div>
+        </Main>
+      </>
+    )
+  }
+
+  // Usamos o acampamento real (agora já sabemos que existe)
+  const activeCamp = currentCamp
 
   function onSubmit(data: SnackBarTransaction) {
     if (!selectedCamperId) return

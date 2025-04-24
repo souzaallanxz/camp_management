@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { teamService } from '@/features/teams/services/team-service'
 
 export interface MetricData {
   total: number
@@ -38,11 +39,22 @@ interface RawRecentRegistration {
   camp_name: string
 }
 
+// Função auxiliar para obter o team_id do usuário atual
+async function getCurrentTeamId(): Promise<string | null> {
+  const team = await teamService.getCurrentUserTeam()
+  return team?.id || null
+}
+
 export const dashboardService = {
   async getMonthlyPayments(): Promise<MetricData> {
     const now = new Date()
     const currentYear = now.getFullYear()
     const currentMonth = now.getMonth() + 1
+    const teamId = await getCurrentTeamId()
+    
+    if (!teamId) {
+      return { total: 0, previousTotal: 0, percentageChange: null }
+    }
 
     // Get current month's total
     const { data: currentData, error: currentError } = await db.query(
@@ -51,8 +63,9 @@ export const dashboardService = {
        JOIN registrations r ON p.registration_id = r.id
        JOIN camps c ON r.camp_id = c.id
        WHERE EXTRACT(YEAR FROM payment_date) = $1
-       AND EXTRACT(MONTH FROM payment_date) = $2`,
-      [currentYear, currentMonth]
+       AND EXTRACT(MONTH FROM payment_date) = $2
+       AND c.team_id = $3`,
+      [currentYear, currentMonth, teamId]
     )
 
     if (currentError) {
@@ -66,8 +79,9 @@ export const dashboardService = {
        JOIN registrations r ON p.registration_id = r.id
        JOIN camps c ON r.camp_id = c.id
        WHERE EXTRACT(YEAR FROM payment_date) = $1
-       AND EXTRACT(MONTH FROM payment_date) = $2`,
-      [currentMonth === 1 ? currentYear - 1 : currentYear, currentMonth === 1 ? 12 : currentMonth - 1]
+       AND EXTRACT(MONTH FROM payment_date) = $2
+       AND c.team_id = $3`,
+      [currentMonth === 1 ? currentYear - 1 : currentYear, currentMonth === 1 ? 12 : currentMonth - 1, teamId]
     )
 
     if (previousError) {
@@ -89,6 +103,11 @@ export const dashboardService = {
     const now = new Date()
     const currentYear = now.getFullYear()
     const currentMonth = now.getMonth() + 1
+    const teamId = await getCurrentTeamId()
+    
+    if (!teamId) {
+      return { total: 0, previousTotal: 0, percentageChange: null }
+    }
 
     // Get current month's total
     const { data: currentData, error: currentError } = await db.query(
@@ -96,8 +115,9 @@ export const dashboardService = {
        FROM registrations r
        JOIN camps c ON r.camp_id = c.id
        WHERE EXTRACT(YEAR FROM r.created_at) = $1
-       AND EXTRACT(MONTH FROM r.created_at) = $2`,
-      [currentYear, currentMonth]
+       AND EXTRACT(MONTH FROM r.created_at) = $2
+       AND c.team_id = $3`,
+      [currentYear, currentMonth, teamId]
     )
 
     if (currentError) {
@@ -110,8 +130,9 @@ export const dashboardService = {
        FROM registrations r
        JOIN camps c ON r.camp_id = c.id
        WHERE EXTRACT(YEAR FROM r.created_at) = $1
-       AND EXTRACT(MONTH FROM r.created_at) = $2`,
-      [currentMonth === 1 ? currentYear - 1 : currentYear, currentMonth === 1 ? 12 : currentMonth - 1]
+       AND EXTRACT(MONTH FROM r.created_at) = $2
+       AND c.team_id = $3`,
+      [currentMonth === 1 ? currentYear - 1 : currentYear, currentMonth === 1 ? 12 : currentMonth - 1, teamId]
     )
 
     if (previousError) {
@@ -133,6 +154,11 @@ export const dashboardService = {
     const now = new Date()
     const currentYear = now.getFullYear()
     const currentMonth = now.getMonth() + 1
+    const teamId = await getCurrentTeamId()
+    
+    if (!teamId) {
+      return { total: 0, previousTotal: 0, percentageChange: null }
+    }
 
     // Get current month's total
     const { data: currentData, error: currentError } = await db.query(
@@ -141,8 +167,9 @@ export const dashboardService = {
        JOIN registrations r ON sb.registration_id = r.id
        JOIN camps camp ON r.camp_id = camp.id
        WHERE EXTRACT(YEAR FROM sb.created_at) = $1
-       AND EXTRACT(MONTH FROM sb.created_at) = $2`,
-      [currentYear, currentMonth]
+       AND EXTRACT(MONTH FROM sb.created_at) = $2
+       AND camp.team_id = $3`,
+      [currentYear, currentMonth, teamId]
     )
 
     if (currentError) {
@@ -156,8 +183,9 @@ export const dashboardService = {
        JOIN registrations r ON sb.registration_id = r.id
        JOIN camps camp ON r.camp_id = camp.id
        WHERE EXTRACT(YEAR FROM sb.created_at) = $1
-       AND EXTRACT(MONTH FROM sb.created_at) = $2`,
-      [currentMonth === 1 ? currentYear - 1 : currentYear, currentMonth === 1 ? 12 : currentMonth - 1]
+       AND EXTRACT(MONTH FROM sb.created_at) = $2
+       AND camp.team_id = $3`,
+      [currentMonth === 1 ? currentYear - 1 : currentYear, currentMonth === 1 ? 12 : currentMonth - 1, teamId]
     )
 
     if (previousError) {
@@ -178,6 +206,11 @@ export const dashboardService = {
   async getYearlyCampers(): Promise<MetricData> {
     const now = new Date()
     const currentYear = now.getFullYear()
+    const teamId = await getCurrentTeamId()
+    
+    if (!teamId) {
+      return { total: 0, previousTotal: 0, percentageChange: null }
+    }
 
     // Get current year's total
     const { data: currentData, error: currentError } = await db.query(
@@ -185,8 +218,9 @@ export const dashboardService = {
        FROM campers c
        JOIN registrations r ON c.registration_id = r.id
        JOIN camps camp ON r.camp_id = camp.id
-       WHERE EXTRACT(YEAR FROM c.created_at) = $1`,
-      [currentYear]
+       WHERE EXTRACT(YEAR FROM c.created_at) = $1
+       AND camp.team_id = $2`,
+      [currentYear, teamId]
     )
 
     if (currentError) {
@@ -199,8 +233,9 @@ export const dashboardService = {
        FROM campers c
        JOIN registrations r ON c.registration_id = r.id
        JOIN camps camp ON r.camp_id = camp.id
-       WHERE EXTRACT(YEAR FROM c.created_at) = $1`,
-      [currentYear - 1]
+       WHERE EXTRACT(YEAR FROM c.created_at) = $1
+       AND camp.team_id = $2`,
+      [currentYear - 1, teamId]
     )
 
     if (previousError) {
@@ -219,6 +254,12 @@ export const dashboardService = {
   },
 
   async getCampPayments(): Promise<CampPaymentsData[]> {
+    const teamId = await getCurrentTeamId()
+    
+    if (!teamId) {
+      return []
+    }
+
     const { data, error } = await db.query(
       `SELECT 
         c.id as camp_id,
@@ -228,8 +269,10 @@ export const dashboardService = {
        FROM camps c
        LEFT JOIN registrations r ON c.id = r.camp_id
        LEFT JOIN payments p ON r.id = p.registration_id
+       WHERE c.team_id = $1
        GROUP BY c.id, c.name
-       ORDER BY c.created_at DESC`
+       ORDER BY c.created_at DESC`,
+      [teamId]
     )
 
     if (error) {
@@ -245,6 +288,12 @@ export const dashboardService = {
   },
 
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
+    const teamId = await getCurrentTeamId()
+    
+    if (!teamId) {
+      return []
+    }
+
     const { data, error } = await db.query(
       `SELECT 
         r.id, 
@@ -256,10 +305,11 @@ export const dashboardService = {
        FROM registrations r
        JOIN camps c ON r.camp_id = c.id
        LEFT JOIN payments p ON r.id = p.registration_id
+       WHERE c.team_id = $1
        GROUP BY r.id, r.name, r.email, r.created_at, c.name
        ORDER BY r.created_at DESC
-       LIMIT $1`,
-      [limit]
+       LIMIT $2`,
+      [teamId, limit]
     )
 
     if (error) {

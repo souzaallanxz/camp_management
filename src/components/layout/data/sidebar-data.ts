@@ -5,12 +5,12 @@ import {
   IconPalette,
   IconNotification,
   IconBrowserCheck,
-  IconHelp,
   IconUserCog,
   IconFileDescription,
   IconTent,
   IconCampfire,
   IconIceCream,
+  IconUsers,
 } from '@tabler/icons-react'
 import { Command } from 'lucide-react'
 import { type SidebarData, type NavItem } from '../types'
@@ -50,6 +50,11 @@ export const sidebarData: SidebarData = {
           title: 'Campistas',
           url: '/campers',
           icon: IconTent,
+        },
+        {
+          title: 'Usuários',
+          url: '/users',
+          icon: IconUsers,
         },
         {
           title: 'Acampamentos',
@@ -119,6 +124,11 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
       title: 'Campistas',
       url: '/campers',
       icon: IconTent,
+    },
+    {
+      title: 'Usuários',
+      url: '/users',
+      icon: IconUsers,
     },
     {
       title: 'Acampamentos',

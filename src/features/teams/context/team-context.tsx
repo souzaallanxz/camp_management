@@ -26,10 +26,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const fetchTeam = async () => {
-    console.log('Fetching team for user:', user);
-
     if (!user || isAuthLoading) {
-      console.log('No user or auth loading, skipping team fetch');
       setTeam(null);
       setShowOnboarding(false);
       setIsLoading(false);
@@ -38,16 +35,12 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
     try {
       setIsLoading(true);
-      console.log('Calling teamService.getCurrentUserTeam()');
       const team = await teamService.getCurrentUserTeam();
-      console.log('Received team:', team);
 
       setTeam(team);
       const shouldShowOnboarding = !team;
-      console.log('Should show onboarding:', shouldShowOnboarding);
       setShowOnboarding(shouldShowOnboarding);
     } catch (error) {
-      console.error('Error fetching team:', error);
       setTeam(null);
       setShowOnboarding(true);
       toast({
@@ -62,7 +55,6 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
   // Fetch team whenever auth state changes
   useEffect(() => {
-    console.log('Auth state changed:', { user, isAuthLoading });
     if (!isAuthLoading) {
       fetchTeam()
     }
@@ -70,9 +62,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
   // Ensure dialog stays open if no team
   useEffect(() => {
-    console.log('Team state changed:', { user, team, isLoading, showOnboarding });
     if (user && !isLoading && !team) {
-      console.log('Setting showOnboarding to true because user has no team');
       setShowOnboarding(true)
     }
   }, [user, team, isLoading])

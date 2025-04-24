@@ -25,7 +25,6 @@ export function RegistrationDialogs({
       <RegistrationDialog
         open={openDialog === 'create'}
         onOpenChange={(open) => {
-          console.log('RegistrationDialog onOpenChange called with:', open);
           if (!open) {
             forceCloseDialog();
             if (onRegistrationUpdated) {
@@ -36,7 +35,6 @@ export function RegistrationDialogs({
           }
         }}
         onRegistrationCreated={() => {
-          console.log('Registration created callback');
           forceCloseDialog();
           onRegistrationUpdated();
         }}

@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { ChevronsUpDown, Plus, Building2 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -18,7 +17,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTeamData } from '@/features/teams/hooks/use-team-data'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import type { Team } from '@/features/teams/types'
 
 export function TeamSwitcher({ isLoading = false }: { isLoading?: boolean }) {
   const { isMobile } = useSidebar()

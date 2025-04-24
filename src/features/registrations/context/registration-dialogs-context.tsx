@@ -28,25 +28,21 @@ export function RegistrationDialogsProvider({ children }: RegistrationDialogsPro
   const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null)
 
   const forceCloseDialog = () => {
-    console.log('Force closing dialog');
     setOpenDialog(null);
     setSelectedRegistration(null);
   };
 
   const closeCreateDialog = () => {
-    console.log('Closing create dialog directly');
     if (openDialog === 'create') {
       setOpenDialog(null);
     }
   };
 
   const handleOpenChange = (open: boolean) => {
-    console.log('Context handleOpenChange called with:', open);
     if (open) {
       // Se abrindo, o diálogo já deve ter sido definido pelo método apropriado
     } else {
       // Se fechando, limpar o estado
-      console.log('Closing dialog in context, setting openDialog=null');
       setOpenDialog(null);
       setSelectedRegistration(null);
     }

@@ -126,9 +126,7 @@ async function main() {
       );
     `);
 
-    console.log('Database tables have been successfully recreated!');
   } catch (error) {
-    console.error('Error recreating database tables:', error);
     process.exit(1);
   }
 }

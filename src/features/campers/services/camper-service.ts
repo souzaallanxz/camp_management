@@ -5,9 +5,7 @@ import type { Camper, InsertCamper } from '../data/schema'
 const devLog = (message: string, data?: any) => {
   if (import.meta.env.DEV) {
     if (data) {
-      console.log(message, data)
     } else {
-      console.log(message)
     }
   }
 }

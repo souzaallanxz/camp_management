@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -8,15 +9,25 @@ import { UsersDialogs } from './components/users-dialogs'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersTable } from './components/users-table'
 import UsersProvider from './context/users-context'
-import { userListSchema } from './data/schema'
-import { users } from './data/users'
+import { User } from './data/schema'
+import { getUsers } from './services/user-service'
 
-export default function Users() {
-  // Parse user list
-  const userList = userListSchema.parse(users)
+function UsersContent() {
+  const { data: users = [], refetch, isLoading, error } = useQuery({
+    queryKey: ['users'],
+    queryFn: getUsers,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+    retry: 2
+  });
+
+  const handleRefetch = () => {
+    refetch();
+  };
 
   return (
-    <UsersProvider>
+    <>
       <Header fixed>
         <Search />
         <div className='ml-auto flex items-center space-x-4'>
@@ -28,19 +39,34 @@ export default function Users() {
       <Main>
         <div className='mb-2 flex items-center justify-between space-y-2 flex-wrap'>
           <div>
-            <h2 className='text-2xl font-bold tracking-tight'>User List</h2>
+            <h2 className='text-2xl font-bold tracking-tight'>Lista de Usuários</h2>
             <p className='text-muted-foreground'>
-              Manage your users and their roles here.
+              Gerencie os usuários e seus papéis na plataforma.
             </p>
           </div>
           <UsersPrimaryButtons />
         </div>
-        <div className='-mx-4 flex-1 overflow-auto px-4 py-1 lg:flex-row lg:space-x-12 lg:space-y-0'>
-          <UsersTable data={userList} columns={columns} />
+
+        <div className='-mx-4 flex-1 overflow-auto px-4 py-1'>
+          {isLoading ? (
+            <div className="text-center p-4">Carregando usuários...</div>
+          ) : error ? (
+            <div className="text-center p-4 text-red-500">Erro ao carregar usuários: {error instanceof Error ? error.message : 'Erro desconhecido'}</div>
+          ) : (
+            <UsersTable data={users} columns={columns} />
+          )}
         </div>
       </Main>
 
-      <UsersDialogs />
+      <UsersDialogs onUserUpdated={handleRefetch} />
+    </>
+  )
+}
+
+export default function Users() {
+  return (
+    <UsersProvider>
+      <UsersContent />
     </UsersProvider>
   )
 }

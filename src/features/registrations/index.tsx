@@ -64,8 +64,6 @@ function RegistrationsContent() {
             <div className="text-center p-4">A carregar inscrições...</div>
           ) : error ? (
             <div className="text-center p-4 text-red-500">Erro ao carregar inscrições: {error.message}</div>
-          ) : registrationsWithActions.length === 0 ? (
-            <div className="text-center p-4">Não existem inscrições. Clique em "Nova Inscrição" para criar.</div>
           ) : (
             <RegistrationsTable data={registrationsWithActions} columns={columns} />
           )}

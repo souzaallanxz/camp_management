@@ -99,7 +99,7 @@ const db = {
 }
 
 async function main() {
-  console.log('Running migrations...')
+
   
   const { error } = await db.migrate()
   
