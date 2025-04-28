@@ -108,8 +108,13 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
 export function useTeam() {
   const context = useContext(TeamContext)
-  if (context === undefined) {
-    throw new Error('useTeam must be used within a TeamProvider')
+  if (!context) {
+    console.warn('useTeam must be used within a TeamProvider')
+    return {
+      data: null,
+      isLoading: true,
+      mutate: async () => {},
+    }
   }
   return context
 } 

@@ -18,6 +18,7 @@ import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index
 import { Route as AuthenticatedSnackBarImport } from './routes/_authenticated/snack-bar'
 import { Route as AuthenticatedCampsImport } from './routes/_authenticated/camps'
 import { Route as authSignInImport } from './routes/(auth)/sign-in'
+import { Route as authSetupPasswordImport } from './routes/(auth)/setup-password'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as auth500Import } from './routes/(auth)/500'
 import { Route as AuthenticatedSnackBarIndexImport } from './routes/_authenticated/snack-bar/index'
@@ -191,6 +192,12 @@ const AuthenticatedCampsRoute = AuthenticatedCampsImport.update({
 const authSignInRoute = authSignInImport.update({
   id: '/(auth)/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const authSetupPasswordRoute = authSetupPasswordImport.update({
+  id: '/(auth)/setup-password',
+  path: '/setup-password',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -385,6 +392,13 @@ declare module '@tanstack/react-router' {
       path: '/otp'
       fullPath: '/otp'
       preLoaderRoute: typeof authOtpImport
+      parentRoute: typeof rootRoute
+    }
+    '/(auth)/setup-password': {
+      id: '/(auth)/setup-password'
+      path: '/setup-password'
+      fullPath: '/setup-password'
+      preLoaderRoute: typeof authSetupPasswordImport
       parentRoute: typeof rootRoute
     }
     '/(auth)/sign-in': {
@@ -685,6 +699,7 @@ export interface FileRoutesByFullPath {
   '': typeof AuthenticatedRouteRouteWithChildren
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
+  '/setup-password': typeof authSetupPasswordRoute
   '/sign-in': typeof authSignInRoute
   '/camps': typeof AuthenticatedCampsRoute
   '/snack-bar': typeof AuthenticatedSnackBarRouteWithChildren
@@ -719,6 +734,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
+  '/setup-password': typeof authSetupPasswordRoute
   '/sign-in': typeof authSignInRoute
   '/camps': typeof AuthenticatedCampsRoute
   '/forgot-password': typeof authForgotPasswordLazyRoute
@@ -753,6 +769,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/(auth)/500': typeof auth500Route
   '/(auth)/otp': typeof authOtpRoute
+  '/(auth)/setup-password': typeof authSetupPasswordRoute
   '/(auth)/sign-in': typeof authSignInRoute
   '/_authenticated/camps': typeof AuthenticatedCampsRoute
   '/_authenticated/snack-bar': typeof AuthenticatedSnackBarRouteWithChildren
@@ -791,6 +808,7 @@ export interface FileRouteTypes {
     | ''
     | '/500'
     | '/otp'
+    | '/setup-password'
     | '/sign-in'
     | '/camps'
     | '/snack-bar'
@@ -824,6 +842,7 @@ export interface FileRouteTypes {
   to:
     | '/500'
     | '/otp'
+    | '/setup-password'
     | '/sign-in'
     | '/camps'
     | '/forgot-password'
@@ -856,6 +875,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/(auth)/500'
     | '/(auth)/otp'
+    | '/(auth)/setup-password'
     | '/(auth)/sign-in'
     | '/_authenticated/camps'
     | '/_authenticated/snack-bar'
@@ -893,6 +913,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   auth500Route: typeof auth500Route
   authOtpRoute: typeof authOtpRoute
+  authSetupPasswordRoute: typeof authSetupPasswordRoute
   authSignInRoute: typeof authSignInRoute
   authForgotPasswordLazyRoute: typeof authForgotPasswordLazyRoute
   authResetPasswordLazyRoute: typeof authResetPasswordLazyRoute
@@ -909,6 +930,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   auth500Route: auth500Route,
   authOtpRoute: authOtpRoute,
+  authSetupPasswordRoute: authSetupPasswordRoute,
   authSignInRoute: authSignInRoute,
   authForgotPasswordLazyRoute: authForgotPasswordLazyRoute,
   authResetPasswordLazyRoute: authResetPasswordLazyRoute,
@@ -934,6 +956,7 @@ export const routeTree = rootRoute
         "/_authenticated",
         "/(auth)/500",
         "/(auth)/otp",
+        "/(auth)/setup-password",
         "/(auth)/sign-in",
         "/(auth)/forgot-password",
         "/(auth)/reset-password",
@@ -968,6 +991,9 @@ export const routeTree = rootRoute
     },
     "/(auth)/otp": {
       "filePath": "(auth)/otp.tsx"
+    },
+    "/(auth)/setup-password": {
+      "filePath": "(auth)/setup-password.tsx"
     },
     "/(auth)/sign-in": {
       "filePath": "(auth)/sign-in.tsx"

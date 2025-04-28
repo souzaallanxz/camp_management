@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { useUser } from '@/features/auth/hooks/use-user'
 import { columns } from './components/users-columns'
 import { UsersDialogs } from './components/users-dialogs'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersTable } from './components/users-table'
 import UsersProvider from './context/users-context'
-import { User } from './data/schema'
 import { getUsers } from './services/user-service'
 
 function UsersContent() {
@@ -64,6 +66,22 @@ function UsersContent() {
 }
 
 export default function Users() {
+  const { role, user } = useUser()
+  const navigate = useNavigate()
+
+  console.log('Current user role:', role)
+  console.log('Current user:', user)
+
+  useEffect(() => {
+    if (role !== 'superadmin' && role !== 'admin') {
+      navigate({ to: '/' })
+    }
+  }, [role, navigate])
+
+  if (role !== 'superadmin' && role !== 'admin') {
+    return null
+  }
+
   return (
     <UsersProvider>
       <UsersContent />

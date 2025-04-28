@@ -125,17 +125,22 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
       url: '/campers',
       icon: IconTent,
     },
-    {
+  ]
+
+  // Only show Users menu item for superadmin and admin roles
+  if (user?.role === 'superadmin' || user?.role === 'admin') {
+    generalItems.push({
       title: 'Usuários',
       url: '/users',
       icon: IconUsers,
-    },
-    {
-      title: 'Acampamentos',
-      url: '/camps',
-      icon: IconCampfire,
-    },
-  ]
+    })
+  }
+
+  generalItems.push({
+    title: 'Acampamentos',
+    url: '/camps',
+    icon: IconCampfire,
+  })
 
   if (permissions.snackBar.access) {
     generalItems.push({

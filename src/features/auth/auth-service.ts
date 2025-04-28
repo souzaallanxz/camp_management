@@ -7,6 +7,7 @@ export type User = {
   email: string
   name?: string
   team_id?: string | null
+  role?: 'superadmin' | 'admin' | 'contributor' | 'cashier' | 'manager'
 }
 
 export type Session = {
@@ -24,7 +25,7 @@ export async function signIn(email: string | { email: string, password: string }
 
   // Buscar usuário pelo email
   const result = await sqlNeon`
-    SELECT id, email, name, password_hash, team_id, created_at, updated_at
+    SELECT id, email, name, password_hash, team_id, role, created_at, updated_at
     FROM public.users 
     WHERE email = ${credentials.email}::text
   `
@@ -49,14 +50,16 @@ export async function signIn(email: string | { email: string, password: string }
       id: user.id,
       email: user.email,
       name: user.name,
-      team_id: user.team_id
+      team_id: user.team_id,
+      role: user.role
     }, 
     session: { 
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        team_id: user.team_id
+        team_id: user.team_id,
+        role: user.role
       }, 
       token 
     } 
@@ -74,7 +77,7 @@ export async function getCurrentUser() {
   }
 
   const result = await sqlNeon`
-    SELECT id, email, name, team_id, created_at, updated_at
+    SELECT id, email, name, team_id, role, created_at, updated_at
     FROM public.users
     WHERE id = ${token}::uuid
   `
@@ -85,11 +88,14 @@ export async function getCurrentUser() {
     throw new Error('User not found')
   }
 
+  console.log('User from database:', user)
+
   return {
     id: user.id,
     email: user.email,
     name: user.name,
-    team_id: user.team_id
+    team_id: user.team_id,
+    role: user.role
   }
 }
 

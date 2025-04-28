@@ -38,9 +38,7 @@ import { updateUser } from '../services/user-service'
 const formSchema = z.object({
   firstName: z.string().min(1, { message: 'First name is required.' }),
   lastName: z.string().min(1, { message: 'Last name is required.' }),
-  username: z.string().min(3, { message: 'Username must be at least 3 characters.' }),
   email: z.string().min(1, { message: 'Email is required.' }).email(),
-  phoneNumber: z.string().min(1, { message: 'Phone number is required.' }),
   role: z.enum(['superadmin', 'admin', 'contributor', 'cashier', 'manager'] as const),
 })
 
@@ -58,9 +56,7 @@ export function UsersActionDialog({ open, onOpenChange, onUserUpdated, initialDa
   const defaultValues: UserFormValues = {
     firstName: initialData?.firstName || '',
     lastName: initialData?.lastName || '',
-    username: initialData?.username || '',
     email: initialData?.email || '',
-    phoneNumber: initialData?.phoneNumber || '',
     role: initialData?.role || 'contributor',
   }
 
@@ -155,38 +151,12 @@ export function UsersActionDialog({ open, onOpenChange, onUserUpdated, initialDa
             </div>
             <FormField
               control={form.control}
-              name='username'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Username</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name='email'
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
                     <Input type='email' {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='phoneNumber'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number</FormLabel>
-                  <FormControl>
-                    <Input type='tel' {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

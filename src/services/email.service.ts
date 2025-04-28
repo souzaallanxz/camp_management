@@ -191,6 +191,66 @@ export const emailService = {
       text,
     });
   },
+
+  /**
+   * Envia um email de convite para um novo usuário
+   */
+  async sendInvitationEmail(email: string, userId: string): Promise<EmailResult> {
+    const subject = 'Convite para a plataforma';
+    
+    // URL para definição de senha com query parameters codificados
+    const setupLink = `${window.location.origin}/setup-password?userId=${encodeURIComponent(userId)}`;
+    
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Bem-vindo à plataforma!</h2>
+        <p>Você foi convidado para fazer parte da nossa plataforma.</p>
+        <p>Clique no botão abaixo para definir sua senha e começar a usar:</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${setupLink}" 
+             style="background-color: #0070f3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+            Definir Senha
+          </a>
+        </div>
+        <p>Se você não solicitou este convite, ignore este email.</p>
+        <p>Este link expirará em 24 horas por motivos de segurança.</p>
+        <hr style="border: 1px solid #eee; margin: 30px 0;" />
+        <p style="color: #666; font-size: 12px;">© 2024 InfoLio. Todos os direitos reservados.</p>
+      </div>
+    `;
+
+    const text = `
+      Bem-vindo à plataforma!
+      
+      Você foi convidado para fazer parte da nossa plataforma.
+      
+      Para definir sua senha e começar a usar, acesse o link:
+      ${setupLink}
+      
+      Se você não solicitou este convite, ignore este email.
+      
+      Este link expirará em 24 horas por motivos de segurança.
+    `;
+
+    // Em ambiente de desenvolvimento, exibe o link no console para facilitar os testes
+    if (import.meta.env.DEV && IS_DEMO_MODE) {
+      // eslint-disable-next-line no-console
+      console.log('==========================================');
+      // eslint-disable-next-line no-console
+      console.log('LINK DE CONVITE (DEV)');
+      // eslint-disable-next-line no-console
+      console.log(setupLink);
+      // eslint-disable-next-line no-console
+      console.log('==========================================');
+    }
+
+    return this.sendEmail({
+      to: email,
+      subject,
+      html,
+      text,
+    });
+  },
   
   // Variável de exportação para verificar se estamos em modo de demonstração
   isInDemoMode: IS_DEMO_MODE

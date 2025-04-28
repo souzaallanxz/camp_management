@@ -14,8 +14,50 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import SidebarNav from './components/sidebar-nav'
+import { useUser } from '@/features/auth/hooks/use-user'
 
 export default function Settings() {
+  const { role } = useUser()
+
+  const sidebarNavItems = [
+    {
+      title: 'Perfil',
+      icon: <IconUser size={18} />,
+      href: '/settings',
+    },
+    ...(role === 'superadmin' || role === 'admin'
+      ? [
+          {
+            title: 'Organização',
+            icon: <IconBuildingCommunity size={18} />,
+            href: '/settings/organization',
+          },
+          {
+            title: 'Faturação',
+            icon: <IconCreditCard size={18} />,
+            href: '/settings/billing',
+          },
+        ]
+      : []),
+    {
+      title: 'Aparência',
+      icon: <IconPalette size={18} />,
+      href: '/settings/appearance',
+    },
+    {
+      title: 'Notificações',
+      icon: <IconNotification size={18} />,
+      href: '/settings/notifications',
+      disabled: true,
+    },
+    {
+      title: 'Ecrãs',
+      icon: <IconBrowserCheck size={18} />,
+      href: '/settings/display',
+      disabled: true,
+    },
+  ]
+
   return (
     <>
       {/* ===== Top Heading ===== */}
@@ -49,38 +91,3 @@ export default function Settings() {
     </>
   )
 }
-
-const sidebarNavItems = [
-  {
-    title: 'Perfil',
-    icon: <IconUser size={18} />,
-    href: '/settings',
-  },
-  {
-    title: 'Organização',
-    icon: <IconBuildingCommunity size={18} />,
-    href: '/settings/organization',
-  },
-  {
-    title: 'Faturação',
-    icon: <IconCreditCard size={18} />,
-    href: '/settings/billing',
-  },
-  {
-    title: 'Aparência',
-    icon: <IconPalette size={18} />,
-    href: '/settings/appearance',
-  },
-  {
-    title: 'Notificações',
-    icon: <IconNotification size={18} />,
-    href: '/settings/notifications',
-    disabled: true,
-  },
-  {
-    title: 'Ecrãs',
-    icon: <IconBrowserCheck size={18} />,
-    href: '/settings/display',
-    disabled: true,
-  },
-]

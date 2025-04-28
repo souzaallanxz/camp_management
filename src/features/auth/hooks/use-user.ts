@@ -6,19 +6,19 @@ interface UseUserReturn {
   isAuthenticated: boolean
   isLoading: boolean
   email: string | null
+  role?: 'superadmin' | 'admin' | 'contributor' | 'cashier' | 'manager'
 }
 
-export const useUser = (): UseUserReturn => {
-  const auth = useAuth()
-
-  if (!auth) {
-    throw new Error('useUser must be used within an AuthProvider')
-  }
-
+export function useUser(): UseUserReturn {
+  const { user, isAuthenticated, isLoading } = useAuth()
+  
+  console.log('Auth context user:', user)
+  
   return {
-    user: auth.user,
-    isAuthenticated: auth.isAuthenticated,
-    isLoading: auth.isLoading,
-    email: auth.user?.email || null,
+    user,
+    isAuthenticated,
+    isLoading,
+    email: user?.email ?? null,
+    role: user?.role as UseUserReturn['role']
   }
 } 

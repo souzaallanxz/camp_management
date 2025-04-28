@@ -2,6 +2,7 @@ import { User } from '../data/schema'
 import { db } from '@/lib/db'
 import { getCurrentUserTeam } from '@/features/auth/auth-service'
 import { sqlNeon } from '@/lib/sql-neon'
+import { emailService } from '@/services/email.service'
 
 // Busca apenas usuários da equipe atual do usuário logado
 export async function getUsers(): Promise<User[]> {
@@ -71,11 +72,18 @@ export async function createUserWithInvitation(userData: Omit<User, 'id' | 'crea
     throw error
   }
   
-  // Aqui você adicionaria a lógica para enviar o email de convite com link para definir senha
-  // sendInvitationEmail(data.email, data.id)
+  // Get the created user
+  const user = (Array.isArray(data) && data.length > 0 ? data[0] : data) as User
   
-  // The result will be an array, so take the first item
-  return (Array.isArray(data) && data.length > 0 ? data[0] : data) as User
+  // Send invitation email
+  const emailResult = await emailService.sendInvitationEmail(user.email, user.id)
+  
+  if (!emailResult.success) {
+    // Log the error but don't throw - we still want to return the created user
+    console.error('Failed to send invitation email:', emailResult.error)
+  }
+  
+  return user
 }
 
 export async function updateUser(userId: string, userData: Partial<User>): Promise<User> {
@@ -104,13 +112,13 @@ export async function updateUser(userId: string, userData: Partial<User>): Promi
       created_at as createdAt,
       updated_at as updatedAt
     `)
-    .single()
   
   if (error) {
     throw error
   }
   
-  return data as User
+  const user = Array.isArray(data) ? data[0] : data;
+  return user as User;
 }
 
 export async function deleteUser(userId: string): Promise<void> {
