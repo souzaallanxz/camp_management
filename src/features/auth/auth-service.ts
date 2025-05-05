@@ -17,7 +17,7 @@ export type Session = {
 export type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED'
 
 export async function signIn(credentials: SignInCredentials) {
-  const response = await fetch(buildApiUrl('/auth/sign-in'), {
+  const response = await fetch(buildApiUrl('/api/auth/sign-in'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -46,7 +46,7 @@ export async function getCurrentUser() {
     throw new Error('No token found')
   }
 
-  const response = await fetch(buildApiUrl('/auth/me'), {
+  const response = await fetch(buildApiUrl('/api/auth/me'), {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
@@ -79,7 +79,7 @@ export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Se
 }
 
 export async function signUp({ email, password, name }: SignUpCredentials) {
-  const response = await fetch(buildApiUrl('/auth/sign-up'), {
+  const response = await fetch(buildApiUrl('/api/auth/sign-up'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -96,7 +96,7 @@ export async function signUp({ email, password, name }: SignUpCredentials) {
 }
 
 export async function forgotPassword(email: string) {
-  const response = await fetch(buildApiUrl('/auth/forgot-password'), {
+  const response = await fetch(buildApiUrl('/api/auth/forgot-password'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -113,7 +113,7 @@ export async function forgotPassword(email: string) {
 }
 
 export async function resetPassword(token: string, password: string) {
-  const response = await fetch(buildApiUrl('/auth/reset-password'), {
+  const response = await fetch(buildApiUrl('/api/auth/reset-password'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
