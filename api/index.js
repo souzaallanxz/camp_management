@@ -1,22 +1,17 @@
-import { neon } from '@neondatabase/serverless';
-import bcrypt from 'bcryptjs';
-import { sql as sqlVercel } from '@vercel/postgres';
-
-// Load environment variables
-const dotenv = import('dotenv');
-dotenv.config();
-
-// Initialize Express app
+// Importar o servidor Express do arquivo server.ts
 import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import { Resend } from 'resend';
-import { v4 as uuidv4 } from 'uuid';
-import stripe from 'stripe';
-import twilio from 'twilio';
+import { neon } from '@neondatabase/serverless';
+import bcrypt from 'bcryptjs';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 
-// Middleware
+// Enable CORS
 app.use(cors({
   origin: ['http://localhost:5173', 'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app', 'https://campmanagement.vercel.app', 'https://campmanagement-a0bu9c7hx-souzaallanxzs-projects.vercel.app', 'https://campmanagement-pzl6edpul-souzaallanxzs-projects.vercel.app', 'https://campmanagement-9eqwfmsi7-souzaallanxzs-projects.vercel.app', 'https://campmanagement-hi7hnzpy1-souzaallanxzs-projects.vercel.app'],
   credentials: true,
@@ -26,16 +21,6 @@ app.use(cors({
 
 // Parse JSON request bodies
 app.use(express.json());
-
-// Middleware para definir cabeçalhos de cache para impedir o cache das respostas da API
-app.use((req, res, next) => {
-  // Impedir o cache para todas as rotas de API
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  res.set('Surrogate-Control', 'no-store');
-  next();
-});
 
 // Initialize Neon database connection
 const sql = neon(process.env.DATABASE_URL);
@@ -51,7 +36,7 @@ app.post('/auth/sign-in', async (req, res) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const userResult = await sqlVercel`
+    const userResult = await sql`
       SELECT id, email, name, password_hash, team_id 
       FROM public.users 
       WHERE email = ${email}
@@ -89,12 +74,6 @@ app.post('/auth/sign-in', async (req, res) => {
 
 // Get current user route
 app.get('/auth/me', async (req, res) => {
-  // Define cache headers
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  res.set('Surrogate-Control', 'no-store');
-  
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -104,7 +83,7 @@ app.get('/auth/me', async (req, res) => {
     const token = authHeader.split(' ')[1];
 
     // Find user by token (which is the user ID)
-    const userResult = await sqlVercel`
+    const userResult = await sql`
       SELECT id, email, name, team_id, role, created_at, updated_at
       FROM public.users
       WHERE id = ${token}::uuid
@@ -138,7 +117,7 @@ app.get('/teams/current', async (req, res) => {
     }
     const token = authHeader.split(' ')[1];
     // Buscar o usuário pelo token (id)
-    const userResult = await sqlVercel`
+    const userResult = await sql`
       SELECT team_id FROM public.users WHERE id = ${token}::uuid
     `;
     const user = userResult[0];
@@ -149,7 +128,7 @@ app.get('/teams/current', async (req, res) => {
       return res.json(null); // Usuário não tem equipe
     }
     // Buscar os dados do time
-    const teamResult = await sqlVercel`
+    const teamResult = await sql`
       SELECT * FROM public.teams WHERE id = ${user.team_id}::uuid
     `;
     const team = teamResult[0];
@@ -174,7 +153,7 @@ app.get('/dashboard/monthly-payments', async (req, res) => {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
     // Pagamentos do mês atual
-    const current = await sqlVercel`
+    const current = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM payments p
       JOIN registrations r ON p.registration_id = r.id
@@ -185,7 +164,7 @@ app.get('/dashboard/monthly-payments', async (req, res) => {
     `;
     
     // Pagamentos do mês anterior
-    const prev = await sqlVercel`
+    const prev = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM payments p
       JOIN registrations r ON p.registration_id = r.id
@@ -217,7 +196,7 @@ app.get('/dashboard/monthly-registrations', async (req, res) => {
     const currentMonth = now.getMonth() + 1;
     
     // Registrations do mês atual
-    const current = await sqlVercel`
+    const current = await sql`
       SELECT COUNT(*) as total_count
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
@@ -227,7 +206,7 @@ app.get('/dashboard/monthly-registrations', async (req, res) => {
     `;
     
     // Registrations do mês anterior
-    const prev = await sqlVercel`
+    const prev = await sql`
       SELECT COUNT(*) as total_count
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
@@ -258,7 +237,7 @@ app.get('/dashboard/monthly-snackbar', async (req, res) => {
     const currentMonth = now.getMonth() + 1;
     
     // Snackbar do mês atual
-    const current = await sqlVercel`
+    const current = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
@@ -269,7 +248,7 @@ app.get('/dashboard/monthly-snackbar', async (req, res) => {
     `;
     
     // Snackbar do mês anterior
-    const prev = await sqlVercel`
+    const prev = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
@@ -300,7 +279,7 @@ app.get('/dashboard/yearly-campers', async (req, res) => {
     const currentYear = now.getFullYear();
     
     // Campistas deste ano
-    const current = await sqlVercel`
+    const current = await sql`
       SELECT COUNT(*) as total_count
       FROM campers cm
       JOIN registrations r ON cm.registration_id = r.id
@@ -310,7 +289,7 @@ app.get('/dashboard/yearly-campers', async (req, res) => {
     `;
     
     // Campistas do ano anterior
-    const prev = await sqlVercel`
+    const prev = await sql`
       SELECT COUNT(*) as total_count
       FROM campers cm
       JOIN registrations r ON cm.registration_id = r.id
@@ -337,7 +316,7 @@ app.get('/dashboard/camp-payments', async (req, res) => {
   }
   try {
     // Pagamentos por acampamento
-    const results = await sqlVercel`
+    const results = await sql`
       SELECT c.name as camp_name, COALESCE(SUM(p.amount), 0) as total_amount
       FROM camps c
       LEFT JOIN registrations r ON c.id = r.camp_id
@@ -370,7 +349,7 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
   try {
     // Tentar descobrir a estrutura da tabela registrations
     console.log('Verificando estrutura da tabela registrations...');
-    const tableInfo = await sqlVercel`
+    const tableInfo = await sql`
       SELECT column_name, data_type 
       FROM information_schema.columns 
       WHERE table_name = 'registrations'
@@ -388,7 +367,7 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
     if (teamId) {
       // Se tiver teamId, filtra por ele
       console.log('Executando consulta com filtro de teamId');
-      results = await sqlVercel`
+      results = await sql`
         SELECT 
           r.id, 
           r.name as camper_name, 
@@ -405,7 +384,7 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
     } else {
       // Se não tiver teamId, retorna as mais recentes sem filtro
       console.log('Executando consulta SEM filtro de teamId (modo diagnóstico)');
-      results = await sqlVercel`
+      results = await sql`
         SELECT 
           r.id, 
           r.name as camper_name, 
@@ -454,7 +433,7 @@ app.post('/api/auth/sign-in', async (req, res) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const userResult = await sqlVercel`
+    const userResult = await sql`
       SELECT id, email, name, password_hash, team_id 
       FROM public.users 
       WHERE email = ${email}
@@ -492,12 +471,6 @@ app.post('/api/auth/sign-in', async (req, res) => {
 
 // Get current user route
 app.get('/api/auth/me', async (req, res) => {
-  // Define cache headers
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  res.set('Surrogate-Control', 'no-store');
-  
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -507,7 +480,7 @@ app.get('/api/auth/me', async (req, res) => {
     const token = authHeader.split(' ')[1];
 
     // Find user by token (which is the user ID)
-    const userResult = await sqlVercel`
+    const userResult = await sql`
       SELECT id, email, name, team_id, role, created_at, updated_at
       FROM public.users
       WHERE id = ${token}::uuid
@@ -541,7 +514,7 @@ app.get('/api/teams/current', async (req, res) => {
     }
     const token = authHeader.split(' ')[1];
     // Buscar o usuário pelo token (id)
-    const userResult = await sqlVercel`
+    const userResult = await sql`
       SELECT team_id FROM public.users WHERE id = ${token}::uuid
     `;
     const user = userResult[0];
@@ -552,7 +525,7 @@ app.get('/api/teams/current', async (req, res) => {
       return res.json(null); // Usuário não tem equipe
     }
     // Buscar os dados do time
-    const teamResult = await sqlVercel`
+    const teamResult = await sql`
       SELECT * FROM public.teams WHERE id = ${user.team_id}::uuid
     `;
     const team = teamResult[0];
@@ -579,7 +552,7 @@ app.get('/api/dashboard/monthly-payments', async (req, res) => {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
     // Pagamentos do mês atual
-    const current = await sqlVercel`
+    const current = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM payments p
       JOIN registrations r ON p.registration_id = r.id
@@ -590,7 +563,7 @@ app.get('/api/dashboard/monthly-payments', async (req, res) => {
     `;
     
     // Pagamentos do mês anterior
-    const prev = await sqlVercel`
+    const prev = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM payments p
       JOIN registrations r ON p.registration_id = r.id
@@ -622,7 +595,7 @@ app.get('/api/dashboard/monthly-registrations', async (req, res) => {
     const currentMonth = now.getMonth() + 1;
     
     // Registrations do mês atual
-    const current = await sqlVercel`
+    const current = await sql`
       SELECT COUNT(*) as total_count
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
@@ -632,7 +605,7 @@ app.get('/api/dashboard/monthly-registrations', async (req, res) => {
     `;
     
     // Registrations do mês anterior
-    const prev = await sqlVercel`
+    const prev = await sql`
       SELECT COUNT(*) as total_count
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
@@ -663,7 +636,7 @@ app.get('/api/dashboard/monthly-snackbar', async (req, res) => {
     const currentMonth = now.getMonth() + 1;
     
     // Snackbar do mês atual
-    const current = await sqlVercel`
+    const current = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
@@ -674,7 +647,7 @@ app.get('/api/dashboard/monthly-snackbar', async (req, res) => {
     `;
     
     // Snackbar do mês anterior
-    const prev = await sqlVercel`
+    const prev = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
@@ -705,7 +678,7 @@ app.get('/api/dashboard/yearly-campers', async (req, res) => {
     const currentYear = now.getFullYear();
     
     // Campistas deste ano
-    const current = await sqlVercel`
+    const current = await sql`
       SELECT COUNT(*) as total_count
       FROM campers cm
       JOIN registrations r ON cm.registration_id = r.id
@@ -715,7 +688,7 @@ app.get('/api/dashboard/yearly-campers', async (req, res) => {
     `;
     
     // Campistas do ano anterior
-    const prev = await sqlVercel`
+    const prev = await sql`
       SELECT COUNT(*) as total_count
       FROM campers cm
       JOIN registrations r ON cm.registration_id = r.id
@@ -742,7 +715,7 @@ app.get('/api/dashboard/camp-payments', async (req, res) => {
   }
   try {
     // Pagamentos por acampamento
-    const results = await sqlVercel`
+    const results = await sql`
       SELECT c.name as camp_name, COALESCE(SUM(p.amount), 0) as total_amount
       FROM camps c
       LEFT JOIN registrations r ON c.id = r.camp_id
@@ -783,7 +756,7 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
     if (teamId) {
       // Se tiver teamId, filtra por ele
       console.log('Executando consulta com filtro de teamId');
-      results = await sqlVercel`
+      results = await sql`
         SELECT 
           r.id, 
           r.name as camper_name, 
@@ -800,7 +773,7 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
     } else {
       // Se não tiver teamId, retorna as mais recentes sem filtro
       console.log('Executando consulta SEM filtro de teamId (modo diagnóstico)');
-      results = await sqlVercel`
+      results = await sql`
         SELECT 
           r.id, 
           r.name as camper_name, 
@@ -848,34 +821,34 @@ app.get('/debug/registrations', async (req, res) => {
   try {
     // Verificar conexão com o banco
     console.log('Verificando conexão com o banco de dados...');
-    const testConnection = await sqlVercel`SELECT 1 as test`;
+    const testConnection = await sql`SELECT 1 as test`;
     console.log('Conexão com banco de dados OK:', testConnection);
     
     // Dados básicos das tabelas
     console.log('Buscando informações sobre tabelas...');
     
     // Contagem de registrations
-    const registrationCount = await sqlVercel`SELECT COUNT(*) as count FROM registrations`;
+    const registrationCount = await sql`SELECT COUNT(*) as count FROM registrations`;
     console.log('Total de registrations:', registrationCount[0]?.count);
     
     // Contagem de camps
-    const campsCount = await sqlVercel`SELECT COUNT(*) as count FROM camps`;
+    const campsCount = await sql`SELECT COUNT(*) as count FROM camps`;
     console.log('Total de camps:', campsCount[0]?.count);
     
     // Contagem de teams
-    const teamsCount = await sqlVercel`SELECT COUNT(*) as count FROM teams`;
+    const teamsCount = await sql`SELECT COUNT(*) as count FROM teams`;
     console.log('Total de teams:', teamsCount[0]?.count);
     
     // Listar alguns teams para diagnóstico
-    const teams = await sqlVercel`SELECT id, name FROM teams LIMIT 5`;
+    const teams = await sql`SELECT id, name FROM teams LIMIT 5`;
     console.log('Teams encontrados:', teams);
     
     // Tentar buscar as 5 registrations mais recentes
-    const results = await sqlVercel`
+    const results = await sql`
       SELECT 
         r.id, 
-        r.name as camper_name, 
-        r.email as camper_email,
+        r.camper_name, 
+        r.camper_email,
         r.status,
         r.created_at,
         c.name as camp_name,
@@ -989,154 +962,63 @@ function getTeamId(req) {
 
 // ===== REGISTRATIONS ENDPOINTS =====
 
-// List all registrations
-app.get('/api/registrations', async (req, res) => {
-  // Define cache headers
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  res.set('Surrogate-Control', 'no-store');
+// Get all registrations
+app.get('/registrations', async (req, res) => {
+  console.log('Recebendo requisição para /registrations');
   
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-
   try {
-    // Get all camps for this team
-    const campIds = await sqlVercel`
-      SELECT id FROM camps WHERE team_id = ${teamId}::uuid
-    `;
-
-    if (campIds.length === 0) {
-      return res.json([]);
+    const teamId = getTeamId(req);
+    console.log('Team ID obtido:', teamId);
+    
+    let results;
+    if (teamId) {
+      results = await sql`
+        SELECT r.*, c.name as camp_name
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}::uuid
+        ORDER BY r.created_at DESC
+      `;
+    } else {
+      // Modo diagnóstico - retornar alguns registros para verificação
+      results = await sql`
+        SELECT r.*, c.name as camp_name
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        ORDER BY r.created_at DESC
+        LIMIT 20
+      `;
     }
-
-    // Create array of camp IDs
-    const campIdList = campIds.map((row) => row.id);
-
-    // Get all registrations for these camps
-    const registrations = await sqlVercel`
-      SELECT 
-        r.id,
-        r.name as camper_name,
-        r.email as camper_email,
-        r.status,
-        r.created_at,
-        r.camp_id,
-        r.phone,
-        r.document_type,
-        r.document_number,
-        r.birthday,
-        r.city,
-        r.address,
-        r.total_amount,
-        r.emergency_contact_name,
-        r.emergency_contact_phone,
-        r.emergency_contact_relationship,
-        r.notes,
-        r.onboarding_status,
-        r.payment_status,
-        r.has_allergies,
-        r.allergies_description,
-        r.has_health_issues,
-        r.health_issues_description,
-        r.dietary_restrictions,
-        c.name as camp_name,
-        c.start_date as camp_start_date,
-        c.end_date as camp_end_date
-      FROM registrations r
-      JOIN camps c ON r.camp_id = c.id
-      WHERE r.camp_id = ANY($1::uuid[])
-      ORDER BY r.created_at DESC
-    `;
-
-    const safeRegistrations = registrations.map(reg => {
-      if (reg.emergency_contact_phone && !reg.emergency_contact_phone.startsWith('+')) {
-        reg.emergency_contact_phone = '+' + reg.emergency_contact_phone;
-      }
-      return reg;
-    });
-
-    return res.json(safeRegistrations);
+    
+    return res.json(results);
   } catch (error) {
-    console.error('Error fetching registrations:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Error getting registrations:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
   }
 });
 
-// List all registrations
-app.get('/registrations', async (req, res) => {
-  // Define cache headers
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  res.set('Surrogate-Control', 'no-store');
-  
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-
+// Get registration by ID
+app.get('/registrations/:id', async (req, res) => {
   try {
-    // Get all camps for this team
-    const campIds = await sqlVercel`
-      SELECT id FROM camps WHERE team_id = ${teamId}::uuid
-    `;
-
-    if (campIds.length === 0) {
-      return res.json([]);
-    }
-
-    // Create array of camp IDs
-    const campIdList = campIds.map((row) => row.id);
-
-    // Get all registrations for these camps
-    const registrations = await sqlVercel`
-      SELECT 
-        r.id,
-        r.name as camper_name,
-        r.email as camper_email,
-        r.status,
-        r.created_at,
-        r.camp_id,
-        r.phone,
-        r.document_type,
-        r.document_number,
-        r.birthday,
-        r.city,
-        r.address,
-        r.total_amount,
-        r.emergency_contact_name,
-        r.emergency_contact_phone,
-        r.emergency_contact_relationship,
-        r.notes,
-        r.onboarding_status,
-        r.payment_status,
-        r.has_allergies,
-        r.allergies_description,
-        r.has_health_issues,
-        r.health_issues_description,
-        r.dietary_restrictions,
-        c.name as camp_name,
-        c.start_date as camp_start_date,
-        c.end_date as camp_end_date
+    const { id } = req.params;
+    
+    const result = await sql`
+      SELECT r.*, c.name as camp_name
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      WHERE r.camp_id = ANY($1::uuid[])
-      ORDER BY r.created_at DESC
+      WHERE r.id = ${id}::uuid
     `;
-
-    const safeRegistrations = registrations.map(reg => {
-      if (reg.emergency_contact_phone && !reg.emergency_contact_phone.startsWith('+')) {
-        reg.emergency_contact_phone = '+' + reg.emergency_contact_phone;
-      }
-      return reg;
-    });
-
-    return res.json(safeRegistrations);
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+    
+    return res.json(result[0]);
   } catch (error) {
-    console.error('Error fetching registrations:', error);
+    console.error('Error getting registration by ID:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1153,7 +1035,7 @@ app.get('/campers', async (req, res) => {
     
     let results;
     if (teamId) {
-      results = await sqlVercel`
+      results = await sql`
         SELECT cm.*, r.name as registration_name, c.name as camp_name
         FROM campers cm
         JOIN registrations r ON cm.registration_id = r.id
@@ -1163,7 +1045,7 @@ app.get('/campers', async (req, res) => {
       `;
     } else {
       // Modo diagnóstico
-      results = await sqlVercel`
+      results = await sql`
         SELECT cm.*, r.name as registration_name, c.name as camp_name
         FROM campers cm
         JOIN registrations r ON cm.registration_id = r.id
@@ -1188,7 +1070,7 @@ app.get('/campers/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await sqlVercel`
+    const result = await sql`
       SELECT cm.*, r.name as registration_name, c.name as camp_name
       FROM campers cm
       JOIN registrations r ON cm.registration_id = r.id
@@ -1220,7 +1102,7 @@ app.get('/users', async (req, res) => {
     // Usuários só são acessíveis para a mesma equipe ou superadmin
     let results;
     if (teamId) {
-      results = await sqlVercel`
+      results = await sql`
         SELECT id, email, name, role, team_id, created_at, updated_at
         FROM users
         WHERE team_id = ${teamId}::uuid
@@ -1228,7 +1110,7 @@ app.get('/users', async (req, res) => {
       `;
     } else {
       // Modo diagnóstico - omite informações sensíveis
-      results = await sqlVercel`
+      results = await sql`
         SELECT id, email, name, role, team_id, created_at, updated_at
         FROM users
         ORDER BY created_at DESC
@@ -1251,7 +1133,7 @@ app.get('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await sqlVercel`
+    const result = await sql`
       SELECT id, email, name, role, team_id, created_at, updated_at
       FROM users
       WHERE id = ${id}::uuid
@@ -1280,7 +1162,7 @@ app.get('/camps', async (req, res) => {
     
     let results;
     if (teamId) {
-      results = await sqlVercel`
+      results = await sql`
         SELECT *
         FROM camps
         WHERE team_id = ${teamId}::uuid
@@ -1288,7 +1170,7 @@ app.get('/camps', async (req, res) => {
       `;
     } else {
       // Modo diagnóstico
-      results = await sqlVercel`
+      results = await sql`
         SELECT *
         FROM camps
         ORDER BY created_at DESC
@@ -1311,7 +1193,7 @@ app.get('/camps/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await sqlVercel`
+    const result = await sql`
       SELECT *
       FROM camps
       WHERE id = ${id}::uuid
@@ -1340,7 +1222,7 @@ app.get('/settings/profile', async (req, res) => {
     
     const token = authHeader.split(' ')[1];
     
-    const result = await sqlVercel`
+    const result = await sql`
       SELECT id, email, name, role, team_id, created_at, updated_at
       FROM users
       WHERE id = ${token}::uuid
@@ -1367,7 +1249,7 @@ app.get('/settings/organization', async (req, res) => {
     
     const token = authHeader.split(' ')[1];
     
-    const userResult = await sqlVercel`
+    const userResult = await sql`
       SELECT team_id
       FROM users
       WHERE id = ${token}::uuid
@@ -1379,7 +1261,7 @@ app.get('/settings/organization', async (req, res) => {
     
     const teamId = userResult[0].team_id;
     
-    const result = await sqlVercel`
+    const result = await sql`
       SELECT *
       FROM teams
       WHERE id = ${teamId}::uuid
@@ -1408,7 +1290,7 @@ app.get('/api/registrations', async (req, res) => {
     
     let results;
     if (teamId) {
-      results = await sqlVercel`
+      results = await sql`
         SELECT r.*, c.name as camp_name
         FROM registrations r
         JOIN camps c ON r.camp_id = c.id
@@ -1417,7 +1299,7 @@ app.get('/api/registrations', async (req, res) => {
       `;
     } else {
       // Modo diagnóstico
-      results = await sqlVercel`
+      results = await sql`
         SELECT r.*, c.name as camp_name
         FROM registrations r
         JOIN camps c ON r.camp_id = c.id
@@ -1441,7 +1323,7 @@ app.get('/api/registrations/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await sqlVercel`
+    const result = await sql`
       SELECT r.*, c.name as camp_name
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
@@ -1469,7 +1351,7 @@ app.get('/api/campers', async (req, res) => {
     
     let results;
     if (teamId) {
-      results = await sqlVercel`
+      results = await sql`
         SELECT cm.*, r.name as registration_name, c.name as camp_name
         FROM campers cm
         JOIN registrations r ON cm.registration_id = r.id
@@ -1479,7 +1361,7 @@ app.get('/api/campers', async (req, res) => {
       `;
     } else {
       // Modo diagnóstico
-      results = await sqlVercel`
+      results = await sql`
         SELECT cm.*, r.name as registration_name, c.name as camp_name
         FROM campers cm
         JOIN registrations r ON cm.registration_id = r.id
@@ -1510,7 +1392,7 @@ app.get('/api/users', async (req, res) => {
     // Usuários só são acessíveis para a mesma equipe ou superadmin
     let results;
     if (teamId) {
-      results = await sqlVercel`
+      results = await sql`
         SELECT id, email, name, role, team_id, created_at, updated_at
         FROM users
         WHERE team_id = ${teamId}::uuid
@@ -1518,7 +1400,7 @@ app.get('/api/users', async (req, res) => {
       `;
     } else {
       // Modo diagnóstico - omite informações sensíveis
-      results = await sqlVercel`
+      results = await sql`
         SELECT id, email, name, role, team_id, created_at, updated_at
         FROM users
         ORDER BY created_at DESC
@@ -1546,7 +1428,7 @@ app.get('/api/camps', async (req, res) => {
     
     let results;
     if (teamId) {
-      results = await sqlVercel`
+      results = await sql`
         SELECT *
         FROM camps
         WHERE team_id = ${teamId}::uuid
@@ -1554,7 +1436,7 @@ app.get('/api/camps', async (req, res) => {
       `;
     } else {
       // Modo diagnóstico
-      results = await sqlVercel`
+      results = await sql`
         SELECT *
         FROM camps
         ORDER BY created_at DESC
@@ -1582,7 +1464,7 @@ app.get('/api/settings/profile', async (req, res) => {
     
     const token = authHeader.split(' ')[1];
     
-    const result = await sqlVercel`
+    const result = await sql`
       SELECT id, email, name, role, team_id, created_at, updated_at
       FROM users
       WHERE id = ${token}::uuid
