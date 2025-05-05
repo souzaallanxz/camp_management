@@ -1,17 +1,22 @@
-// Importar o servidor Express do arquivo server.ts
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { Resend } from 'resend';
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
+import { sql } from '@vercel/postgres';
 
 // Load environment variables
+const dotenv = import('dotenv');
 dotenv.config();
+
+// Initialize Express app
+import express from 'express';
+import cors from 'cors';
+import { Resend } from 'resend';
+import { v4 as uuidv4 } from 'uuid';
+import stripe from 'stripe';
+import twilio from 'twilio';
 
 const app = express();
 
-// Enable CORS
+// Middleware
 app.use(cors({
   origin: ['http://localhost:5173', 'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app', 'https://campmanagement.vercel.app', 'https://campmanagement-a0bu9c7hx-souzaallanxzs-projects.vercel.app', 'https://campmanagement-pzl6edpul-souzaallanxzs-projects.vercel.app', 'https://campmanagement-9eqwfmsi7-souzaallanxzs-projects.vercel.app', 'https://campmanagement-hi7hnzpy1-souzaallanxzs-projects.vercel.app'],
   credentials: true,
@@ -22,135 +27,21 @@ app.use(cors({
 // Parse JSON request bodies
 app.use(express.json());
 
+// Middleware para definir cabeçalhos de cache para impedir o cache das respostas da API
+app.use((req, res, next) => {
+  // Impedir o cache para todas as rotas de API
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  next();
+});
+
 // Initialize Neon database connection
 const sql = neon(process.env.DATABASE_URL);
 
 // Initialize Resend
 const resend = new Resend(process.env.VITE_RESEND_API_KEY);
-
-// === ENDPOINTS COM PREFIXO /api === //
-
-// Sign up route com prefixo /api
-app.post('/api/auth/sign-up', async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
-
-    // Check if user already exists
-    const existingUserResult = await sql`
-      SELECT id FROM public.users WHERE email = ${email}
-    `;
-
-    if (existingUserResult.length > 0) {
-      return res.status(400).json({ error: 'User with this email already exists' });
-    }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create user
-    const result = await sql`
-      INSERT INTO public.users (id, email, name, password_hash)
-      VALUES (gen_random_uuid(), ${email}, ${name}, ${hashedPassword})
-      RETURNING id, email, name, team_id
-    `;
-
-    const user = result[0];
-
-    if (!user) {
-      return res.status(500).json({ error: 'Failed to create user' });
-    }
-
-    return res.status(200).json({
-      user,
-      session: {
-        user,
-        token: user.id // Using user ID as token for now
-      }
-    });
-  } catch (error) {
-    console.error('Error in sign-up:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Sign in route com prefixo /api
-app.post('/api/auth/sign-in', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Find user by email
-    const userResult = await sql`
-      SELECT id, email, name, password_hash, team_id 
-      FROM public.users 
-      WHERE email = ${email}
-    `;
-
-    const user = userResult[0];
-
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-
-    if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Remove password_hash from response
-    const userWithoutPassword = { ...user };
-    delete userWithoutPassword.password_hash;
-
-    return res.status(200).json({
-      user: userWithoutPassword,
-      session: {
-        user: userWithoutPassword,
-        token: user.id // Using user ID as token for now
-      }
-    });
-  } catch (error) {
-    console.error('Error in sign-in:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Get current user route com prefixo /api
-app.get('/api/auth/me', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const token = authHeader.split(' ')[1];
-
-    // Find user by token (which is the user ID)
-    const userResult = await sql`
-      SELECT id, email, name, team_id, role, created_at, updated_at
-      FROM public.users
-      WHERE id = ${token}::uuid
-    `;
-
-    const user = userResult[0];
-
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    return res.status(200).json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      team_id: user.team_id,
-      role: user.role
-    });
-  } catch (error) {
-    console.error('Error in get current user:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // === VERSÃO SEM PREFIXO /api === //
 
@@ -198,6 +89,12 @@ app.post('/auth/sign-in', async (req, res) => {
 
 // Get current user route
 app.get('/auth/me', async (req, res) => {
+  // Define cache headers
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -551,8 +448,56 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
 
 // === VERSÃO COM PREFIXO /api === //
 
+// Sign in route
+app.post('/api/auth/sign-in', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user by email
+    const userResult = await sql`
+      SELECT id, email, name, password_hash, team_id 
+      FROM public.users 
+      WHERE email = ${email}
+    `;
+
+    const user = userResult[0];
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Remove password_hash from response
+    const userWithoutPassword = { ...user };
+    delete userWithoutPassword.password_hash;
+
+    return res.status(200).json({
+      user: userWithoutPassword,
+      session: {
+        user: userWithoutPassword,
+        token: user.id // Using user ID as token for now
+      }
+    });
+  } catch (error) {
+    console.error('Error in sign-in:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get current user route
 app.get('/api/auth/me', async (req, res) => {
+  // Define cache headers
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -929,8 +874,8 @@ app.get('/debug/registrations', async (req, res) => {
     const results = await sql`
       SELECT 
         r.id, 
-        r.camper_name, 
-        r.camper_email,
+        r.name as camper_name, 
+        r.email as camper_email,
         r.status,
         r.created_at,
         c.name as camp_name,
@@ -1044,63 +989,154 @@ function getTeamId(req) {
 
 // ===== REGISTRATIONS ENDPOINTS =====
 
-// Get all registrations
-app.get('/registrations', async (req, res) => {
-  console.log('Recebendo requisição para /registrations');
+// List all registrations
+app.get('/api/registrations', async (req, res) => {
+  // Define cache headers
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
   
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
   try {
-    const teamId = getTeamId(req);
-    console.log('Team ID obtido:', teamId);
-    
-    let results;
-    if (teamId) {
-      results = await sql`
-        SELECT r.*, c.name as camp_name
-        FROM registrations r
-        JOIN camps c ON r.camp_id = c.id
-        WHERE c.team_id = ${teamId}::uuid
-        ORDER BY r.created_at DESC
-      `;
-    } else {
-      // Modo diagnóstico - retornar alguns registros para verificação
-      results = await sql`
-        SELECT r.*, c.name as camp_name
-        FROM registrations r
-        JOIN camps c ON r.camp_id = c.id
-        ORDER BY r.created_at DESC
-        LIMIT 20
-      `;
+    // Get all camps for this team
+    const campIds = await sql`
+      SELECT id FROM camps WHERE team_id = ${teamId}::uuid
+    `;
+
+    if (campIds.length === 0) {
+      return res.json([]);
     }
-    
-    return res.json(results);
-  } catch (error) {
-    console.error('Error getting registrations:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      details: error.message
+
+    // Create array of camp IDs
+    const campIdList = campIds.map((row) => row.id);
+
+    // Get all registrations for these camps
+    const registrations = await sql`
+      SELECT 
+        r.id,
+        r.name as camper_name,
+        r.email as camper_email,
+        r.status,
+        r.created_at,
+        r.camp_id,
+        r.phone,
+        r.document_type,
+        r.document_number,
+        r.birthday,
+        r.city,
+        r.address,
+        r.total_amount,
+        r.emergency_contact_name,
+        r.emergency_contact_phone,
+        r.emergency_contact_relationship,
+        r.notes,
+        r.onboarding_status,
+        r.payment_status,
+        r.has_allergies,
+        r.allergies_description,
+        r.has_health_issues,
+        r.health_issues_description,
+        r.dietary_restrictions,
+        c.name as camp_name,
+        c.start_date as camp_start_date,
+        c.end_date as camp_end_date
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.camp_id = ANY($1::uuid[])
+      ORDER BY r.created_at DESC
+    `;
+
+    const safeRegistrations = registrations.map(reg => {
+      if (reg.emergency_contact_phone && !reg.emergency_contact_phone.startsWith('+')) {
+        reg.emergency_contact_phone = '+' + reg.emergency_contact_phone;
+      }
+      return reg;
     });
+
+    return res.json(safeRegistrations);
+  } catch (error) {
+    console.error('Error fetching registrations:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Get registration by ID
-app.get('/registrations/:id', async (req, res) => {
+// List all registrations
+app.get('/registrations', async (req, res) => {
+  // Define cache headers
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
   try {
-    const { id } = req.params;
-    
-    const result = await sql`
-      SELECT r.*, c.name as camp_name
+    // Get all camps for this team
+    const campIds = await sql`
+      SELECT id FROM camps WHERE team_id = ${teamId}::uuid
+    `;
+
+    if (campIds.length === 0) {
+      return res.json([]);
+    }
+
+    // Create array of camp IDs
+    const campIdList = campIds.map((row) => row.id);
+
+    // Get all registrations for these camps
+    const registrations = await sql`
+      SELECT 
+        r.id,
+        r.name as camper_name,
+        r.email as camper_email,
+        r.status,
+        r.created_at,
+        r.camp_id,
+        r.phone,
+        r.document_type,
+        r.document_number,
+        r.birthday,
+        r.city,
+        r.address,
+        r.total_amount,
+        r.emergency_contact_name,
+        r.emergency_contact_phone,
+        r.emergency_contact_relationship,
+        r.notes,
+        r.onboarding_status,
+        r.payment_status,
+        r.has_allergies,
+        r.allergies_description,
+        r.has_health_issues,
+        r.health_issues_description,
+        r.dietary_restrictions,
+        c.name as camp_name,
+        c.start_date as camp_start_date,
+        c.end_date as camp_end_date
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      WHERE r.id = ${id}::uuid
+      WHERE r.camp_id = ANY($1::uuid[])
+      ORDER BY r.created_at DESC
     `;
-    
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'Registration not found' });
-    }
-    
-    return res.json(result[0]);
+
+    const safeRegistrations = registrations.map(reg => {
+      if (reg.emergency_contact_phone && !reg.emergency_contact_phone.startsWith('+')) {
+        reg.emergency_contact_phone = '+' + reg.emergency_contact_phone;
+      }
+      return reg;
+    });
+
+    return res.json(safeRegistrations);
   } catch (error) {
-    console.error('Error getting registration by ID:', error);
+    console.error('Error fetching registrations:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1360,7 +1396,7 @@ app.get('/settings/organization', async (req, res) => {
   }
 });
 
-// === VERSÃO COM PREFIXO /API =====
+// ===== VERSÃO COM PREFIXO /API =====
 
 // Get all registrations
 app.get('/api/registrations', async (req, res) => {
@@ -1559,50 +1595,6 @@ app.get('/api/settings/profile', async (req, res) => {
     return res.json(result[0]);
   } catch (error) {
     console.error('Error getting profile settings:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Add sign-up route without /api prefix
-app.post('/auth/sign-up', async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
-
-    // Check if user already exists
-    const existingUserResult = await sql`
-      SELECT id FROM public.users WHERE email = ${email}
-    `;
-
-    if (existingUserResult.length > 0) {
-      return res.status(400).json({ error: 'User with this email already exists' });
-    }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create user
-    const result = await sql`
-      INSERT INTO public.users (id, email, name, password_hash)
-      VALUES (gen_random_uuid(), ${email}, ${name}, ${hashedPassword})
-      RETURNING id, email, name, team_id
-    `;
-
-    const user = result[0];
-
-    if (!user) {
-      return res.status(500).json({ error: 'Failed to create user' });
-    }
-
-    return res.status(200).json({
-      user,
-      session: {
-        user,
-        token: user.id // Using user ID as token for now
-      }
-    });
-  } catch (error) {
-    console.error('Error in sign-up:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
