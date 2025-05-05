@@ -1,5 +1,6 @@
 import { db } from '@/lib/neon-db'
 import type { CreateTeamDto, Team, TeamTier } from '../types'
+import { buildApiUrl } from '@/services/api'
 
 export interface UpdateTeamData {
   name?: string
@@ -25,10 +26,9 @@ export const teamService = {
   },
 
   async getCurrentUserTeam() {
-    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
     const token = localStorage.getItem('token');
     if (!token) throw new Error('No authenticated user found');
-    const response = await fetch(`${API_BASE_URL}/teams/current`, {
+    const response = await fetch(buildApiUrl('/teams/current'), {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`

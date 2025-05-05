@@ -1,41 +1,15 @@
-import { db } from '@/lib/db'
 import type { Camper, InsertCamper } from '../data/schema'
-
-// Helper function for logging in development mode only
-const devLog = (message: string, data?: any) => {
-  if (import.meta.env.DEV) {
-    if (data) {
-    } else {
-    }
-  }
-}
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { buildApiUrl } from '@/services/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
-  const token = localStorage.getItem('token');
   if (!teamId) throw new Error('No team ID found');
-  if (!token) throw new Error('No authenticated user found');
-  return { 
-    'x-team-id': teamId,
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  };
-}
-
-async function getCurrentUserTeam() {
-  const { data: { user } } = await db.auth.getUser()
-  if (!user) return null
-
-  const { data: team, error } = await db.rpc('get_current_user_team')
-  if (error) throw error
-  return team
+  return { 'x-team-id': teamId };
 }
 
 async function findAll() {
-  const response = await fetch(`${API_BASE_URL}/api/campers`, {
-    headers: { ...getTeamIdHeader() },
+  const response = await fetch(buildApiUrl('/campers'), {
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) throw new Error('Erro ao buscar campistas');
@@ -43,8 +17,8 @@ async function findAll() {
 }
 
 async function findById(id: string) {
-  const response = await fetch(`${API_BASE_URL}/api/campers/${id}`, {
-    headers: { ...getTeamIdHeader() },
+  const response = await fetch(buildApiUrl(`/campers/${id}`), {
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) throw new Error('Erro ao buscar campista');
@@ -52,9 +26,9 @@ async function findById(id: string) {
 }
 
 async function create(camper: InsertCamper) {
-  const response = await fetch(`${API_BASE_URL}/api/campers`, {
+  const response = await fetch(buildApiUrl('/campers'), {
     method: 'POST',
-    headers: { ...getTeamIdHeader() },
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
     body: JSON.stringify(camper),
   });
@@ -63,9 +37,9 @@ async function create(camper: InsertCamper) {
 }
 
 async function update(id: string, camper: Partial<Camper>) {
-  const response = await fetch(`${API_BASE_URL}/api/campers/${id}`, {
+  const response = await fetch(buildApiUrl(`/campers/${id}`), {
     method: 'PUT',
-    headers: { ...getTeamIdHeader() },
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
     body: JSON.stringify(camper),
   });
@@ -74,27 +48,12 @@ async function update(id: string, camper: Partial<Camper>) {
 }
 
 async function remove(id: string) {
-  const response = await fetch(`${API_BASE_URL}/api/campers/${id}`, {
+  const response = await fetch(buildApiUrl(`/campers/${id}`), {
     method: 'DELETE',
     headers: { ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) throw new Error('Erro ao deletar campista');
-}
-
-async function findAllDirectly() {
-  // Get all campers directly without filtering
-  const { data, error } = await db
-    .from('campers')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    devLog('Error fetching all campers directly:', error)
-    return []
-  }
-
-  return data || []
 }
 
 export const camperService = {
@@ -103,5 +62,4 @@ export const camperService = {
   create,
   update,
   remove,
-  findAllDirectly,
-} 
+}

@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { buildApiUrl } from '@/services/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
@@ -7,7 +7,7 @@ function getTeamIdHeader() {
 }
 
 export async function getPaymentsByRegistrationId(registrationId: string) {
-  const response = await fetch(`${API_BASE_URL}/payments?registrationId=${registrationId}`, {
+  const response = await fetch(buildApiUrl(`/payments?registrationId=${registrationId}`), {
     headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
   });
@@ -24,8 +24,21 @@ interface CreatePaymentData {
   payment_link: string | null
 }
 
+// Definindo o tipo Payment
+interface Payment {
+  id: number
+  registration_id: string
+  payment_method: 'MB Way' | 'Transferência Bancária' | 'Dinheiro'
+  amount: number
+  payment_date: string
+  phone_number: string | null
+  payment_link: string | null
+  created_at: string
+  updated_at: string
+}
+
 export async function createPayment(data: CreatePaymentData) {
-  const response = await fetch(`${API_BASE_URL}/payments`, {
+  const response = await fetch(buildApiUrl('/payments'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
@@ -36,7 +49,7 @@ export async function createPayment(data: CreatePaymentData) {
 }
 
 export async function updatePayment(id: number, data: Partial<Omit<Payment, 'id' | 'created_at' | 'updated_at'>>) {
-  const response = await fetch(`${API_BASE_URL}/payments/${id}`, {
+  const response = await fetch(buildApiUrl(`/payments/${id}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
@@ -47,7 +60,7 @@ export async function updatePayment(id: number, data: Partial<Omit<Payment, 'id'
 }
 
 export async function deletePayment(id: number) {
-  const response = await fetch(`${API_BASE_URL}/payments/${id}`, {
+  const response = await fetch(buildApiUrl(`/payments/${id}`), {
     method: 'DELETE',
     headers: { ...getTeamIdHeader() },
     credentials: 'include',
@@ -56,7 +69,7 @@ export async function deletePayment(id: number) {
 }
 
 export async function getLatestPaymentLink(registrationId: string) {
-  const response = await fetch(`${API_BASE_URL}/payments/latest-link?registrationId=${registrationId}`, {
+  const response = await fetch(buildApiUrl(`/payments/latest-link?registrationId=${registrationId}`), {
     headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
   });
