@@ -7,47 +7,47 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/auth/:path*",
-      "destination": "/api/auth/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/teams/:path*",
-      "destination": "/api/teams/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/dashboard/:path*",
-      "destination": "/api/dashboard/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/camps/:path*",
-      "destination": "/api/camps/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/registrations/:path*",
-      "destination": "/api/registrations/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/payments/:path*",
-      "destination": "/api/payments/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/campers/:path*",
-      "destination": "/api/campers/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/users/:path*",
-      "destination": "/api/users/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/settings/:path*",
-      "destination": "/api/settings/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/debug/:path*",
-      "destination": "/api/debug/:path*"
+      "destination": "/api/index.js"
     },
     {
       "source": "/(.*)",
