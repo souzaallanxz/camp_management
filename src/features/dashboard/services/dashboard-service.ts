@@ -1,7 +1,4 @@
-import { api, API_PATHS } from '@/services/api';
-
-// Hard-code the direct base URL for endpoints
-const API_BASE_URL = 'https://campmanagement.vercel.app';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export interface MetricData {
   total: number
@@ -25,181 +22,58 @@ export interface RecentRegistration {
   campName: string
 }
 
-export interface DashboardData {
-  monthlyPayments: MetricData;
-  monthlyRegistrations: MetricData;
-  monthlySnackbar: MetricData;
-  yearlyCampers: MetricData;
-  campPayments: CampPaymentsData[];
-  recentRegistrations: RecentRegistration[];
-}
-
-// Simple fetch helper without caching logic
-const simpleFetch = async (url: string, options: RequestInit = {}) => {
-  const response = await fetch(url, options);
-  
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
-  }
-  
-  return response;
-};
-
 export const dashboardService = {
   async getTeamIdHeader() {
     const teamId = localStorage.getItem('team_id');
     if (!teamId) throw new Error('team_id não encontrado no localStorage');
     return { 'x-team-id': teamId };
   },
-  
-  async getDashboardData(): Promise<DashboardData> {
-    try {
-      // Buscar todos os dados em paralelo
-      const [
-        monthlyPayments,
-        monthlyRegistrations,
-        monthlySnackbar,
-        yearlyCampers,
-        campPayments,
-        recentRegistrations
-      ] = await Promise.all([
-        this.getMonthlyPayments(),
-        this.getMonthlyRegistrations(),
-        this.getMonthlySnackbarTransactions(),
-        this.getYearlyCampers(),
-        this.getCampPayments(),
-        this.getRecentRegistrations(5)
-      ]);
-      
-      return {
-        monthlyPayments,
-        monthlyRegistrations,
-        monthlySnackbar,
-        yearlyCampers,
-        campPayments,
-        recentRegistrations
-      };
-    } catch {
-      throw new Error('Erro ao buscar dados do dashboard');
-    }
-  },
 
   async getMonthlyPayments(): Promise<MetricData> {
-    try {
-      const data = await api.get<{ current: number; previous: number }>(
-        API_PATHS.DASHBOARD_MONTHLY_PAYMENTS
-      );
-      
-      return {
-        total: data.current || 0,
-        previousTotal: data.previous || 0,
-        percentageChange: data.current > 0 && data.previous > 0 
-          ? ((data.current - data.previous) / data.previous) * 100 
-          : null
-      };
-    } catch {
-      return {
-        total: 0,
-        previousTotal: 0,
-        percentageChange: null
-      };
-    }
+    const response = await fetch(`${API_BASE_URL}/dashboard/monthly-payments`, {
+      headers: { ...await this.getTeamIdHeader() },
+    });
+    if (!response.ok) throw new Error('Erro ao buscar pagamentos');
+    return response.json();
   },
 
   async getMonthlyRegistrations(): Promise<MetricData> {
-    try {
-      const data = await api.get<{ current: number; previous: number }>(
-        API_PATHS.DASHBOARD_MONTHLY_REGISTRATIONS
-      );
-      
-      return {
-        total: data.current || 0,
-        previousTotal: data.previous || 0,
-        percentageChange: data.current > 0 && data.previous > 0 
-          ? ((data.current - data.previous) / data.previous) * 100 
-          : null
-      };
-    } catch {
-      return {
-        total: 0,
-        previousTotal: 0,
-        percentageChange: null
-      };
-    }
+    const response = await fetch(`${API_BASE_URL}/dashboard/monthly-registrations`, {
+      headers: { ...await this.getTeamIdHeader() },
+    });
+    if (!response.ok) throw new Error('Erro ao buscar inscrições');
+    return response.json();
   },
 
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
-    try {
-      const data = await api.get<{ current: number; previous: number }>(
-        API_PATHS.DASHBOARD_MONTHLY_SNACKBAR
-      );
-      
-      return {
-        total: data.current || 0,
-        previousTotal: data.previous || 0,
-        percentageChange: data.current > 0 && data.previous > 0 
-          ? ((data.current - data.previous) / data.previous) * 100 
-          : null
-      };
-    } catch {
-      return {
-        total: 0,
-        previousTotal: 0,
-        percentageChange: null
-      };
-    }
+    const response = await fetch(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
+      headers: { ...await this.getTeamIdHeader() },
+    });
+    if (!response.ok) throw new Error('Erro ao buscar carregamentos');
+    return response.json();
   },
 
   async getYearlyCampers(): Promise<MetricData> {
-    try {
-      const data = await api.get<{ current: number; previous: number }>(
-        API_PATHS.DASHBOARD_YEARLY_CAMPERS
-      );
-      
-      return {
-        total: data.current || 0,
-        previousTotal: data.previous || 0,
-        percentageChange: data.current > 0 && data.previous > 0 
-          ? ((data.current - data.previous) / data.previous) * 100 
-          : null
-      };
-    } catch {
-      return {
-        total: 0,
-        previousTotal: 0,
-        percentageChange: null
-      };
-    }
+    const response = await fetch(`${API_BASE_URL}/dashboard/yearly-campers`, {
+      headers: { ...await this.getTeamIdHeader() },
+    });
+    if (!response.ok) throw new Error('Erro ao buscar campistas');
+    return response.json();
   },
 
   async getCampPayments(): Promise<CampPaymentsData[]> {
-    try {
-      return await api.get<CampPaymentsData[]>(API_PATHS.DASHBOARD_CAMP_PAYMENTS);
-    } catch {
-      return [];
-    }
+    const response = await fetch(`${API_BASE_URL}/dashboard/camp-payments`, {
+      headers: { ...await this.getTeamIdHeader() },
+    });
+    if (!response.ok) throw new Error('Erro ao buscar pagamentos');
+    return response.json();
   },
 
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
-    try {
-      const headers = await this.getTeamIdHeader();
-      const response = await simpleFetch(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
-        headers,
-        method: 'GET'
-      });
-      
-      const data = await response.json();
-      return data.map((item: Record<string, unknown>) => ({
-        id: item.id as string,
-        name: (item.camper_name || item.name) as string,
-        email: (item.camper_email || item.email) as string,
-        totalPaid: (item.total_paid || 0) as number,
-        createdAt: (item.created_at || item.createdAt) as string,
-        campName: (item.camp_name || item.campName) as string
-      }));
-    } catch {
-      // Return empty array if the request fails
-      return [];
-    }
+    const response = await fetch(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
+      headers: { ...await this.getTeamIdHeader() },
+    });
+    if (!response.ok) throw new Error('Erro ao buscar inscrições recentes');
+    return response.json();
   }
 } 

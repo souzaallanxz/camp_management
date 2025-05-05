@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/components/ui/use-toast'
 import { Registration } from '../data/schema'
-import { registrationService } from '../services/registration-service'
+import { deleteRegistration } from '../services/registration-service'
 
 interface RegistrationDeleteDialogProps {
   open: boolean
@@ -31,13 +31,14 @@ export function RegistrationDeleteDialog({
 
   const handleDelete = async () => {
     try {
-      await registrationService.deleteRegistration(registration.id)
+      await deleteRegistration(registration.id)
       toast({
         description: 'Registration deleted successfully.',
       })
       onRegistrationDeleted()
       onOpenChange(false)
-    } catch {
+    } catch (error) {
+      console.error('Error deleting registration:', error)
       toast({
         variant: 'destructive',
         title: 'Error',

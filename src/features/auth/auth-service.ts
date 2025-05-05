@@ -1,13 +1,12 @@
 import type { SignInCredentials, SignUpCredentials } from './types'
-import { api, API_PATHS } from '@/services/api'
+import { buildApiUrl } from '@/services/api'
 
 export type User = {
   id: string
   email: string
-  name: string
-  team_id: string | null
-  created_at: string
-  updated_at: string
+  name?: string
+  team_id?: string | null
+  role?: 'superadmin' | 'admin' | 'contributor' | 'cashier' | 'manager'
 }
 
 export type Session = {
@@ -17,44 +16,47 @@ export type Session = {
 
 export type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED'
 
-export interface AuthResponse {
-  user: User
-  session: Session
-}
-
 export async function signIn(credentials: SignInCredentials) {
-  try {
-    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
-      API_PATHS.AUTH_SIGN_IN,
-      credentials
-    );
-    
-    if (response.session?.token) {
-      localStorage.setItem('token', response.session.token);
-    }
-    
-    return { error: null, user: response.user, session: response.session };
-  } catch {
-    return { error: 'Invalid credentials', user: null, session: null };
+  const response = await fetch(buildApiUrl('/api/auth/sign-in'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(credentials),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to sign in')
   }
+
+  const data = await response.json()
+  return data
 }
 
-export function signOut() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('teamId');
-  window.location.href = '/auth/sign-in';
+export async function signOut() {
+  // Clear local storage
+  localStorage.removeItem('token')
+  return { error: null }
 }
 
 export async function getCurrentUser() {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      return null;
-    }
-    return await api.get<User>(API_PATHS.AUTH_ME);
-  } catch {
-    return null;
+  const token = localStorage.getItem('token')
+  if (!token) {
+    throw new Error('No token found')
   }
+
+  const response = await fetch(buildApiUrl('/api/auth/me'), {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to get current user')
+  }
+
+  return response.json()
 }
 
 export async function getCurrentUserTeam() {
@@ -76,89 +78,55 @@ export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Se
   }
 }
 
-export async function signUp(credentials: SignUpCredentials) {
-  try {
-    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
-      API_PATHS.AUTH_SIGN_UP,
-      credentials
-    );
-    
-    if (response.session?.token) {
-      localStorage.setItem('token', response.session.token);
-    }
-    
-    return { error: null, user: response.user, session: response.session };
-  } catch {
-    return { error: 'Failed to create account', user: null, session: null };
+export async function signUp({ email, password, name }: SignUpCredentials) {
+  const response = await fetch(buildApiUrl('/api/auth/sign-up'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password, name }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to sign up')
   }
-}
 
-export async function setupPassword(userId: string, password: string) {
-  try {
-    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
-      API_PATHS.AUTH_SETUP_PASSWORD,
-      { userId, password }
-    );
-
-    if (response.session?.token) {
-      localStorage.setItem('token', response.session.token);
-    }
-
-    return response.user;
-  } catch {
-    throw new Error('Failed to setup password');
-  }
-}
-
-export async function verifyOtp(email: string, otp: string) {
-  try {
-    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
-      API_PATHS.AUTH_VERIFY_OTP,
-      { email, otp }
-    );
-
-    if (response.session?.token) {
-      localStorage.setItem('token', response.session.token);
-    }
-
-    return response.user;
-  } catch {
-    throw new Error('Failed to verify OTP');
-  }
+  return response.json()
 }
 
 export async function forgotPassword(email: string) {
-  try {
-    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
-      API_PATHS.AUTH_FORGOT_PASSWORD,
-      { email }
-    );
+  const response = await fetch(buildApiUrl('/api/auth/forgot-password'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  })
 
-    if (response.session?.token) {
-      localStorage.setItem('token', response.session.token);
-    }
-
-    return response.user;
-  } catch {
-    throw new Error('Failed to send password reset email');
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to send password reset email')
   }
+
+  return response.json()
 }
 
 export async function resetPassword(token: string, password: string) {
-  try {
-    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
-      API_PATHS.AUTH_RESET_PASSWORD,
-      { token, password }
-    );
+  const response = await fetch(buildApiUrl('/api/auth/reset-password'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token, password }),
+  })
 
-    if (response.session?.token) {
-      localStorage.setItem('token', response.session.token);
-    }
-
-    return response.user;
-  } catch {
-    throw new Error('Failed to reset password');
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to reset password')
   }
+
+  return response.json()
 }
 
 // Helper function for debugging team ID

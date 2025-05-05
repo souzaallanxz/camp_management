@@ -1,88 +1,13 @@
 /**
- * Centralized API service for making HTTP requests
+ * API utilities
  */
 
 // Get the base URL from environment or use localhost as fallback
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 /**
- * Standardized API paths to ensure consistency
- */
-export const API_PATHS = {
-  // Auth
-  AUTH_ME: '/auth/me',
-  AUTH_SIGN_IN: '/auth/sign-in',
-  AUTH_SIGN_UP: '/auth/sign-up',
-  AUTH_SETUP_PASSWORD: '/auth/setup-password',
-  AUTH_VERIFY_OTP: '/auth/verify-otp',
-  AUTH_FORGOT_PASSWORD: '/auth/forgot-password',
-  AUTH_RESET_PASSWORD: '/auth/reset-password',
-  
-  // Teams
-  TEAMS: '/teams',
-  TEAMS_CURRENT: '/teams/current',
-  TEAM_MEMBERS: (teamId: string) => `/teams/${teamId}/members`,
-  TEAM_MEMBER: (teamId: string, userId: string) => `/teams/${teamId}/members/${userId}`,
-  
-  // Users
-  USERS: '/users',
-  
-  // Camps
-  CAMPS: '/camps',
-  CAMP: (id: string) => `/camps/${id}`,
-  
-  // Campers
-  CAMPERS: '/campers',
-  CAMPER: (id: string) => `/campers/${id}`,
-  
-  // Registrations
-  REGISTRATIONS: '/registrations',
-  REGISTRATION: (id: string) => `/registrations/${id}`,
-  REGISTRATIONS_BY_CAMP: (campId: string) => `/registrations/camp/${campId}`,
-  
-  // Dashboard
-  DASHBOARD_MONTHLY_PAYMENTS: '/dashboard/monthly-payments',
-  DASHBOARD_MONTHLY_REGISTRATIONS: '/dashboard/monthly-registrations',
-  DASHBOARD_MONTHLY_SNACKBAR: '/dashboard/monthly-snackbar',
-  DASHBOARD_YEARLY_CAMPERS: '/dashboard/yearly-campers',
-  DASHBOARD_CAMP_PAYMENTS: '/dashboard/camp-payments',
-  
-  // Settings
-  SETTINGS_PROFILE: '/settings/profile',
-  SETTINGS_ORGANIZATION: '/settings/organization',
-  
-  // Snackbar
-  SNACKBAR_BALANCE: '/snackbar-balance',
-} as const;
-
-/**
- * Default headers for all requests
- */
-const defaultHeaders = {
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-cache, no-store, must-revalidate',
-  'Pragma': 'no-cache',
-  'Expires': '0',
-};
-
-/**
- * Get authentication headers
- */
-function getAuthHeaders() {
-  const token = localStorage.getItem('token');
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
-}
-
-/**
- * Get team ID header
- */
-function getTeamIdHeader() {
-  const teamId = localStorage.getItem('teamId');
-  return teamId ? { 'x-team-id': teamId } : {};
-}
-
-/**
  * Builds an API URL correctly handling the path
+ * It prevents the '/api' duplication issue when the base URL already includes '/api'
  */
 export function buildApiUrl(path: string): string {
   // Ensure path starts with '/' if not empty
@@ -108,68 +33,6 @@ export function buildApiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
-/**
- * Standardized fetch function with error handling
- */
-async function fetchApi<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const url = buildApiUrl(path);
-  const headers = {
-    ...defaultHeaders,
-    ...getAuthHeaders(),
-    ...getTeamIdHeader(),
-    ...options.headers,
-  };
-
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * API service with standardized methods
- */
-export const api = {
-  // GET request
-  get: <T>(path: string, options: RequestInit = {}) => 
-    fetchApi<T>(path, { ...options, method: 'GET' }),
-
-  // POST request
-  post: <T>(path: string, data: unknown, options: RequestInit = {}) =>
-    fetchApi<T>(path, {
-      ...options,
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // PUT request
-  put: <T>(path: string, data: unknown, options: RequestInit = {}) =>
-    fetchApi<T>(path, {
-      ...options,
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  // DELETE request
-  delete: <T>(path: string, options: RequestInit = {}) =>
-    fetchApi<T>(path, { ...options, method: 'DELETE' }),
-
-  // PATCH request
-  patch: <T>(path: string, data: unknown, options: RequestInit = {}) =>
-    fetchApi<T>(path, {
-      ...options,
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
-};
-
-export default api; 
+export default {
+  buildApiUrl
+}; 

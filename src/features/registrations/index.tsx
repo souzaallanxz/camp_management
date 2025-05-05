@@ -6,7 +6,7 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { IconPlus } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
-import { registrationService } from './services/registration-service'
+import { getRegistrations } from './services/registration-service'
 import { RegistrationsTable } from './components/registrations-table'
 import { RegistrationDialogs } from './components/registration-dialogs'
 import { useRegistrationDialogs } from './context/registration-dialogs-context'
@@ -17,7 +17,7 @@ import { Actions } from './components/registrations-columns'
 function RegistrationsContent() {
   const { data: registrations = [], refetch, isLoading, error } = useQuery({
     queryKey: ['registrations'],
-    queryFn: registrationService.getRegistrations,
+    queryFn: getRegistrations,
   })
 
   // Função personalizada para refetch

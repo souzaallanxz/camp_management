@@ -11,7 +11,6 @@ import {
 import { useToast } from '@/components/ui/use-toast'
 import { PaymentMethod } from '../data/schema'
 import { MBWayService } from '../services/mbway-service'
-import { api, API_PATHS } from '@/services/api'
 
 interface SnackbarBalanceFormProps {
   registrationId: string
@@ -26,11 +25,24 @@ async function saveSnackbarBalance(data: {
   payment_method: string
   phone_number?: string | null
 }) {
-  try {
-    return await api.post(API_PATHS.SNACKBAR_BALANCE, data);
-  } catch {
+  const teamId = localStorage.getItem('teamId');
+  if (!teamId) throw new Error('No team ID found');
+  
+  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/snackbar-balance`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-team-id': teamId
+    },
+    credentials: 'include',
+    body: JSON.stringify(data)
+  });
+  
+  if (!response.ok) {
     throw new Error('Erro ao salvar carregamento do cartão');
   }
+  
+  return response.json();
 }
 
 export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: SnackbarBalanceFormProps) {

@@ -6,7 +6,59 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/auth/sign-up",
+      "destination": "/api"
+    },
+    {
+      "source": "/api/auth/sign-in",
+      "destination": "/api"
+    },
+    {
+      "source": "/api/auth/me",
+      "destination": "/api"
+    },
+    {
       "source": "/api/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/auth/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/teams/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/dashboard/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/camps/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/registrations/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/payments/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/campers/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/users/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/settings/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/debug/:path*",
       "destination": "/api"
     },
     {

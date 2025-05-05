@@ -1,5 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
 import { Avatar } from '@/components/ui/avatar'
-import { RecentRegistration } from '../services/dashboard-service'
+import { dashboardService } from '../services/dashboard-service'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from './empty-state'
 
@@ -19,13 +20,12 @@ function getInitials(name: string) {
     .slice(0, 2)
 }
 
-interface RecentSalesProps {
-  data?: RecentRegistration[]
-  isLoading: boolean
-  error: Error | null
-}
+export function RecentSales() {
+  const { data: registrations, isLoading, error } = useQuery({
+    queryKey: ['dashboard', 'recent-registrations'],
+    queryFn: () => dashboardService.getRecentRegistrations(5)
+  })
 
-export function RecentSales({ data: registrations, isLoading, error }: RecentSalesProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">

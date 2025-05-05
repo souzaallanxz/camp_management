@@ -16,55 +16,47 @@ import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 
-// Criar QueryClient com configurações para evitar cache desnecessário nos endpoints
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        // Limitar tentativas
         if (failureCount >= 0 && import.meta.env.DEV) return false
-        if (failureCount > 1 && import.meta.env.PROD) return false
+        if (failureCount > 3 && import.meta.env.PROD) return false
 
         return !(
           error instanceof AxiosError &&
-          [401, 403, 408, 429].includes(error.response?.status ?? 0)
+          [401, 403].includes(error.response?.status ?? 0)
         )
       },
-      // Configurações padrão para não-dashboard
-      refetchOnWindowFocus: false,
-      staleTime: 30000, // 30 segundos para páginas regulares
-      gcTime: 5 * 60 * 1000, // 5 minutos
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-      // Fazer requisições sempre que houver rede
-      networkMode: 'online',
+      refetchOnWindowFocus: import.meta.env.PROD,
+      staleTime: 10 * 1000, // 10s
     },
     mutations: {
-      retry: 1,
       onError: (error) => {
-        // Ignorar 304
-        if (error instanceof AxiosError && error.response?.status === 304) {
-          return
-        }
-        
         handleServerError(error)
+
+        if (error instanceof AxiosError) {
+          if (error.response?.status === 304) {
+            toast({
+              variant: 'destructive',
+              title: 'Content not modified!',
+            })
+          }
+        }
       },
     },
   },
   queryCache: new QueryCache({
     onError: (error) => {
       if (error instanceof AxiosError) {
-        // Ignorar 304
-        if (error.response?.status === 304) {
-          return
-        }
-        
         if (error.response?.status === 401) {
           toast({
             variant: 'destructive',
             title: 'Session expired!',
           })
           useAuthStore.getState().auth.reset()
-          router.navigate({ to: '/sign-in' })
+          const redirect = `${router.history.location.href}`
+          router.navigate({ to: '/sign-in', search: { redirect } })
         }
         if (error.response?.status === 500) {
           toast({
@@ -75,13 +67,6 @@ const queryClient = new QueryClient({
         }
         if (error.response?.status === 403) {
           // router.navigate("/forbidden", { replace: true });
-        }
-        if (error.response?.status === 408 || error.code === 'ECONNABORTED') {
-          toast({
-            variant: 'destructive',
-            title: 'Falha na conexão',
-            description: 'O servidor demorou muito para responder. Tente novamente mais tarde.'
-          })
         }
       }
     },

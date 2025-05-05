@@ -1,35 +1,124 @@
 import type { Registration, InsertRegistration, UpdateRegistration } from '../data/schema'
-import { api, API_PATHS } from '@/services/api'
+import { buildApiUrl } from '@/services/api'
+
+function getTeamIdHeader() {
+  const teamId = localStorage.getItem('teamId');
+  if (!teamId) throw new Error('No team ID found');
+  return { 'x-team-id': teamId };
+}
 
 export const registrationService = {
-  async getRegistrations() {
-    return await api.get<Registration[]>(API_PATHS.REGISTRATIONS);
+  async findAll() {
+    const response = await fetch(buildApiUrl('/registrations'), {
+      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Erro ao buscar inscrições');
+    return response.json();
   },
 
-  async getRegistration(id: string) {
-    return await api.get<Registration>(API_PATHS.REGISTRATION(id));
+  async findById(id: string) {
+    const response = await fetch(buildApiUrl(`/registrations/${id}`), {
+      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Erro ao buscar inscrição');
+    return response.json();
   },
 
-  async createRegistration(data: InsertRegistration) {
-    return await api.post<Registration>(API_PATHS.REGISTRATIONS, data);
+  async create(registration: InsertRegistration) {
+    const response = await fetch(buildApiUrl('/registrations'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+      credentials: 'include',
+      body: JSON.stringify(registration),
+    });
+    if (!response.ok) throw new Error('Erro ao criar inscrição');
+    return response.json();
   },
 
-  async updateRegistration(id: string, data: UpdateRegistration) {
-    return await api.put<Registration>(API_PATHS.REGISTRATION(id), data);
+  async update(id: string, registration: UpdateRegistration) {
+    const response = await fetch(buildApiUrl(`/registrations/${id}`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+      credentials: 'include',
+      body: JSON.stringify(registration),
+    });
+    if (!response.ok) throw new Error('Erro ao atualizar inscrição');
+    return response.json();
   },
 
-  async deleteRegistration(id: string) {
-    await api.delete(API_PATHS.REGISTRATION(id));
-  },
-
-  async getRegistrationsByCamp(campId: string) {
-    return await api.get<Registration[]>(API_PATHS.REGISTRATIONS_BY_CAMP(campId));
-  },
-
-  async updateOnboardingStatus(registrationId: string, onboardingStatus: string) {
-    return await api.patch<Registration>(
-      `${API_PATHS.REGISTRATION(registrationId)}/onboarding-status`,
-      { onboarding_status: onboardingStatus }
-    );
+  async delete(id: string) {
+    const response = await fetch(buildApiUrl(`/registrations/${id}`), {
+      method: 'DELETE',
+      headers: { ...getTeamIdHeader() },
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Erro ao deletar inscrição');
   }
-};
+}
+
+export async function getRegistrations() {
+  const response = await fetch(buildApiUrl('/registrations'), {
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    credentials: 'include',
+  });
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function getRegistrationById(id: string): Promise<Registration> {
+  const response = await fetch(buildApiUrl(`/registrations/${id}`), {
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('Erro ao buscar inscrição');
+  return response.json();
+}
+
+export async function updateRegistration(id: string, registration: UpdateRegistration) {
+  const response = await fetch(buildApiUrl(`/registrations/${id}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    credentials: 'include',
+    body: JSON.stringify(registration),
+  });
+  if (!response.ok) throw new Error('Erro ao atualizar inscrição');
+  return response.json();
+}
+
+export async function deleteRegistration(id: string) {
+  const response = await fetch(buildApiUrl(`/registrations/${id}`), {
+    method: 'DELETE',
+    headers: { ...getTeamIdHeader() },
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('Erro ao deletar inscrição');
+}
+
+export async function updateOnboardingStatus(registrationId: string, onboardingStatus: string) {
+  const teamId = localStorage.getItem('teamId');
+  if (!teamId) throw new Error('No team ID found');
+  const response = await fetch(buildApiUrl(`/registrations/${registrationId}/onboarding-status`), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-team-id': teamId
+    },
+    credentials: 'include',
+    body: JSON.stringify({ onboarding_status: onboardingStatus })
+  });
+  if (!response.ok) throw new Error('Erro ao atualizar status de onboarding');
+  return response.json();
+}
+
+export async function createRegistration(registration: InsertRegistration) {
+  const response = await fetch(buildApiUrl('/registrations'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    credentials: 'include',
+    body: JSON.stringify(registration),
+  });
+  if (!response.ok) throw new Error('Erro ao criar inscrição');
+  return response.json();
+}

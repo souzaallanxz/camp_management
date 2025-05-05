@@ -1,5 +1,6 @@
+import { useQuery } from '@tanstack/react-query'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, TooltipProps } from 'recharts'
-import { CampPaymentsData } from '../services/dashboard-service'
+import { dashboardService, CampPaymentsData } from '../services/dashboard-service'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from './empty-state'
@@ -46,13 +47,12 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   return null
 }
 
-interface OverviewProps {
-  data?: CampPaymentsData[]
-  isLoading: boolean
-  error: Error | null
-}
+export function Overview() {
+  const { data: campPayments, isLoading, error } = useQuery({
+    queryKey: ['dashboard', 'camp-payments'],
+    queryFn: () => dashboardService.getCampPayments()
+  })
 
-export function Overview({ data: campPayments, isLoading, error }: OverviewProps) {
   if (isLoading) {
     return <Skeleton className="w-full h-[350px]" />
   }
@@ -77,19 +77,9 @@ export function Overview({ data: campPayments, isLoading, error }: OverviewProps
     )
   }
 
-  // Ensure we have valid data for the chart
-  const validData = campPayments.map(item => ({
-    ...item,
-    // Ensure we have numbers, not undefined or NaN
-    totalPayments: typeof item.totalPayments === 'number' ? item.totalPayments : 0,
-    totalRegistrations: typeof item.totalRegistrations === 'number' ? item.totalRegistrations : 0,
-    // Ensure campName is a string
-    campName: item.campName || 'Desconhecido'
-  }));
-
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={validData}>
+      <BarChart data={campPayments}>
         <XAxis
           dataKey="campName"
           stroke="#888888"

@@ -20,8 +20,6 @@ import { toast } from 'sonner'
 import { useCurrentTeam } from '@/features/teams/hooks/use-current-team'
 import { teamService } from '@/features/teams/services/team-service'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { useQuery } from '@tanstack/react-query'
-import { settingsService } from '@/features/settings/services/settings-service'
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -33,22 +31,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>
 
 export function OrganizationForm() {
-  const { data: currentTeam, mutate: mutateCurrentTeam } = useCurrentTeam()
-  
-  // Add a query to get organization settings
-  const { 
-    data: organizationData, 
-    isLoading,
-    isError,
-    refetch 
-  } = useQuery({
-    queryKey: ['organizationSettings'],
-    queryFn: () => settingsService.getOrganization(),
-    retry: 1,
-    refetchOnWindowFocus: false,
-  })
-  
-  const team = organizationData || currentTeam
+  const { data: team, mutate } = useCurrentTeam()
   const [isUploading, setIsUploading] = useState(false)
   const [updateKey, setUpdateKey] = useState(0)
 
@@ -75,8 +58,7 @@ export function OrganizationForm() {
       })
 
       toast.success('Organização atualizada com sucesso')
-      mutateCurrentTeam()
-      refetch()
+      mutate()
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       toast.error(`Erro ao atualizar organização: ${errorMessage}`)
@@ -104,8 +86,7 @@ export function OrganizationForm() {
           form.setValue('logo_url', base64String)
           setUpdateKey(prev => prev + 1)
           toast.success('Logo atualizada com sucesso')
-          mutateCurrentTeam()
-          refetch()
+          mutate()
         }
       }
     } catch (error) {
@@ -124,14 +105,6 @@ export function OrganizationForm() {
       })
     }
   }, [team, form])
-
-  if (isLoading) {
-    return <div>Carregando...</div>
-  }
-
-  if (isError) {
-    return <div>Erro ao carregar configurações da organização</div>
-  }
 
   return (
     <Form {...form}>

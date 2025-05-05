@@ -1,44 +1,65 @@
-import type { Camper, InsertCamper, UpdateCamper } from '../data/schema'
-import { api, API_PATHS } from '@/services/api'
+import type { Camper, InsertCamper } from '../data/schema'
+import { buildApiUrl } from '@/services/api'
+
+function getTeamIdHeader() {
+  const teamId = localStorage.getItem('teamId');
+  if (!teamId) throw new Error('No team ID found');
+  return { 'x-team-id': teamId };
+}
+
+async function findAll() {
+  const response = await fetch(buildApiUrl('/campers'), {
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('Erro ao buscar campistas');
+  return response.json();
+}
+
+async function findById(id: string) {
+  const response = await fetch(buildApiUrl(`/campers/${id}`), {
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('Erro ao buscar campista');
+  return response.json();
+}
+
+async function create(camper: InsertCamper) {
+  const response = await fetch(buildApiUrl('/campers'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    credentials: 'include',
+    body: JSON.stringify(camper),
+  });
+  if (!response.ok) throw new Error('Erro ao criar campista');
+  return response.json();
+}
+
+async function update(id: string, camper: Partial<Camper>) {
+  const response = await fetch(buildApiUrl(`/campers/${id}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    credentials: 'include',
+    body: JSON.stringify(camper),
+  });
+  if (!response.ok) throw new Error('Erro ao atualizar campista');
+  return response.json();
+}
+
+async function remove(id: string) {
+  const response = await fetch(buildApiUrl(`/campers/${id}`), {
+    method: 'DELETE',
+    headers: { ...getTeamIdHeader() },
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('Erro ao deletar campista');
+}
 
 export const camperService = {
-  async getCampers() {
-    try {
-      return await api.get<Camper[]>(API_PATHS.CAMPERS);
-    } catch {
-      return [];
-    }
-  },
-
-  async getCamper(id: string) {
-    try {
-      return await api.get<Camper>(API_PATHS.CAMPER(id));
-    } catch {
-      return null;
-    }
-  },
-
-  async createCamper(data: InsertCamper) {
-    try {
-      return await api.post<Camper>(API_PATHS.CAMPERS, data);
-    } catch {
-      throw new Error('Failed to create camper');
-    }
-  },
-
-  async updateCamper(id: string, data: UpdateCamper) {
-    try {
-      return await api.put<Camper>(API_PATHS.CAMPER(id), data);
-    } catch {
-      throw new Error('Failed to update camper');
-    }
-  },
-
-  async deleteCamper(id: string) {
-    try {
-      await api.delete(API_PATHS.CAMPER(id));
-    } catch {
-      throw new Error('Failed to delete camper');
-    }
-  }
-};
+  findAll,
+  findById,
+  create,
+  update,
+  remove,
+}

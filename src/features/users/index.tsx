@@ -13,22 +13,15 @@ import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersTable } from './components/users-table'
 import UsersProvider from './context/users-context'
 import { getUsers } from './services/user-service'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { ReloadIcon } from '@radix-ui/react-icons'
 
 function UsersContent() {
-  const { 
-    data: users = [], 
-    refetch,
-    isLoading, 
-    isError 
-  } = useQuery({
+  const { data: users = [], refetch, isLoading, error } = useQuery({
     queryKey: ['users'],
     queryFn: getUsers,
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    gcTime: 10 * 60 * 1000, // 10 minutos
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
-    retry: 3
+    retry: 2
   });
 
   const handleRefetch = () => {
@@ -56,23 +49,11 @@ function UsersContent() {
           <UsersPrimaryButtons />
         </div>
 
-        {isError && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTitle>Erro</AlertTitle>
-            <AlertDescription>
-              Não foi possível carregar a lista de usuários. Tente novamente mais tarde.
-            </AlertDescription>
-          </Alert>
-        )}
-
         <div className='-mx-4 flex-1 overflow-auto px-4 py-1'>
           {isLoading ? (
-            <div className="flex justify-center items-center p-8">
-              <div className="flex flex-col items-center gap-2">
-                <ReloadIcon className="h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Carregando usuários...</p>
-              </div>
-            </div>
+            <div className="text-center p-4">Carregando usuários...</div>
+          ) : error ? (
+            <div className="text-center p-4 text-red-500">Erro ao carregar usuários: {error instanceof Error ? error.message : 'Erro desconhecido'}</div>
           ) : (
             <UsersTable data={users} columns={columns} />
           )}
@@ -85,7 +66,7 @@ function UsersContent() {
 }
 
 export default function Users() {
-  const { role } = useUser()
+  const { role, user } = useUser()
   const navigate = useNavigate()
 
   useEffect(() => {
