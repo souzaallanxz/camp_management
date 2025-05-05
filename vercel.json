@@ -6,48 +6,52 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/auth/sign-up",
+      "destination": "/pages/api/auth/sign-up"
+    },
+    {
       "source": "/api/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/:path*"
     },
     {
       "source": "/auth/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/auth/:path*"
     },
     {
       "source": "/teams/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/teams/:path*"
     },
     {
       "source": "/dashboard/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/dashboard/:path*"
     },
     {
       "source": "/camps/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/camps/:path*"
     },
     {
       "source": "/registrations/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/registrations/:path*"
     },
     {
       "source": "/payments/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/payments/:path*"
     },
     {
       "source": "/campers/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/campers/:path*"
     },
     {
       "source": "/users/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/users/:path*"
     },
     {
       "source": "/settings/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/settings/:path*"
     },
     {
       "source": "/debug/:path*",
-      "destination": "/api/server.mjs"
+      "destination": "/api/debug/:path*"
     },
     {
       "source": "/(.*)",
@@ -55,7 +59,7 @@
     }
   ],
   "functions": {
-    "api/server.mjs": {
+    "api/index.js": {
       "memory": 1024,
       "maxDuration": 10
     }
