@@ -4,14 +4,20 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
+  const token = localStorage.getItem('token');
   if (!teamId) throw new Error('No team ID found');
-  return { 'x-team-id': teamId };
+  if (!token) throw new Error('No authenticated user found');
+  return { 
+    'x-team-id': teamId,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
 }
 
 export const registrationService = {
   async findAll() {
-    const response = await fetch(`${API_BASE_URL}/registrations`, {
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    const response = await fetch(`${API_BASE_URL}/api/registrations`, {
+      headers: { ...getTeamIdHeader() },
       credentials: 'include',
     });
     if (!response.ok) throw new Error('Erro ao buscar inscrições');
@@ -19,8 +25,8 @@ export const registrationService = {
   },
 
   async findById(id: string) {
-    const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    const response = await fetch(`${API_BASE_URL}/api/registrations/${id}`, {
+      headers: { ...getTeamIdHeader() },
       credentials: 'include',
     });
     if (!response.ok) throw new Error('Erro ao buscar inscrição');
@@ -28,9 +34,9 @@ export const registrationService = {
   },
 
   async create(registration: InsertRegistration) {
-    const response = await fetch(`${API_BASE_URL}/registrations`, {
+    const response = await fetch(`${API_BASE_URL}/api/registrations`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+      headers: { ...getTeamIdHeader() },
       credentials: 'include',
       body: JSON.stringify(registration),
     });
@@ -39,9 +45,9 @@ export const registrationService = {
   },
 
   async update(id: string, registration: UpdateRegistration) {
-    const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/registrations/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+      headers: { ...getTeamIdHeader() },
       credentials: 'include',
       body: JSON.stringify(registration),
     });
@@ -50,7 +56,7 @@ export const registrationService = {
   },
 
   async delete(id: string) {
-    const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/registrations/${id}`, {
       method: 'DELETE',
       headers: { ...getTeamIdHeader() },
       credentials: 'include',
@@ -60,8 +66,8 @@ export const registrationService = {
 }
 
 export async function getRegistrations() {
-  const response = await fetch(`${API_BASE_URL}/registrations`, {
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+  const response = await fetch(`${API_BASE_URL}/api/registrations`, {
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) return [];
@@ -69,8 +75,8 @@ export async function getRegistrations() {
 }
 
 export async function getRegistrationById(id: string): Promise<Registration> {
-  const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+  const response = await fetch(`${API_BASE_URL}/api/registrations/${id}`, {
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) throw new Error('Erro ao buscar inscrição');
@@ -78,9 +84,9 @@ export async function getRegistrationById(id: string): Promise<Registration> {
 }
 
 export async function updateRegistration(id: string, registration: UpdateRegistration) {
-  const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/api/registrations/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
     body: JSON.stringify(registration),
   });
@@ -89,7 +95,7 @@ export async function updateRegistration(id: string, registration: UpdateRegistr
 }
 
 export async function deleteRegistration(id: string) {
-  const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/api/registrations/${id}`, {
     method: 'DELETE',
     headers: { ...getTeamIdHeader() },
     credentials: 'include',
@@ -98,14 +104,9 @@ export async function deleteRegistration(id: string) {
 }
 
 export async function updateOnboardingStatus(registrationId: string, onboardingStatus: string) {
-  const teamId = localStorage.getItem('teamId');
-  if (!teamId) throw new Error('No team ID found');
-  const response = await fetch(`${API_BASE_URL}/registrations/${registrationId}/onboarding-status`, {
+  const response = await fetch(`${API_BASE_URL}/api/registrations/${registrationId}/onboarding-status`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-team-id': teamId
-    },
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
     body: JSON.stringify({ onboarding_status: onboardingStatus })
   });
@@ -114,9 +115,9 @@ export async function updateOnboardingStatus(registrationId: string, onboardingS
 }
 
 export async function createRegistration(registration: InsertRegistration) {
-  const response = await fetch(`${API_BASE_URL}/registrations`, {
+  const response = await fetch(`${API_BASE_URL}/api/registrations`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
     body: JSON.stringify(registration),
   });
