@@ -224,6 +224,12 @@ app.post('/api/auth/reset-password', (async (req: Request, res: Response) => {
 // Get current user route
 app.get('/api/auth/me', (async (req: Request, res: Response) => {
   try {
+    // Set cache control headers to prevent 304 responses
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Unauthorized' })
@@ -341,6 +347,12 @@ app.post('/api/auth/setup-password', (async (req: Request, res: Response) => {
 // === GET CURRENT USER'S TEAM ===
 app.get('/api/teams/current', (async (req: Request, res: Response) => {
   try {
+    // Set cache control headers to prevent 304 responses
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Unauthorized' });
