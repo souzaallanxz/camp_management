@@ -1,7 +1,4 @@
-import { db } from '@/lib/db'
-import { sqlNeon } from '@/lib/sql-neon'
 import type { Registration, InsertRegistration, UpdateRegistration } from '../data/schema'
-import { getCurrentUserTeam } from '@/features/auth/auth-service'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
