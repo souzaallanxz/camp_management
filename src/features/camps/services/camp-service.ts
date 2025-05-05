@@ -4,14 +4,20 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
+  const token = localStorage.getItem('token');
   if (!teamId) throw new Error('No team ID found');
-  return { 'x-team-id': teamId };
+  if (!token) throw new Error('No authenticated user found');
+  return { 
+    'x-team-id': teamId,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
 }
 
 export const campService = {
   async findAll() {
-    const response = await fetch(`${API_BASE_URL}/camps`, {
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    const response = await fetch(`${API_BASE_URL}/api/camps`, {
+      headers: { ...getTeamIdHeader() },
       credentials: 'include',
     });
     if (!response.ok) throw new Error('Erro ao buscar acampamentos');
@@ -19,8 +25,8 @@ export const campService = {
   },
 
   async findById(id: string) {
-    const response = await fetch(`${API_BASE_URL}/camps/${id}`, {
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    const response = await fetch(`${API_BASE_URL}/api/camps/${id}`, {
+      headers: { ...getTeamIdHeader() },
       credentials: 'include',
     });
     if (!response.ok) throw new Error('Erro ao buscar acampamento');
@@ -28,9 +34,9 @@ export const campService = {
   },
 
   async create(camp: InsertCamp) {
-    const response = await fetch(`${API_BASE_URL}/camps`, {
+    const response = await fetch(`${API_BASE_URL}/api/camps`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+      headers: { ...getTeamIdHeader() },
       credentials: 'include',
       body: JSON.stringify(camp),
     });
@@ -39,9 +45,9 @@ export const campService = {
   },
 
   async update(id: string, camp: UpdateCamp) {
-    const response = await fetch(`${API_BASE_URL}/camps/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/camps/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+      headers: { ...getTeamIdHeader() },
       credentials: 'include',
       body: JSON.stringify(camp),
     });
@@ -50,7 +56,7 @@ export const campService = {
   },
 
   async delete(id: string) {
-    const response = await fetch(`${API_BASE_URL}/camps/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/api/camps/${id}`, {
       method: 'DELETE',
       headers: { ...getTeamIdHeader() },
       credentials: 'include',
@@ -60,8 +66,8 @@ export const campService = {
 }
 
 export async function getCamps() {
-  const response = await fetch(`${API_BASE_URL}/camps`, {
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+  const response = await fetch(`${API_BASE_URL}/api/camps`, {
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) return [];
@@ -69,8 +75,8 @@ export async function getCamps() {
 }
 
 export async function getCampById(id: string): Promise<Camp> {
-  const response = await fetch(`${API_BASE_URL}/camps/${id}`, {
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+  const response = await fetch(`${API_BASE_URL}/api/camps/${id}`, {
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) throw new Error('Erro ao buscar acampamento');

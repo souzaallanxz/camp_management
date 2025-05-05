@@ -14,8 +14,14 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
+  const token = localStorage.getItem('token');
   if (!teamId) throw new Error('No team ID found');
-  return { 'x-team-id': teamId };
+  if (!token) throw new Error('No authenticated user found');
+  return { 
+    'x-team-id': teamId,
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  };
 }
 
 async function getCurrentUserTeam() {
@@ -28,8 +34,8 @@ async function getCurrentUserTeam() {
 }
 
 async function findAll() {
-  const response = await fetch(`${API_BASE_URL}/campers`, {
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+  const response = await fetch(`${API_BASE_URL}/api/campers`, {
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) throw new Error('Erro ao buscar campistas');
@@ -37,8 +43,8 @@ async function findAll() {
 }
 
 async function findById(id: string) {
-  const response = await fetch(`${API_BASE_URL}/campers/${id}`, {
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+  const response = await fetch(`${API_BASE_URL}/api/campers/${id}`, {
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) throw new Error('Erro ao buscar campista');
@@ -46,9 +52,9 @@ async function findById(id: string) {
 }
 
 async function create(camper: InsertCamper) {
-  const response = await fetch(`${API_BASE_URL}/campers`, {
+  const response = await fetch(`${API_BASE_URL}/api/campers`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
     body: JSON.stringify(camper),
   });
@@ -57,9 +63,9 @@ async function create(camper: InsertCamper) {
 }
 
 async function update(id: string, camper: Partial<Camper>) {
-  const response = await fetch(`${API_BASE_URL}/campers/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/api/campers/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+    headers: { ...getTeamIdHeader() },
     credentials: 'include',
     body: JSON.stringify(camper),
   });
@@ -68,7 +74,7 @@ async function update(id: string, camper: Partial<Camper>) {
 }
 
 async function remove(id: string) {
-  const response = await fetch(`${API_BASE_URL}/campers/${id}`, {
+  const response = await fetch(`${API_BASE_URL}/api/campers/${id}`, {
     method: 'DELETE',
     headers: { ...getTeamIdHeader() },
     credentials: 'include',
