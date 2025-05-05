@@ -16,7 +16,7 @@ interface CamperSnackbarBalanceDialogProps {
 export function CamperSnackbarBalanceDialog({
   open,
   onOpenChange,
-  camperId,
+  camperId, // Na verdade já é o registrationId
   onSuccess,
 }: CamperSnackbarBalanceDialogProps) {
   const handleSuccess = () => {

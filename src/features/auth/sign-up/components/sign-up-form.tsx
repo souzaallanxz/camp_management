@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { useAuth } from '../../auth-context'
+import { toast } from '@/components/ui/use-toast'
 
 type SignUpFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -57,12 +58,18 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
   async function onSubmit(data: z.infer<typeof formSchema>) {
     try {
       setIsLoading(true)
-      await signUp(data)
-      
-      // Após o registro bem-sucedido e autenticação, redirecionar para a página principal
+      await signUp({
+        email: data.email,
+        password: data.password,
+        name: data.name,
+      })
       navigate({ to: '/' })
     } catch (error) {
-      console.error('Sign up failed:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: error instanceof Error ? error.message : 'Falha ao criar conta. Por favor, tente novamente.',
+      })
     } finally {
       setIsLoading(false)
     }

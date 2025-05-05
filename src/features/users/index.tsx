@@ -69,9 +69,6 @@ export default function Users() {
   const { role, user } = useUser()
   const navigate = useNavigate()
 
-  console.log('Current user role:', role)
-  console.log('Current user:', user)
-
   useEffect(() => {
     if (role !== 'superadmin' && role !== 'admin') {
       navigate({ to: '/' })

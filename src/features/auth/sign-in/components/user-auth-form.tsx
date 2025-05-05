@@ -54,11 +54,11 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
       setIsLoading(true)
       await signIn(data)
       navigate({ to: search.redirect ?? '/' })
-    } catch {
+    } catch (error) {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: 'Falha ao entrar. Por favor, verifique suas credenciais e tente novamente.',
+        description: error instanceof Error ? error.message : 'Falha ao entrar. Por favor, verifique suas credenciais e tente novamente.',
       })
     } finally {
       setIsLoading(false)

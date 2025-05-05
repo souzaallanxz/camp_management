@@ -47,9 +47,7 @@ async function updateUsersTable() {
       $$;
     `
 
-    console.log('Users table updated successfully')
   } catch (error) {
-    console.error('Error updating users table:', error)
     process.exit(1)
   }
 }
@@ -57,6 +55,5 @@ async function updateUsersTable() {
 updateUsersTable()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error('Unhandled error:', error)
     process.exit(1)
   }) 

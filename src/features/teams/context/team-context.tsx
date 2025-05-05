@@ -30,6 +30,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       setTeam(null);
       setShowOnboarding(false);
       setIsLoading(false);
+      localStorage.removeItem('teamId');
       return;
     }
 
@@ -38,11 +39,17 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       const team = await teamService.getCurrentUserTeam();
 
       setTeam(team);
+      if (team && team.id) {
+        localStorage.setItem('teamId', team.id);
+      } else {
+        localStorage.removeItem('teamId');
+      }
       const shouldShowOnboarding = !team;
       setShowOnboarding(shouldShowOnboarding);
     } catch (error) {
       setTeam(null);
       setShowOnboarding(true);
+      localStorage.removeItem('teamId');
       toast({
         variant: 'destructive',
         title: 'Error',

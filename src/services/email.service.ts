@@ -39,9 +39,7 @@ export const emailService = {
     try {
       // Em ambiente de demonstração, use fallback local
       if (import.meta.env.DEV && IS_DEMO_MODE) {
-        // eslint-disable-next-line no-console
-        console.log('Usando fallback local para envio de email em ambiente de desenvolvimento');
-        
+
         // Cria um ID simulado para o email
         const emailId = `demo-email-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         
@@ -58,28 +56,6 @@ export const emailService = {
         
         // Salva no localStorage para poder visualizar depois
         localStorage.setItem(`email_${emailId}`, JSON.stringify(emailData));
-        
-        // Exibe informações sobre o email simulado no console
-        // eslint-disable-next-line no-console
-        console.log('==========================================');
-        // eslint-disable-next-line no-console
-        console.log('SIMULAÇÃO DE EMAIL (Modo de demonstração)');
-        // eslint-disable-next-line no-console
-        console.log('------------------------------------------');
-        // eslint-disable-next-line no-console
-        console.log(`De: ${from}`);
-        // eslint-disable-next-line no-console
-        console.log(`Para: ${to}`);
-        // eslint-disable-next-line no-console
-        console.log(`Assunto: ${subject}`);
-        // eslint-disable-next-line no-console
-        console.log(`Conteúdo HTML: ${html.substring(0, 150)}...`);
-        if (text) {
-          // eslint-disable-next-line no-console
-          console.log(`Conteúdo texto: ${text.substring(0, 150)}...`);
-        }
-        // eslint-disable-next-line no-console
-        console.log('==========================================');
         
         return {
           success: true,
@@ -172,18 +148,6 @@ export const emailService = {
       Este link expirará em 1 hora por motivos de segurança.
     `;
 
-    // Em ambiente de desenvolvimento, exibe o link no console para facilitar os testes
-    if (import.meta.env.DEV && IS_DEMO_MODE) {
-      // eslint-disable-next-line no-console
-      console.log('==========================================');
-      // eslint-disable-next-line no-console
-      console.log('LINK DE RECUPERAÇÃO (DEV)');
-      // eslint-disable-next-line no-console
-      console.log(resetLink);
-      // eslint-disable-next-line no-console
-      console.log('==========================================');
-    }
-
     return this.sendEmail({
       to: email,
       subject,
@@ -231,18 +195,6 @@ export const emailService = {
       
       Este link expirará em 24 horas por motivos de segurança.
     `;
-
-    // Em ambiente de desenvolvimento, exibe o link no console para facilitar os testes
-    if (import.meta.env.DEV && IS_DEMO_MODE) {
-      // eslint-disable-next-line no-console
-      console.log('==========================================');
-      // eslint-disable-next-line no-console
-      console.log('LINK DE CONVITE (DEV)');
-      // eslint-disable-next-line no-console
-      console.log(setupLink);
-      // eslint-disable-next-line no-console
-      console.log('==========================================');
-    }
 
     return this.sendEmail({
       to: email,

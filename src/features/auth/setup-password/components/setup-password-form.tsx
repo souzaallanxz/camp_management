@@ -17,8 +17,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useNavigate, useSearch } from '@tanstack/react-router'
-import { sqlNeon } from '@/lib/sql-neon'
-import bcrypt from 'bcryptjs'
 
 type SetupPasswordFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -31,6 +29,8 @@ const formSchema = z.object({
   message: 'As senhas não coincidem',
   path: ['confirmPassword'],
 })
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -56,42 +56,21 @@ export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProp
 
     setIsLoading(true)
     setError(null)
-    
     try {
-      // Check if user exists and is invited
-      const userResult = await sqlNeon`
-        SELECT id, status, email
-        FROM public.users
-        WHERE id = ${userId}::uuid
-      `
+      // Chama o backend Express para definir a senha
+      const response = await fetch(`${API_BASE_URL}/auth/setup-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, password }),
+      });
 
-      const user = userResult[0]
-
-      if (!user) {
-        throw new Error('Usuário não encontrado')
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Erro ao definir senha');
       }
 
-      if (user.status !== 'invited') {
-        throw new Error('Este usuário já definiu sua senha')
-      }
-
-      // Hash the password
-      const salt = await bcrypt.genSalt(10)
-      const hashedPassword = await bcrypt.hash(password, salt)
-
-      // Update user password and status
-      await sqlNeon`
-        UPDATE public.users
-        SET 
-          password_hash = ${hashedPassword}::text,
-          status = 'active',
-          updated_at = NOW()
-        WHERE id = ${user.id}::uuid
-      `
-      
       toast.success('Senha definida com sucesso!')
       setPasswordSet(true)
-      
       // Redirect to sign in after 2 seconds
       setTimeout(() => {
         navigate({ to: '/sign-in' })

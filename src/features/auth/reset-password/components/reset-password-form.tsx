@@ -53,36 +53,17 @@ export function ResetPasswordForm({ className, ...props }: ResetPasswordFormProp
   const navigate = useNavigate()
   
   useEffect(() => {
-    // Debug: mostrar os parâmetros da URL no console
-    // eslint-disable-next-line no-console
-    console.log('Parâmetros da URL:', search);
-    
     const token = search.token as string;
     const email = search.email as string;
-    
-    // Armazena para depuração
     setDebugInfo({ token, email });
-    
     if (token && email) {
       try {
-        // eslint-disable-next-line no-console
-        console.log(`Tentando validar token para ${email}`);
-        // eslint-disable-next-line no-console
-        console.log(`Token a ser validado: ${token}`);
-        
-        // Limpa possíveis caracteres extras que possam ter sido adicionados à URL
         const cleanToken = token.trim();
-        
+        // Agora só valida se é UUID e se email está presente
         const isValid = tokenService.validateToken(cleanToken, email);
         setIsTokenValid(isValid);
-        
         if (!isValid) {
-          // eslint-disable-next-line no-console
-          console.error('Token inválido ou expirado');
           toast.error('Link de redefinição de senha inválido ou expirado.');
-        } else {
-          // eslint-disable-next-line no-console
-          console.log('Token validado com sucesso');
         }
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -119,7 +100,7 @@ export function ResetPasswordForm({ className, ...props }: ResetPasswordFormProp
 
     try {
       // Atualiza a senha no serviço de autenticação (agora é assíncrono)
-      const success = await authService.resetPassword(email, values.password);
+      const success = await authService.resetPassword(token, values.password);
       
       if (success) {
         // Invalida o token após o uso (apenas se não estiver em modo manual)
@@ -130,8 +111,7 @@ export function ResetPasswordForm({ className, ...props }: ResetPasswordFormProp
         toast.success('Senha redefinida com sucesso!');
         setResetComplete(true);
         
-        // eslint-disable-next-line no-console
-        console.log('Senha atualizada para o email:', email);
+
       } else {
         throw new Error('Falha ao redefinir a senha');
       }

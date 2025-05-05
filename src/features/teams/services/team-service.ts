@@ -25,40 +25,18 @@ export const teamService = {
   },
 
   async getCurrentUserTeam() {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      throw new Error('No authenticated user found')
-    }
-
-    // Primeiro, busque o team_id do usuário atual
-    const { data: userData, error: userError } = await db.query(
-      `SELECT team_id FROM users WHERE id = $1::uuid`,
-      [token]
-    )
-
-    if (userError) {
-      throw new Error(`Error getting user data: ${(userError as DbError).message}`)
-    }
-
-    if (!userData || userData.length === 0 || !userData[0].team_id) {
-      return null // Usuário não tem equipe
-    }
-
-    // Busque os detalhes da equipe pelo ID
-    const { data: team, error: teamError } = await db.query(
-      `SELECT * FROM teams WHERE id = $1::uuid`,
-      [userData[0].team_id]
-    )
-
-    if (teamError) {
-      throw new Error(`Error getting team data: ${(teamError as DbError).message}`)
-    }
-
-    if (!team || team.length === 0) {
-      return null
-    }
-
-    return team[0] as Team
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No authenticated user found');
+    const response = await fetch(`${API_BASE_URL}/teams/current`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    return response.json();
   },
 
   async createTeam(dto: CreateTeamDto) {

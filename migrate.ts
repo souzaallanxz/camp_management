@@ -104,11 +104,8 @@ async function main() {
   const { error } = await db.migrate()
   
   if (error) {
-    console.error('Migration failed:', error)
     process.exit(1)
   }
-  
-  console.log('Migrations completed successfully')
   process.exit(0)
 }
 

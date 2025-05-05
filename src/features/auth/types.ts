@@ -5,12 +5,13 @@ export interface User {
   updated_at: string
 }
 
-export interface SignInCredentials {
+export type SignInCredentials = {
   email: string
   password: string
 }
 
-export interface SignUpCredentials extends SignInCredentials {
-  confirmPassword: string
+export type SignUpCredentials = {
+  email: string
+  password: string
   name: string
 } 

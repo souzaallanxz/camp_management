@@ -1,3 +1,7 @@
+// ATENÇÃO: Este módulo não deve ser usado no frontend!
+// Todas as operações de banco de dados devem ser feitas via backend Express (http://localhost:3001/api/...).
+// Se precisar de dados no frontend, crie endpoints no backend e consuma via fetch/axios.
+
 import { env } from '@/env'
 import { neon } from '@neondatabase/serverless'
 

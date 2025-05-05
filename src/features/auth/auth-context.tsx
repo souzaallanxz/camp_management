@@ -74,6 +74,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Definir o token no localStorage
       localStorage.setItem('token', session.token)
+      
+      // Definir o team_id no localStorage
+      if (session.user.team_id) {
+        localStorage.setItem('team_id', session.user.team_id)
+      }
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -91,6 +96,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Definir o token no localStorage
       localStorage.setItem('token', response.session.token)
+      
+      // Definir o team_id no localStorage
+      if (response.session.user.team_id) {
+        localStorage.setItem('team_id', response.session.user.team_id)
+      }
       
       return response
     } catch (error) {

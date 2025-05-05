@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { emailService } from '@/services/email.service'
-import { tokenService } from '@/services/token.service'
+import { forgotPassword } from '@/features/auth/auth-service'
 
 type ForgotFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -45,37 +45,13 @@ export function ForgotForm({ className, ...props }: ForgotFormProps) {
     
     try {
       setRecoveryEmail(data.email)
-      
-      // Gera um token válido para este email usando o serviço de token
-      const token = tokenService.generateToken(data.email)
-      
-      // URL para redefinição de senha com query parameters codificados
-      const resetLink = `${window.location.origin}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(data.email)}`
-      
-      // Para depuração, mostra o token no console em ambiente de desenvolvimento
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.log('Token gerado:', token);
-        // eslint-disable-next-line no-console
-        console.log('Link de recuperação:', resetLink);
-      }
-
-      // Envia o email usando a API Resend
-      const result = await emailService.sendPasswordRecoveryEmail(data.email, resetLink)
-      
-      if (result.success) {
-        toast.success('Email de recuperação enviado com sucesso!')
-        setEmailSent(true)
-      } else {
-        setError(result.error?.message || 'Falha ao enviar email de recuperação')
-        toast.error('Erro ao enviar email. Tente novamente.')
-      }
+      await forgotPassword(data.email)
+      toast.success('Email de recuperação enviado com sucesso!')
+      setEmailSent(true)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
       setError(errorMessage)
-      toast.error('Erro ao processar sua solicitação')
-      // eslint-disable-next-line no-console
-      console.error('Erro no processamento de recuperação de senha:', error)
+      toast.error('Erro ao enviar email. Tente novamente.')
     } finally {
       setIsLoading(false)
     }

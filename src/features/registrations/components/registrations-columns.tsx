@@ -214,12 +214,12 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
     }
   },
   {
-    accessorKey: 'total_amount_paid',
+    accessorKey: 'total_paid',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Valor Pago" />
     ),
     cell: ({ row }) => {
-      return <div>{formatCurrency(row.original.total_amount_paid || 0)}</div>
+      return <div>{formatCurrency(row.original.total_paid || 0)}</div>
     }
   },
   {

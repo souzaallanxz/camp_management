@@ -15,11 +15,13 @@ import { formatCurrency } from '@/lib/utils'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
-export interface CamperWithActions extends Camper {
+export interface CamperWithActions extends Omit<Camper, 'camp'> {
   onEdit?: (camper: Camper) => void
   onLoadCard?: (camper: Camper) => void
   onUpgradeClick?: () => void
+  snack_bar_balance?: string | number
   total_balance: number
+  camp?: string | { name?: string }
 }
 
 export const columns: ColumnDef<CamperWithActions>[] = [
@@ -53,15 +55,22 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Acampamento" />
     ),
-    cell: ({ row }) => row.getValue('camp') || '-'
+    cell: ({ row }) => {
+      const camp = row.original.camp;
+      // Verificar se camp é objeto e tem propriedade name, ou é string
+      if (typeof camp === 'object' && camp?.name) {
+        return camp.name;
+      }
+      return camp || '-';
+    }
   },
   {
-    accessorKey: 'total_balance',
+    accessorKey: 'snack_bar_balance',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Saldo" />
     ),
     cell: ({ row }) => {
-      const balance = row.getValue('total_balance') as number
+      const balance = Number(row.original.snack_bar_balance) || 0
       return (
         <div className={`font-medium ${balance > 0 ? 'text-green-600' : 'text-red-600'}`}>
           {formatCurrency(balance)}

@@ -1,6 +1,4 @@
-import { sqlNeon } from '@/lib/sql-neon'
-import type { SignUpCredentials } from './types'
-import bcrypt from 'bcryptjs'
+import type { SignInCredentials, SignUpCredentials } from './types'
 
 export type User = {
   id: string
@@ -17,56 +15,29 @@ export type Session = {
 
 export type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED'
 
-export async function signIn(email: string | { email: string, password: string }, password?: string) {
-  // Handle both object and separate parameters
-  const credentials = typeof email === 'object' 
-    ? { email: String(email.email), password: String(email.password) }
-    : { email: String(email), password: String(password) }
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
-  // Buscar usuário pelo email
-  const result = await sqlNeon`
-    SELECT id, email, name, password_hash, team_id, role, created_at, updated_at
-    FROM public.users 
-    WHERE email = ${credentials.email}::text
-  `
+export async function signIn(credentials: SignInCredentials) {
+  const response = await fetch(`${API_BASE_URL}/auth/sign-in`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(credentials),
+  })
 
-  const user = result[0]
-  
-  if (!user) {
-    throw new Error('Invalid credentials')
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to sign in')
   }
 
-  // Verificar a senha
-  const passwordMatch = await bcrypt.compare(credentials.password, user.password_hash)
-  
-  if (!passwordMatch) {
-    throw new Error('Invalid credentials')
-  }
-
-  const token = user.id
-
-  return { 
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      team_id: user.team_id,
-      role: user.role
-    }, 
-    session: { 
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        team_id: user.team_id,
-        role: user.role
-      }, 
-      token 
-    } 
-  }
+  const data = await response.json()
+  return data
 }
 
 export async function signOut() {
+  // Clear local storage
+  localStorage.removeItem('token')
   return { error: null }
 }
 
@@ -76,43 +47,25 @@ export async function getCurrentUser() {
     throw new Error('No token found')
   }
 
-  const result = await sqlNeon`
-    SELECT id, email, name, team_id, role, created_at, updated_at
-    FROM public.users
-    WHERE id = ${token}::uuid
-  `
+  const response = await fetch(`${API_BASE_URL}/auth/me`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
 
-  const user = result[0]
-  
-  if (!user) {
-    throw new Error('User not found')
+  if (!response.ok) {
+    throw new Error('Failed to get current user')
   }
 
-  console.log('User from database:', user)
-
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    team_id: user.team_id,
-    role: user.role
-  }
+  return response.json()
 }
 
 export async function getCurrentUserTeam() {
   try {
-    const user = await getCurrentUser();
-    
-    if (!user.team_id) {
-      // Return null if user has no team_id, don't throw an error
-      return null;
-    }
-    
-    // Just return the team_id directly as that's what the user service expects
-    return user.team_id;
+    const user = await getCurrentUser()
+    return user.team_id || null
   } catch {
-    // Return null instead of throwing an error
-    return null;
+    return null
   }
 }
 
@@ -120,75 +73,69 @@ export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Se
   // In a real app, you'd set up event listeners for auth state changes
   // For now, we're not implementing real-time updates
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _callback = callback; // Store callback to avoid linter error
+  const _callback = callback // Store callback to avoid linter error
   return () => {
     // Cleanup function
   }
 }
 
 export async function signUp({ email, password, name }: SignUpCredentials) {
-  // Verificar se o usuário já existe
-  const existingUserResult = await sqlNeon`
-    SELECT id FROM public.users WHERE email = ${email}::text
-  `
-  
-  if (existingUserResult.length > 0) {
-    throw new Error('User with this email already exists')
-  }
-  
-  // Gerar hash da senha
-  const salt = await bcrypt.genSalt(10)
-  const hashedPassword = await bcrypt.hash(password, salt)
-  
-  // Criar o usuário
-  const result = await sqlNeon`
-    INSERT INTO public.users (id, email, name, password_hash)
-    VALUES (gen_random_uuid(), ${email}::text, ${name}::text, ${hashedPassword}::text)
-    RETURNING id, email, name, team_id
-  `
-  
-  const user = result[0]
-  
-  if (!user) {
-    throw new Error('Failed to create user')
-  }
-  
-  const token = user.id
+  const response = await fetch(`${API_BASE_URL}/auth/sign-up`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, password, name }),
+  })
 
-  return { 
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      team_id: user.team_id
-    }, 
-    session: { 
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        team_id: user.team_id
-      }, 
-      token 
-    } 
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to sign up')
   }
+
+  return response.json()
 }
 
-// Nova função para ajudar a debugar o ID do time
+export async function forgotPassword(email: string) {
+  const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to send password reset email')
+  }
+
+  return response.json()
+}
+
+export async function resetPassword(token: string, password: string) {
+  const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token, password }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to reset password')
+  }
+
+  return response.json()
+}
+
+// Helper function for debugging team ID
 export async function logCurrentUserTeamId() {
   try {
-    const user = await getCurrentUser();
-    const team_id = user.team_id;
-    
-    // Log do ID do time no console para facilitar debug
-    console.log('='.repeat(50));
-    console.log('ID do time do usuário atual:', team_id);
-    console.log(`Para testar com esse team_id use: ${window.location.origin}/users?team_id=${team_id}`);
-    console.log('='.repeat(50));
-    
-    return team_id;
+    const user = await getCurrentUser()
+    return user.team_id
   } catch {
-    console.log('Não foi possível obter o ID do time do usuário');
-    return null;
+    return null
   }
 } 

@@ -6,7 +6,6 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { IconPlus } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
-import { db } from '@/lib/db'
 import { type Camper } from './data/schema'
 import { CampersTable } from './components/campers-table'
 import { CamperDialogs } from './components/camper-dialogs'
@@ -17,7 +16,7 @@ import { CamperSnackbarBalanceDialog } from './components/camper-snackbar-balanc
 import { toast } from 'sonner'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { type CamperWithActions } from './components/campers-table'
-import { getCurrentUser } from '@/features/auth/auth-service'
+import { camperService } from './services/camper-service'
 
 function CampersContent() {
   // Query simplificada para buscar campers e seus saldos
@@ -25,56 +24,7 @@ function CampersContent() {
     queryKey: ['campers-with-balance'],
     queryFn: async () => {
       try {
-        // Get the current user's team ID
-        const user = await getCurrentUser();
-        
-        if (!user || !user.team_id) {
-          return [];
-        }
-
-        // Buscar campers com SQL, filtrando pelo team_id
-        const result = await db.query(`
-          SELECT 
-            c.*,
-            COALESCE(
-              (SELECT SUM(sb.amount) 
-               FROM snackbar_balance sb 
-               WHERE sb.registration_id = c.registration_id
-               GROUP BY sb.registration_id), 
-              0
-            ) as total_balance
-          FROM campers c
-          JOIN registrations r ON c.registration_id = r.id
-          JOIN camps camp ON r.camp_id = camp.id
-          WHERE camp.team_id = $1
-          ORDER BY c.created_at DESC
-        `, [user.team_id]);
-
-        if (!result.data || !Array.isArray(result.data)) {
-          return [];
-        }
-
-        // Converter para o formato esperado pela tabela
-        return result.data.map(camper => ({
-          id: camper.id,
-          name: camper.name,
-          email: camper.email,
-          contact: camper.contact,
-          registration_id: camper.registration_id,
-          form_id: camper.form_id,
-          camp: camper.camp,
-          additional_notes: camper.additional_notes,
-          created_at: camper.created_at,
-          updated_at: camper.updated_at,
-          id_number: camper.id_number,
-          sns_number: camper.sns_number,
-          date_of_birth: camper.date_of_birth,
-          dietary_restrictions: camper.dietary_restrictions,
-          guardian_name: camper.guardian_name,
-          guardian_email: camper.guardian_email,
-          guardian_phone: camper.guardian_phone,
-          total_balance: Number(camper.total_balance) || 0
-        }));
+        return await camperService.findAll();
       } catch {
         // Em caso de erro, retornar array vazio
         return [];
@@ -123,7 +73,11 @@ function CampersContent() {
               Gerencie todos os campistas registrados no sistema.
             </p>
           </div>
-          <Button onClick={openCreateDialog}>
+          <Button 
+            onClick={openCreateDialog} 
+            disabled={true}
+            title="Funcionalidade temporariamente indisponível"
+          >
             <IconPlus className='mr-2 h-4 w-4' />
             Novo Campista
           </Button>

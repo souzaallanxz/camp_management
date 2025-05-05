@@ -11,11 +11,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useCamperDialogs } from '../context/camper-dialogs-context'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { insertCamperSchema, type InsertCamper } from '../data/schema'
 import { db } from '@/lib/db'
 import { toast } from 'sonner'
+import { useCamps } from '@/features/camps/hooks/use-camps'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface CamperDialogsProps {
   onCamperCreated?: () => void
@@ -23,6 +31,8 @@ interface CamperDialogsProps {
 
 export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
   const { isCreateDialogOpen, closeCreateDialog } = useCamperDialogs()
+  const { data: camps, isLoading: isLoadingCamps } = useCamps()
+  
   const form = useForm<InsertCamper>({
     resolver: zodResolver(insertCamperSchema),
     defaultValues: {
@@ -129,10 +139,36 @@ export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
 
           <div className="space-y-2">
             <Label htmlFor="camp">Acampamento</Label>
-            <Input
-              id="camp"
-              {...form.register('camp')}
-              placeholder="Nome do acampamento"
+            <Controller
+              name="camp"
+              control={form.control}
+              render={({ field }) => (
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um acampamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingCamps ? (
+                      <SelectItem value="loading" disabled>
+                        Carregando acampamentos...
+                      </SelectItem>
+                    ) : camps && camps.length > 0 ? (
+                      camps.map((camp) => (
+                        <SelectItem key={camp.id} value={camp.name}>
+                          {camp.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        Nenhum acampamento encontrado
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             />
             {form.formState.errors.camp && (
               <p className="text-sm text-destructive">

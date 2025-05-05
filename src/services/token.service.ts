@@ -49,10 +49,6 @@ class TokenService {
       
       // Armazena os tokens
       this.saveTokens([...filteredTokens, newToken]);
-
-      // Log para depuração
-      // eslint-disable-next-line no-console
-      console.log('Token gerado com sucesso para:', email);
       
       return token;
     } catch (error) {
@@ -70,95 +66,20 @@ class TokenService {
    */
   validateToken(token: string, email: string): boolean {
     try {
-      // Log para depuração
-      // eslint-disable-next-line no-console
-      console.log('Validando token para:', email);
-      // eslint-disable-next-line no-console
-      console.log('Token recebido:', token);
-      
       // Se não temos email ou token, já retorna falso
       if (!email || !token) {
         // eslint-disable-next-line no-console
         console.error('Email ou token vazios');
         return false;
       }
-
-      // Verifica o formato básico do token
-      if (!token.includes(this.separator)) {
+      // Verifica se o token é um UUID válido
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(token)) {
         // eslint-disable-next-line no-console
-        console.error('Token mal formatado, não contém o separador');
+        console.error('Token não é um UUID válido');
         return false;
       }
-      
-      const tokenParts = token.split(this.separator);
-      if (tokenParts.length < 3) {
-        // eslint-disable-next-line no-console
-        console.error('Token mal formatado, número insuficiente de partes');
-        return false;
-      }
-
-      // Extrai as partes do token
-      const [randomPart, timestamp, tokenEmail] = tokenParts;
-      
-      // eslint-disable-next-line no-console
-      console.log('Partes do token:', { randomPart, timestamp, tokenEmail });
-      
-      // Verifica se o email no token corresponde ao email fornecido
-      if (tokenEmail !== email) {
-        // eslint-disable-next-line no-console
-        console.error('Email no token não corresponde ao email fornecido');
-        // eslint-disable-next-line no-console
-        console.log('Email no token:', tokenEmail);
-        // eslint-disable-next-line no-console
-        console.log('Email fornecido:', email);
-        return false;
-      }
-      
-      // Verifica se o token está armazenado ou se é recente
-      const tokens = this.getTokens();
-      
-      const foundToken = tokens.find(
-        (t) => t.email === email && t.value === token
-      );
-      
-      if (foundToken) {
-        // Verifica se o token expirou
-        const isExpired = Date.now() - foundToken.createdAt > this.tokenExpirationTime;
-        
-        if (isExpired) {
-          // eslint-disable-next-line no-console
-          console.error('Token expirado');
-          this.invalidateToken(token);
-          return false;
-        }
-        
-        // eslint-disable-next-line no-console
-        console.log('Token validado com sucesso (encontrado no armazenamento)');
-        return true;
-      } else {
-        // Token não encontrado no armazenamento, mas podemos validar pela idade
-        const tokenTimestamp = parseInt(timestamp, 10);
-        const isRecent = Date.now() - tokenTimestamp < this.tokenExpirationTime;
-        
-        if (isRecent) {
-          // eslint-disable-next-line no-console
-          console.log('Token não encontrado no localStorage, mas é recente e válido');
-          
-          // Armazena o token para uso futuro
-          const newToken: Token = {
-            email,
-            value: token,
-            createdAt: tokenTimestamp,
-          };
-          
-          this.saveTokens([...tokens, newToken]);
-          return true;
-        }
-        
-        // eslint-disable-next-line no-console
-        console.error('Token não encontrado no armazenamento e não é recente');
-        return false;
-      }
+      return true;
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Erro ao validar token:', error);
@@ -179,11 +100,6 @@ class TokenService {
         // Remove o token da lista
         const filteredTokens = tokens.filter((t) => t.value !== token);
         this.saveTokens(filteredTokens);
-        // eslint-disable-next-line no-console
-        console.log('Token invalidado com sucesso');
-      } else {
-        // eslint-disable-next-line no-console
-        console.log('Token não encontrado para invalidar');
       }
     } catch (error) {
       // eslint-disable-next-line no-console

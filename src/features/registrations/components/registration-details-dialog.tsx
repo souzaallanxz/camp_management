@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { IconPlus } from '@tabler/icons-react'
 import { PaymentForm } from './payment-form'
+import { campService } from '@/features/camps/services/camp-service'
 
 const statusStyles = {
   paid: 'bg-green-100 text-green-900 dark:bg-green-900 dark:text-green-100',
@@ -60,8 +61,25 @@ export function RegistrationDetailsSheet({
       }
 
       try {
+        // Load payments
         const paymentsData = await getPaymentsByRegistrationId(registration.id)
         setPayments(paymentsData)
+        
+        // If registration has a camp_id but no camp object, fetch the camp details
+        if (registration.camp_id && !registration.camp) {
+          try {
+            // Fetch camps and find the matching one
+            const camps = await campService.findAll()
+            const matchingCamp = camps.find(camp => camp.id === registration.camp_id)
+            
+            if (matchingCamp) {
+              // Create a new registration object with the camp info
+              registration.camp = matchingCamp
+            }
+          } catch {
+            // Camp fetch failed, but we can continue
+          }
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to load payments'
         toast({
@@ -147,7 +165,10 @@ export function RegistrationDetailsSheet({
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Acampamento</span>
-                <span className="col-span-3">{registration.camp?.name}</span>
+                <span className="col-span-3">
+                  {registration.camp?.name || 
+                   (registration.camp_id ? `ID: ${registration.camp_id}` : '-')}
+                </span>
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">ID do Formulário</span>

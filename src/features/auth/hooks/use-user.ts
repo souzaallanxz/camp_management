@@ -12,8 +12,6 @@ interface UseUserReturn {
 export function useUser(): UseUserReturn {
   const { user, isAuthenticated, isLoading } = useAuth()
   
-  console.log('Auth context user:', user)
-  
   return {
     user,
     isAuthenticated,

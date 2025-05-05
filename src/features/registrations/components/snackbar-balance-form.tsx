@@ -10,13 +10,39 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { PaymentMethod } from '../data/schema'
-import { db } from '@/lib/db'
 import { MBWayService } from '../services/mbway-service'
 
 interface SnackbarBalanceFormProps {
   registrationId: string
   onSuccess: () => void
   onCancel: () => void
+}
+
+// Função para salvar o saldo através da API
+async function saveSnackbarBalance(data: {
+  registration_id: string
+  amount: number
+  payment_method: string
+  phone_number?: string | null
+}) {
+  const teamId = localStorage.getItem('teamId');
+  if (!teamId) throw new Error('No team ID found');
+  
+  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/snackbar-balance`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-team-id': teamId
+    },
+    credentials: 'include',
+    body: JSON.stringify(data)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Erro ao salvar carregamento do cartão');
+  }
+  
+  return response.json();
 }
 
 export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: SnackbarBalanceFormProps) {
@@ -39,41 +65,38 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
           title: 'Erro',
           description: 'O valor do carregamento deve ser maior que 0',
         })
+        setLoading(false)
         return
       }
 
       // If payment method is MB Way, trigger the payment request first
       if (paymentMethod === 'MB Way') {
-        await MBWayService.requestPayment({
-          mobileNumber: phoneNumber,
-          amount: numericAmount,
-          description: `Carregamento Cartão - ${registrationId}`,
-          orderId: `${registrationId}-${Date.now()}`,
-        })
+        try {
+          await MBWayService.requestPayment({
+            mobileNumber: phoneNumber,
+            amount: numericAmount,
+            description: `Carregamento Cartão - ${registrationId}`,
+            orderId: `${registrationId}-${Date.now()}`,
+          })
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+          toast({
+            variant: 'destructive',
+            title: 'Erro MB Way',
+            description: errorMessage,
+          })
+          setLoading(false)
+          return
+        }
       }
 
-      // Create the snackbar balance record
-      const { error } = await db.query(
-        `INSERT INTO snackbar_balance (
-          registration_id,
-          amount,
-          payment_method,
-          phone_number,
-          created_at,
-          updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *`,
-        [
-          registrationId,
-          numericAmount,
-          paymentMethod,
-          phoneNumber || null,
-          new Date().toISOString(),
-          new Date().toISOString(),
-        ]
-      )
-
-      if (error) throw error
+      // Salvar através da API em vez de db.query
+      await saveSnackbarBalance({
+        registration_id: registrationId,
+        amount: numericAmount,
+        payment_method: paymentMethod,
+        phone_number: phoneNumber || null,
+      })
 
       toast({
         title: 'Sucesso',
