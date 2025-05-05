@@ -103,7 +103,7 @@ export async function deleteRegistration(id: string) {
 export async function updateOnboardingStatus(registrationId: string, onboardingStatus: string) {
   const teamId = localStorage.getItem('teamId');
   if (!teamId) throw new Error('No team ID found');
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/registrations/${registrationId}/onboarding-status`, {
+  const response = await fetch(`${API_BASE_URL}/registrations/${registrationId}/onboarding-status`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',

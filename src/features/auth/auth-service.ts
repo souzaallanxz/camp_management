@@ -1,4 +1,5 @@
 import type { SignInCredentials, SignUpCredentials } from './types'
+import { buildApiUrl } from '@/services/api'
 
 export type User = {
   id: string
@@ -15,10 +16,8 @@ export type Session = {
 
 export type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-
 export async function signIn(credentials: SignInCredentials) {
-  const response = await fetch(`${API_BASE_URL}/auth/sign-in`, {
+  const response = await fetch(buildApiUrl('/auth/sign-in'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -47,7 +46,7 @@ export async function getCurrentUser() {
     throw new Error('No token found')
   }
 
-  const response = await fetch(`${API_BASE_URL}/auth/me`, {
+  const response = await fetch(buildApiUrl('/auth/me'), {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
@@ -80,7 +79,7 @@ export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Se
 }
 
 export async function signUp({ email, password, name }: SignUpCredentials) {
-  const response = await fetch(`${API_BASE_URL}/auth/sign-up`, {
+  const response = await fetch(buildApiUrl('/auth/sign-up'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -97,7 +96,7 @@ export async function signUp({ email, password, name }: SignUpCredentials) {
 }
 
 export async function forgotPassword(email: string) {
-  const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+  const response = await fetch(buildApiUrl('/auth/forgot-password'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -114,7 +113,7 @@ export async function forgotPassword(email: string) {
 }
 
 export async function resetPassword(token: string, password: string) {
-  const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+  const response = await fetch(buildApiUrl('/auth/reset-password'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
