@@ -1,24 +1,16 @@
 import { User } from '../data/schema'
-import { emailService } from '@/services/email.service'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { buildApiUrl } from '@/services/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
-  const token = localStorage.getItem('token');
   if (!teamId) throw new Error('No team ID found');
-  if (!token) throw new Error('No authenticated user found');
-  return { 
-    'x-team-id': teamId,
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  };
+  return { 'x-team-id': teamId };
 }
 
 // Busca apenas usuários da equipe atual do usuário logado
 export async function getUsers(): Promise<User[]> {
-  const response = await fetch(`${API_BASE_URL}/api/users`, {
-    headers: { ...getTeamIdHeader() },
+  const response = await fetch(buildApiUrl('/users'), {
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
   });
   if (!response.ok) return [];
@@ -27,9 +19,9 @@ export async function getUsers(): Promise<User[]> {
 
 // Função unificada para criar/convidar usuários
 export async function createUserWithInvitation(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'username' | 'phoneNumber'>): Promise<User> {
-  const response = await fetch(`${API_BASE_URL}/api/users`, {
+  const response = await fetch(buildApiUrl('/users'), {
     method: 'POST',
-    headers: { ...getTeamIdHeader() },
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
     body: JSON.stringify(userData),
   });
@@ -38,9 +30,9 @@ export async function createUserWithInvitation(userData: Omit<User, 'id' | 'crea
 }
 
 export async function updateUser(userId: string, userData: Partial<User>): Promise<User> {
-  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+  const response = await fetch(buildApiUrl(`/users/${userId}`), {
     method: 'PUT',
-    headers: { ...getTeamIdHeader() },
+    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
     body: JSON.stringify(userData),
   });
@@ -49,7 +41,7 @@ export async function updateUser(userId: string, userData: Partial<User>): Promi
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+  const response = await fetch(buildApiUrl(`/users/${userId}`), {
     method: 'DELETE',
     headers: { ...getTeamIdHeader() },
     credentials: 'include',
