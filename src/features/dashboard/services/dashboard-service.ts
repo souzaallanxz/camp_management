@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { fetchWithNoCache } from '@/services/api';
 
 export interface MetricData {
   total: number
@@ -30,48 +31,48 @@ export const dashboardService = {
   },
 
   async getMonthlyPayments(): Promise<MetricData> {
-    const response = await fetch(`${API_BASE_URL}/dashboard/monthly-payments`, {
-      headers: { ...await this.getTeamIdHeader() },
+    const response = await fetchWithNoCache(`${API_BASE_URL}/dashboard/monthly-payments`, {
+      headers: { ...await this.getTeamIdHeader() }
     });
     if (!response.ok) throw new Error('Erro ao buscar pagamentos');
     return response.json();
   },
 
   async getMonthlyRegistrations(): Promise<MetricData> {
-    const response = await fetch(`${API_BASE_URL}/dashboard/monthly-registrations`, {
-      headers: { ...await this.getTeamIdHeader() },
+    const response = await fetchWithNoCache(`${API_BASE_URL}/dashboard/monthly-registrations`, {
+      headers: { ...await this.getTeamIdHeader() }
     });
     if (!response.ok) throw new Error('Erro ao buscar inscrições');
     return response.json();
   },
 
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
-    const response = await fetch(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
-      headers: { ...await this.getTeamIdHeader() },
+    const response = await fetchWithNoCache(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
+      headers: { ...await this.getTeamIdHeader() }
     });
     if (!response.ok) throw new Error('Erro ao buscar carregamentos');
     return response.json();
   },
 
   async getYearlyCampers(): Promise<MetricData> {
-    const response = await fetch(`${API_BASE_URL}/dashboard/yearly-campers`, {
-      headers: { ...await this.getTeamIdHeader() },
+    const response = await fetchWithNoCache(`${API_BASE_URL}/dashboard/yearly-campers`, {
+      headers: { ...await this.getTeamIdHeader() }
     });
     if (!response.ok) throw new Error('Erro ao buscar campistas');
     return response.json();
   },
 
   async getCampPayments(): Promise<CampPaymentsData[]> {
-    const response = await fetch(`${API_BASE_URL}/dashboard/camp-payments`, {
-      headers: { ...await this.getTeamIdHeader() },
+    const response = await fetchWithNoCache(`${API_BASE_URL}/dashboard/camp-payments`, {
+      headers: { ...await this.getTeamIdHeader() }
     });
     if (!response.ok) throw new Error('Erro ao buscar pagamentos');
     return response.json();
   },
 
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
-    const response = await fetch(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
-      headers: { ...await this.getTeamIdHeader() },
+    const response = await fetchWithNoCache(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
+      headers: { ...await this.getTeamIdHeader() }
     });
     if (!response.ok) throw new Error('Erro ao buscar inscrições recentes');
     return response.json();

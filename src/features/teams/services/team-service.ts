@@ -31,9 +31,13 @@ export const teamService = {
     const response = await fetch(buildApiUrl('/teams/current'), {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       },
       credentials: 'include',
+      cache: 'no-store'
     });
     if (!response.ok) return null;
     return response.json();

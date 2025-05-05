@@ -33,6 +33,33 @@ export function buildApiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
+/**
+ * Cache control headers to prevent 304 Not Modified responses
+ */
+export const noCacheHeaders = {
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+};
+
+/**
+ * Makes a fetch request with cache control headers
+ */
+export async function fetchWithNoCache(url: string, options: RequestInit = {}) {
+  const headers = {
+    ...options.headers,
+    ...noCacheHeaders
+  };
+  
+  return fetch(url, {
+    ...options,
+    headers,
+    cache: 'no-store'
+  });
+}
+
 export default {
-  buildApiUrl
+  buildApiUrl,
+  noCacheHeaders,
+  fetchWithNoCache
 }; 

@@ -1,5 +1,5 @@
 import type { Registration, InsertRegistration, UpdateRegistration } from '../data/schema'
-import { buildApiUrl } from '@/services/api'
+import { buildApiUrl, fetchWithNoCache } from '@/services/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
@@ -9,7 +9,7 @@ function getTeamIdHeader() {
 
 export const registrationService = {
   async findAll() {
-    const response = await fetch(buildApiUrl('/registrations'), {
+    const response = await fetchWithNoCache(buildApiUrl('/registrations'), {
       headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
       credentials: 'include',
     });
@@ -18,7 +18,7 @@ export const registrationService = {
   },
 
   async findById(id: string) {
-    const response = await fetch(buildApiUrl(`/registrations/${id}`), {
+    const response = await fetchWithNoCache(buildApiUrl(`/registrations/${id}`), {
       headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
       credentials: 'include',
     });
@@ -27,7 +27,7 @@ export const registrationService = {
   },
 
   async create(registration: InsertRegistration) {
-    const response = await fetch(buildApiUrl('/registrations'), {
+    const response = await fetchWithNoCache(buildApiUrl('/registrations'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
       credentials: 'include',
@@ -38,7 +38,7 @@ export const registrationService = {
   },
 
   async update(id: string, registration: UpdateRegistration) {
-    const response = await fetch(buildApiUrl(`/registrations/${id}`), {
+    const response = await fetchWithNoCache(buildApiUrl(`/registrations/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
       credentials: 'include',
@@ -49,7 +49,7 @@ export const registrationService = {
   },
 
   async delete(id: string) {
-    const response = await fetch(buildApiUrl(`/registrations/${id}`), {
+    const response = await fetchWithNoCache(buildApiUrl(`/registrations/${id}`), {
       method: 'DELETE',
       headers: { ...getTeamIdHeader() },
       credentials: 'include',
@@ -59,7 +59,7 @@ export const registrationService = {
 }
 
 export async function getRegistrations() {
-  const response = await fetch(buildApiUrl('/registrations'), {
+  const response = await fetchWithNoCache(buildApiUrl('/registrations'), {
     headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
   });

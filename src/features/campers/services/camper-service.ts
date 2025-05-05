@@ -1,5 +1,5 @@
-import type { Camper, InsertCamper } from '../data/schema'
-import { buildApiUrl } from '@/services/api'
+import type { InsertCamper } from '../data/schema'
+import { buildApiUrl, fetchWithNoCache } from '@/services/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
@@ -8,7 +8,7 @@ function getTeamIdHeader() {
 }
 
 async function findAll() {
-  const response = await fetch(buildApiUrl('/campers'), {
+  const response = await fetchWithNoCache(buildApiUrl('/campers'), {
     headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
   });
@@ -17,7 +17,7 @@ async function findAll() {
 }
 
 async function findById(id: string) {
-  const response = await fetch(buildApiUrl(`/campers/${id}`), {
+  const response = await fetchWithNoCache(buildApiUrl(`/campers/${id}`), {
     headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
   });
@@ -26,7 +26,7 @@ async function findById(id: string) {
 }
 
 async function create(camper: InsertCamper) {
-  const response = await fetch(buildApiUrl('/campers'), {
+  const response = await fetchWithNoCache(buildApiUrl('/campers'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
@@ -36,8 +36,8 @@ async function create(camper: InsertCamper) {
   return response.json();
 }
 
-async function update(id: string, camper: Partial<Camper>) {
-  const response = await fetch(buildApiUrl(`/campers/${id}`), {
+async function update(id: string, camper: Partial<InsertCamper>) {
+  const response = await fetchWithNoCache(buildApiUrl(`/campers/${id}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
     credentials: 'include',
@@ -48,7 +48,7 @@ async function update(id: string, camper: Partial<Camper>) {
 }
 
 async function remove(id: string) {
-  const response = await fetch(buildApiUrl(`/campers/${id}`), {
+  const response = await fetchWithNoCache(buildApiUrl(`/campers/${id}`), {
     method: 'DELETE',
     headers: { ...getTeamIdHeader() },
     credentials: 'include',

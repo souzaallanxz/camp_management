@@ -1,12 +1,12 @@
 import type { SignInCredentials, SignUpCredentials } from './types'
-import { buildApiUrl } from '@/services/api'
+import { buildApiUrl, fetchWithNoCache } from '@/services/api'
 
 export type User = {
   id: string
   email: string
   name?: string
   team_id?: string | null
-  role?: 'superadmin' | 'admin' | 'contributor' | 'cashier' | 'manager'
+  role?: string
 }
 
 export type Session = {
@@ -16,8 +16,13 @@ export type Session = {
 
 export type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED'
 
+export interface AuthResponse {
+  user: User
+  session: Session
+}
+
 export async function signIn(credentials: SignInCredentials) {
-  const response = await fetch(buildApiUrl('/auth/sign-in'), {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/sign-in'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -46,7 +51,7 @@ export async function getCurrentUser() {
     throw new Error('No token found')
   }
 
-  const response = await fetch(buildApiUrl('/auth/me'), {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/me'), {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
@@ -78,13 +83,13 @@ export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Se
   }
 }
 
-export async function signUp({ email, password, name }: SignUpCredentials) {
-  const response = await fetch(buildApiUrl('/auth/sign-up'), {
+export async function signUp(credentials: SignUpCredentials) {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/sign-up'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password, name }),
+    body: JSON.stringify(credentials),
   })
 
   if (!response.ok) {
@@ -95,8 +100,42 @@ export async function signUp({ email, password, name }: SignUpCredentials) {
   return response.json()
 }
 
+export async function setupPassword(userId: string, password: string) {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/setup-password'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ userId, password }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Falha ao definir senha')
+  }
+
+  return response.json()
+}
+
+export async function verifyOtp(email: string, otp: string) {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/verify-otp'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, otp }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to verify OTP')
+  }
+
+  return response.json()
+}
+
 export async function forgotPassword(email: string) {
-  const response = await fetch(buildApiUrl('/auth/forgot-password'), {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/forgot-password'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -113,7 +152,7 @@ export async function forgotPassword(email: string) {
 }
 
 export async function resetPassword(token: string, password: string) {
-  const response = await fetch(buildApiUrl('/auth/reset-password'), {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/reset-password'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
