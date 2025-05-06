@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react'
 import { Registration } from '../data/schema'
-import { getRegistrationById } from '../services/registration-service'
+import { registrationService } from '../services/registration-service'
 import { toast } from 'sonner'
 
 type DialogType = 'create' | 'view' | 'delete' | 'onboard' | null
@@ -55,7 +55,7 @@ export function RegistrationDialogsProvider({ children }: RegistrationDialogsPro
 
   const openViewDialog = async (registration: Registration) => {
     try {
-      const fullRegistration = await getRegistrationById(registration.id)
+      const fullRegistration = await registrationService.getRegistration(registration.id)
       setSelectedRegistration(fullRegistration)
       setOpenDialog('view')
     } catch (error) {

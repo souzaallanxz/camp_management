@@ -1,4 +1,4 @@
-import { buildApiUrl, fetchWithNoCache, API_PATHS } from '@/services/api';
+import { api, API_PATHS } from '@/services/api';
 
 interface UserProfile {
   id: string;
@@ -21,46 +21,24 @@ interface OrganizationSettings {
 
 export const settingsService = {
   async getProfile(): Promise<UserProfile> {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('No authenticated user found');
-    
-    const response = await fetchWithNoCache(buildApiUrl(API_PATHS.SETTINGS_PROFILE), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      if (response.status === 401) {
+    try {
+      return await api.get<UserProfile>(API_PATHS.SETTINGS_PROFILE);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('401')) {
         throw new Error('Unauthorized - Please log in again');
       }
       throw new Error('Failed to get profile settings');
     }
-    
-    return response.json();
   },
   
   async getOrganization(): Promise<OrganizationSettings> {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('No authenticated user found');
-    
-    const response = await fetchWithNoCache(buildApiUrl(API_PATHS.SETTINGS_ORGANIZATION), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      if (response.status === 401) {
+    try {
+      return await api.get<OrganizationSettings>(API_PATHS.SETTINGS_ORGANIZATION);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('401')) {
         throw new Error('Unauthorized - Please log in again');
       }
       throw new Error('Failed to get organization settings');
     }
-    
-    return response.json();
   }
 }; 

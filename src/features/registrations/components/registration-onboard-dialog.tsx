@@ -9,7 +9,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Registration } from '../data/schema'
-import { updateOnboardingStatus } from '../services/registration-service'
+import { registrationService } from '../services/registration-service'
 import { toast } from 'sonner'
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
@@ -52,26 +52,19 @@ export function RegistrationOnboardDialog({
   const remainingAmount = Number(campPrice) - Number(totalPaid)
 
   const createCamper = async () => {
-    try {
-      // Get camp details from registration
-      const campName = registration.camp?.name || '';
-      const campId = registration.camp?.id || '';
-      
-      // Criar o camper com os dados da registration
-      const newCamper = await camperService.create({
-        name: registration.name,
-        email: registration.email,
-        contact: registration.contact,
-        registration_id: registration.id,
-        camp: campName,
-        form_id: registration.form_id,
-        additional_notes: null
-      });
-      
-      return newCamper;
-    } catch (error) {
-      throw error;
-    }
+    // Get camp details from registration
+    const campName = registration.camp?.name || '';
+    
+    // Criar o camper com os dados da registration
+    return await camperService.createCamper({
+      name: registration.name,
+      email: registration.email,
+      contact: registration.contact,
+      registration_id: registration.id,
+      camp: campName,
+      form_id: registration.form_id,
+      additional_notes: null
+    });
   }
 
   const handleConfirm = async () => {
@@ -82,7 +75,7 @@ export function RegistrationOnboardDialog({
       await createCamper()
       
       // Atualizar o status de onboarding
-      await updateOnboardingStatus(registration.id, 'Onboarded')
+      await registrationService.updateOnboardingStatus(registration.id, 'Onboarded')
       
       // Invalidar a query de registrations para atualizar a tabela após todas as operações
       await queryClient.invalidateQueries({ queryKey: ['registrations'] })
@@ -141,7 +134,7 @@ export function RegistrationOnboardDialog({
       await createCamper()
 
       // Atualizar o status de onboarding
-      await updateOnboardingStatus(registration.id, 'Onboarded')
+      await registrationService.updateOnboardingStatus(registration.id, 'Onboarded')
       
       // Invalidar a query de registrations para atualizar a tabela após todas as operações
       await queryClient.invalidateQueries({ queryKey: ['registrations'] })
