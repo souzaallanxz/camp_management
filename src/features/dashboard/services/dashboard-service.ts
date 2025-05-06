@@ -71,13 +71,12 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout 
 
 // Função para determinar o URL base correto para requisições
 const getApiBaseUrl = () => {
-  // Se estamos em desenvolvimento, usa a URL normal da API
   if (import.meta.env.DEV) {
     return API_BASE_URL;
   }
   
-  // Em produção, usar a URL correta para os endpoints do dashboard
-  return import.meta.env.VITE_API_URL || window.location.origin;
+  // Em produção, usar a URL correta
+  return (import.meta.env.VITE_API_URL || window.location.origin) + '/api';
 };
 
 export const dashboardService = {
@@ -88,101 +87,182 @@ export const dashboardService = {
   },
   
   async getDashboardData(): Promise<DashboardData> {
-    const baseUrl = getApiBaseUrl();
-    // Em produção, a URL será /dashboard/data diretamente
-    const url = baseUrl.includes('/api') 
-      ? `${baseUrl}/dashboard/data` 
-      : `${baseUrl}/dashboard/data`;
+    // Dados mockados para teste em produção
+    const mockData: DashboardData = {
+      monthlyPayments: {
+        total: 2500,
+        previousTotal: 2000,
+        percentageChange: 25
+      },
+      monthlyRegistrations: {
+        total: 42,
+        previousTotal: 35,
+        percentageChange: 20
+      },
+      monthlySnackbar: {
+        total: 1200,
+        previousTotal: 1000,
+        percentageChange: 20
+      },
+      yearlyCampers: {
+        total: 150,
+        previousTotal: 120,
+        percentageChange: 25
+      },
+      campPayments: [
+        {
+          campId: '1',
+          campName: 'Acampamento Verão',
+          totalPayments: 1500,
+          totalRegistrations: 25
+        },
+        {
+          campId: '2',
+          campName: 'Acampamento Inverno',
+          totalPayments: 1000,
+          totalRegistrations: 17
+        }
+      ],
+      recentRegistrations: [
+        {
+          id: '1',
+          name: 'Ana Silva',
+          email: 'ana@exemplo.com',
+          totalPaid: 65,
+          createdAt: new Date().toISOString(),
+          campName: 'Acampamento Verão'
+        },
+        {
+          id: '2',
+          name: 'Pedro Santos',
+          email: 'pedro@exemplo.com',
+          totalPaid: 65,
+          createdAt: new Date().toISOString(),
+          campName: 'Acampamento Verão'
+        },
+        {
+          id: '3',
+          name: 'Maria Oliveira',
+          email: 'maria@exemplo.com',
+          totalPaid: 65,
+          createdAt: new Date().toISOString(),
+          campName: 'Acampamento Inverno'
+        },
+        {
+          id: '4',
+          name: 'João Costa',
+          email: 'joao@exemplo.com',
+          totalPaid: 65,
+          createdAt: new Date().toISOString(),
+          campName: 'Acampamento Inverno'
+        },
+        {
+          id: '5',
+          name: 'Carla Souza',
+          email: 'carla@exemplo.com',
+          totalPaid: 65,
+          createdAt: new Date().toISOString(),
+          campName: 'Acampamento Verão'
+        }
+      ]
+    };
     
-    const response = await fetchWithTimeout(url, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 10000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar dados do dashboard');
-    return response.json();
+    return mockData;
   },
 
   async getMonthlyPayments(): Promise<MetricData> {
-    const baseUrl = getApiBaseUrl();
-    const url = baseUrl.includes('/api') 
-      ? `${baseUrl}/dashboard/monthly-payments` 
-      : `${baseUrl}/dashboard/monthly-payments`;
-    
-    const response = await fetchWithTimeout(url, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar pagamentos');
-    return response.json();
+    return {
+      total: 2500,
+      previousTotal: 2000,
+      percentageChange: 25
+    };
   },
 
   async getMonthlyRegistrations(): Promise<MetricData> {
-    const baseUrl = getApiBaseUrl();
-    const url = baseUrl.includes('/api') 
-      ? `${baseUrl}/dashboard/monthly-registrations` 
-      : `${baseUrl}/dashboard/monthly-registrations`;
-    
-    const response = await fetchWithTimeout(url, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar inscrições');
-    return response.json();
+    return {
+      total: 42,
+      previousTotal: 35,
+      percentageChange: 20
+    };
   },
 
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
-    const baseUrl = getApiBaseUrl();
-    const url = baseUrl.includes('/api') 
-      ? `${baseUrl}/dashboard/monthly-snackbar` 
-      : `${baseUrl}/dashboard/monthly-snackbar`;
-    
-    const response = await fetchWithTimeout(url, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar carregamentos');
-    return response.json();
+    return {
+      total: 1200,
+      previousTotal: 1000,
+      percentageChange: 20
+    };
   },
 
   async getYearlyCampers(): Promise<MetricData> {
-    const baseUrl = getApiBaseUrl();
-    const url = baseUrl.includes('/api') 
-      ? `${baseUrl}/dashboard/yearly-campers` 
-      : `${baseUrl}/dashboard/yearly-campers`;
-    
-    const response = await fetchWithTimeout(url, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar campistas');
-    return response.json();
+    return {
+      total: 150,
+      previousTotal: 120,
+      percentageChange: 25
+    };
   },
 
   async getCampPayments(): Promise<CampPaymentsData[]> {
-    const baseUrl = getApiBaseUrl();
-    const url = baseUrl.includes('/api') 
-      ? `${baseUrl}/dashboard/camp-payments` 
-      : `${baseUrl}/dashboard/camp-payments`;
-    
-    const response = await fetchWithTimeout(url, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar pagamentos');
-    return response.json();
+    return [
+      {
+        campId: '1',
+        campName: 'Acampamento Verão',
+        totalPayments: 1500,
+        totalRegistrations: 25
+      },
+      {
+        campId: '2',
+        campName: 'Acampamento Inverno',
+        totalPayments: 1000,
+        totalRegistrations: 17
+      }
+    ];
   },
 
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
-    const baseUrl = getApiBaseUrl();
-    const url = baseUrl.includes('/api') 
-      ? `${baseUrl}/dashboard/recent-registrations?limit=${limit}` 
-      : `${baseUrl}/dashboard/recent-registrations?limit=${limit}`;
+    const registrations: RecentRegistration[] = [
+      {
+        id: '1',
+        name: 'Ana Silva',
+        email: 'ana@exemplo.com',
+        totalPaid: 65,
+        createdAt: new Date().toISOString(),
+        campName: 'Acampamento Verão'
+      },
+      {
+        id: '2',
+        name: 'Pedro Santos',
+        email: 'pedro@exemplo.com',
+        totalPaid: 65,
+        createdAt: new Date().toISOString(),
+        campName: 'Acampamento Verão'
+      },
+      {
+        id: '3',
+        name: 'Maria Oliveira',
+        email: 'maria@exemplo.com',
+        totalPaid: 65,
+        createdAt: new Date().toISOString(),
+        campName: 'Acampamento Inverno'
+      },
+      {
+        id: '4',
+        name: 'João Costa',
+        email: 'joao@exemplo.com',
+        totalPaid: 65,
+        createdAt: new Date().toISOString(),
+        campName: 'Acampamento Inverno'
+      },
+      {
+        id: '5',
+        name: 'Carla Souza',
+        email: 'carla@exemplo.com',
+        totalPaid: 65,
+        createdAt: new Date().toISOString(),
+        campName: 'Acampamento Verão'
+      }
+    ];
     
-    const response = await fetchWithTimeout(url, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar inscrições recentes');
-    return response.json();
+    return registrations.slice(0, limit);
   }
 } 
