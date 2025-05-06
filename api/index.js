@@ -67,7 +67,6 @@ app.post('/auth/sign-in', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in sign-in:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -103,7 +102,6 @@ app.get('/auth/me', async (req, res) => {
       role: user.role
     });
   } catch (error) {
-    console.error('Error in get current user:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -137,7 +135,6 @@ app.get('/teams/current', async (req, res) => {
     }
     return res.json(team);
   } catch (error) {
-    console.error('Error getting team:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -179,7 +176,6 @@ app.get('/dashboard/monthly-payments', async (req, res) => {
       previous: prev[0]?.total_amount || 0
     });
   } catch (error) {
-    console.error('Error getting monthly payments:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -220,7 +216,6 @@ app.get('/dashboard/monthly-registrations', async (req, res) => {
       previous: prev[0]?.total_count || 0
     });
   } catch (error) {
-    console.error('Error getting monthly registrations:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -263,7 +258,6 @@ app.get('/dashboard/monthly-snackbar', async (req, res) => {
       previous: prev[0]?.total_amount || 0
     });
   } catch (error) {
-    console.error('Error getting monthly snackbar:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -303,7 +297,6 @@ app.get('/dashboard/yearly-campers', async (req, res) => {
       previous: prev[0]?.total_count || 0
     });
   } catch (error) {
-    console.error('Error getting yearly campers:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -332,41 +325,21 @@ app.get('/dashboard/camp-payments', async (req, res) => {
       total: item.total_amount
     })));
   } catch (error) {
-    console.error('Error getting camp payments:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Recent Registrations
 app.get('/dashboard/recent-registrations', async (req, res) => {
-  console.log('Recebendo requisição para /dashboard/recent-registrations');
-  console.log('Headers:', req.headers);
-  console.log('Query params:', req.query);
-  
   const teamId = getTeamId(req);
-  console.log('Team ID obtido:', teamId);
-  
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
-    // Tentar descobrir a estrutura da tabela registrations
-    console.log('Verificando estrutura da tabela registrations...');
-    const tableInfo = await sql`
-      SELECT column_name, data_type 
-      FROM information_schema.columns 
-      WHERE table_name = 'registrations'
-    `;
-    
-    console.log('Colunas da tabela registrations:', tableInfo.map(col => col.column_name));
-    
     const limit = req.query.limit ? parseInt(req.query.limit) : 5;
-    console.log('Limit para consulta:', limit);
-    
-    // Inscrições recentes - usando nome das colunas corretas
-    console.log('Executando consulta SQL...');
     
     let results;
     if (teamId) {
-      // Se tiver teamId, filtra por ele
-      console.log('Executando consulta com filtro de teamId');
       results = await sql`
         SELECT 
           r.id, 
@@ -382,8 +355,6 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
         LIMIT ${limit}
       `;
     } else {
-      // Se não tiver teamId, retorna as mais recentes sem filtro
-      console.log('Executando consulta SEM filtro de teamId (modo diagnóstico)');
       results = await sql`
         SELECT 
           r.id, 
@@ -398,9 +369,6 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
         LIMIT ${limit}
       `;
     }
-    
-    console.log('Consulta SQL executada com sucesso');
-    console.log('Resultados obtidos:', results.length);
 
     const formattedResults = results.map(item => ({
       id: item.id,
@@ -411,12 +379,8 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
       camp_name: item.camp_name
     }));
     
-    console.log('Enviando resposta...');
     return res.json(formattedResults);
   } catch (error) {
-    console.error('Error getting recent registrations - DETALHADO:', error);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       error: 'Internal server error', 
       details: error.message,
@@ -464,7 +428,6 @@ app.post('/api/auth/sign-in', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in sign-in:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -500,7 +463,6 @@ app.get('/api/auth/me', async (req, res) => {
       role: user.role
     });
   } catch (error) {
-    console.error('Error in get current user:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -534,12 +496,9 @@ app.get('/api/teams/current', async (req, res) => {
     }
     return res.json(team);
   } catch (error) {
-    console.error('Error getting team:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// ===== DASHBOARD ENDPOINTS =====
 
 // Monthly Payments
 app.get('/api/dashboard/monthly-payments', async (req, res) => {
@@ -578,7 +537,6 @@ app.get('/api/dashboard/monthly-payments', async (req, res) => {
       previous: prev[0]?.total_amount || 0
     });
   } catch (error) {
-    console.error('Error getting monthly payments:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -619,7 +577,6 @@ app.get('/api/dashboard/monthly-registrations', async (req, res) => {
       previous: prev[0]?.total_count || 0
     });
   } catch (error) {
-    console.error('Error getting monthly registrations:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -662,7 +619,6 @@ app.get('/api/dashboard/monthly-snackbar', async (req, res) => {
       previous: prev[0]?.total_amount || 0
     });
   } catch (error) {
-    console.error('Error getting monthly snackbar:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -702,7 +658,6 @@ app.get('/api/dashboard/yearly-campers', async (req, res) => {
       previous: prev[0]?.total_count || 0
     });
   } catch (error) {
-    console.error('Error getting yearly campers:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -731,31 +686,21 @@ app.get('/api/dashboard/camp-payments', async (req, res) => {
       total: item.total_amount
     })));
   } catch (error) {
-    console.error('Error getting camp payments:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Recent Registrations
 app.get('/api/dashboard/recent-registrations', async (req, res) => {
-  console.log('Recebendo requisição para /api/dashboard/recent-registrations');
-  console.log('Headers:', req.headers);
-  console.log('Query params:', req.query);
-  
   const teamId = getTeamId(req);
-  console.log('Team ID obtido:', teamId);
-  
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
     const limit = req.query.limit ? parseInt(req.query.limit) : 5;
-    console.log('Limit para consulta:', limit);
-    
-    // Inscrições recentes - usando nome das colunas corretas
-    console.log('Executando consulta SQL...');
     
     let results;
     if (teamId) {
-      // Se tiver teamId, filtra por ele
-      console.log('Executando consulta com filtro de teamId');
       results = await sql`
         SELECT 
           r.id, 
@@ -771,8 +716,6 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
         LIMIT ${limit}
       `;
     } else {
-      // Se não tiver teamId, retorna as mais recentes sem filtro
-      console.log('Executando consulta SEM filtro de teamId (modo diagnóstico)');
       results = await sql`
         SELECT 
           r.id, 
@@ -787,9 +730,6 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
         LIMIT ${limit}
       `;
     }
-    
-    console.log('Consulta SQL executada com sucesso');
-    console.log('Resultados obtidos:', results.length);
 
     const formattedResults = results.map(item => ({
       id: item.id,
@@ -800,12 +740,8 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
       camp_name: item.camp_name
     }));
     
-    console.log('Enviando resposta...');
     return res.json(formattedResults);
   } catch (error) {
-    console.error('Error getting recent registrations - DETALHADO:', error);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       error: 'Internal server error', 
       details: error.message,
@@ -816,32 +752,23 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
 
 // Rota de diagnóstico (sem verificação de teamId)
 app.get('/debug/registrations', async (req, res) => {
-  console.log('Executando rota de diagnóstico /debug/registrations');
-  
   try {
     // Verificar conexão com o banco
-    console.log('Verificando conexão com o banco de dados...');
     const testConnection = await sql`SELECT 1 as test`;
-    console.log('Conexão com banco de dados OK:', testConnection);
     
     // Dados básicos das tabelas
-    console.log('Buscando informações sobre tabelas...');
     
     // Contagem de registrations
     const registrationCount = await sql`SELECT COUNT(*) as count FROM registrations`;
-    console.log('Total de registrations:', registrationCount[0]?.count);
     
     // Contagem de camps
     const campsCount = await sql`SELECT COUNT(*) as count FROM camps`;
-    console.log('Total de camps:', campsCount[0]?.count);
     
     // Contagem de teams
     const teamsCount = await sql`SELECT COUNT(*) as count FROM teams`;
-    console.log('Total de teams:', teamsCount[0]?.count);
     
     // Listar alguns teams para diagnóstico
     const teams = await sql`SELECT id, name FROM teams LIMIT 5`;
-    console.log('Teams encontrados:', teams);
     
     // Tentar buscar as 5 registrations mais recentes
     const results = await sql`
@@ -858,7 +785,6 @@ app.get('/debug/registrations', async (req, res) => {
       ORDER BY r.created_at DESC
       LIMIT 5
     `;
-    console.log('Registrations mais recentes encontrados:', results.length);
     
     return res.json({
       success: true,

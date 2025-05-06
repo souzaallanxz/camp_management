@@ -50,7 +50,11 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 export function Overview() {
   const { data: campPayments, isLoading, error } = useQuery({
     queryKey: ['dashboard', 'camp-payments'],
-    queryFn: () => dashboardService.getCampPayments()
+    queryFn: () => dashboardService.getCampPayments(),
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    retry: 1,
+    retryDelay: 1000,
+    refetchOnWindowFocus: false
   })
 
   if (isLoading) {

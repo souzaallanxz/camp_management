@@ -21,17 +21,21 @@ const queryClient = new QueryClient({
     queries: {
       retry: (failureCount, error) => {
         if (failureCount >= 0 && import.meta.env.DEV) return false
-        if (failureCount > 3 && import.meta.env.PROD) return false
+        if (failureCount > 1 && import.meta.env.PROD) return false
 
         return !(
           error instanceof AxiosError &&
-          [401, 403].includes(error.response?.status ?? 0)
+          [401, 403, 408, 429].includes(error.response?.status ?? 0)
         )
       },
-      refetchOnWindowFocus: import.meta.env.PROD,
-      staleTime: 10 * 1000, // 10s
+      refetchOnWindowFocus: false,
+      staleTime: 3 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      networkMode: 'offlineFirst',
     },
     mutations: {
+      retry: 1,
       onError: (error) => {
         handleServerError(error)
 
@@ -67,6 +71,13 @@ const queryClient = new QueryClient({
         }
         if (error.response?.status === 403) {
           // router.navigate("/forbidden", { replace: true });
+        }
+        if (error.response?.status === 408 || error.code === 'ECONNABORTED') {
+          toast({
+            variant: 'destructive',
+            title: 'Falha na conexão',
+            description: 'O servidor demorou muito para responder. Tente novamente mais tarde.'
+          })
         }
       }
     },
