@@ -2,8 +2,12 @@ import { User } from '../data/schema'
 
 // Get API URL from environment with proper handling for production vs development
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-// Make sure we have /api at the end but avoid double /api/api
-const API_BASE_URL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
+
+// Check if we're in production environment (campmanagement.vercel.app)
+const isProduction = API_URL.includes('campmanagement.vercel.app');
+
+// In production, the API endpoints don't have /api prefix
+const API_BASE_URL = isProduction ? API_URL : (API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`);
 
 // Common headers for caching prevention
 const getCacheHeaders = () => ({
@@ -54,7 +58,11 @@ export async function createUserWithInvitation(userData: Omit<User, 'id' | 'crea
       ...getCacheHeaders()
     };
     
-    const response = await fetch(`${API_BASE_URL}/users`, {
+    // Add timestamp to prevent caching
+    const timestamp = Date.now();
+    const url = `${API_BASE_URL}/users?_=${timestamp}`;
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -76,7 +84,11 @@ export async function updateUser(userId: string, userData: Partial<User>): Promi
       ...getCacheHeaders()
     };
     
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+    // Add timestamp to prevent caching
+    const timestamp = Date.now();
+    const url = `${API_BASE_URL}/users/${userId}?_=${timestamp}`;
+    
+    const response = await fetch(url, {
       method: 'PUT',
       headers,
       credentials: 'include',
@@ -97,7 +109,11 @@ export async function deleteUser(userId: string): Promise<void> {
       ...getCacheHeaders()
     };
     
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+    // Add timestamp to prevent caching
+    const timestamp = Date.now();
+    const url = `${API_BASE_URL}/users/${userId}?_=${timestamp}`;
+    
+    const response = await fetch(url, {
       method: 'DELETE',
       headers,
       credentials: 'include',

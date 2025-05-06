@@ -1,7 +1,11 @@
 // Get API URL from environment with proper handling for production vs development
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-// Make sure we have /api at the end but avoid double /api/api
-const API_BASE_URL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
+
+// Check if we're in production environment (campmanagement.vercel.app)
+const isProduction = API_URL.includes('campmanagement.vercel.app');
+
+// In production, the API endpoints don't have /api prefix
+const API_BASE_URL = isProduction ? API_URL : (API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`);
 
 export interface MetricData {
   total: number
