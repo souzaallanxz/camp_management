@@ -1,5 +1,5 @@
 import type { Camp, InsertCamp, UpdateCamp } from '../data/schema'
-import { buildApiUrl, fetchWithNoCache } from '@/services/api'
+import { api, API_PATHS } from '@/services/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
@@ -16,69 +16,46 @@ function getTeamIdHeader() {
 }
 
 export const campService = {
-  async findAll() {
-    const response = await fetchWithNoCache(buildApiUrl('/camps'), {
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
-      credentials: 'include'
-    });
-    if (!response.ok) throw new Error('Erro ao buscar acampamentos');
-    return response.json();
-  },
-
-  async findById(id: string) {
-    const response = await fetchWithNoCache(buildApiUrl(`/camps/${id}`), {
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
-      credentials: 'include'
-    });
-    if (!response.ok) throw new Error('Erro ao buscar acampamento');
-    return response.json();
-  },
-
-  async create(camp: InsertCamp) {
-    // Log teamId for debugging
-    console.log('Creating camp with teamId:', localStorage.getItem('teamId'));
-    
-    const response = await fetchWithNoCache(buildApiUrl('/camps'), {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json', 
-        ...getTeamIdHeader(),
-        // Add debug header
-        'X-Debug-Info': `teamId=${localStorage.getItem('teamId')}`
-      },
-      credentials: 'include',
-      body: JSON.stringify(camp)
-    });
-    
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Error creating camp:', error);
-      throw new Error(`Erro ao criar acampamento: ${error}`);
+  async getCamps() {
+    try {
+      return await api.get<Camp[]>(API_PATHS.CAMPS);
+    } catch {
+      return [];
     }
-    
-    return response.json();
   },
 
-  async update(id: string, camp: UpdateCamp) {
-    const response = await fetchWithNoCache(buildApiUrl(`/camps/${id}`), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
-      credentials: 'include',
-      body: JSON.stringify(camp)
-    });
-    if (!response.ok) throw new Error('Erro ao atualizar acampamento');
-    return response.json();
+  async getCamp(id: string) {
+    try {
+      return await api.get<Camp>(API_PATHS.CAMP(id));
+    } catch {
+      return null;
+    }
   },
 
-  async delete(id: string) {
-    const response = await fetchWithNoCache(buildApiUrl(`/camps/${id}`), {
-      method: 'DELETE',
-      headers: { ...getTeamIdHeader() },
-      credentials: 'include'
-    });
-    if (!response.ok) throw new Error('Erro ao deletar acampamento');
+  async createCamp(data: InsertCamp) {
+    try {
+      return await api.post<Camp>(API_PATHS.CAMPS, data);
+    } catch {
+      throw new Error('Failed to create camp');
+    }
+  },
+
+  async updateCamp(id: string, data: UpdateCamp) {
+    try {
+      return await api.put<Camp>(API_PATHS.CAMP(id), data);
+    } catch {
+      throw new Error('Failed to update camp');
+    }
+  },
+
+  async deleteCamp(id: string) {
+    try {
+      await api.delete(API_PATHS.CAMP(id));
+    } catch {
+      throw new Error('Failed to delete camp');
+    }
   }
-}
+};
 
 export async function getCamps() {
   const response = await fetchWithNoCache(buildApiUrl('/camps'), {

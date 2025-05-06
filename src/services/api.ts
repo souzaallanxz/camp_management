@@ -27,6 +27,19 @@ export const API_PATHS = {
   // Users
   USERS: '/users',
   
+  // Camps
+  CAMPS: '/camps',
+  CAMP: (id: string) => `/camps/${id}`,
+  
+  // Campers
+  CAMPERS: '/campers',
+  CAMPER: (id: string) => `/campers/${id}`,
+  
+  // Registrations
+  REGISTRATIONS: '/registrations',
+  REGISTRATION: (id: string) => `/registrations/${id}`,
+  REGISTRATIONS_BY_CAMP: (campId: string) => `/registrations/camp/${campId}`,
+  
   // Dashboard
   DASHBOARD_MONTHLY_PAYMENTS: '/dashboard/monthly-payments',
   DASHBOARD_MONTHLY_REGISTRATIONS: '/dashboard/monthly-registrations',
