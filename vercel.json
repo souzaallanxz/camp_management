@@ -4,10 +4,46 @@
   "installCommand": "pnpm install",
   "framework": "vite",
   "outputDirectory": "dist",
+  "regions": ["cdg1"],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
+        { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-team-id" }
+      ]
+    }
+  ],
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api"
+      "source": "/auth/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/teams/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/camps/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/dashboard/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/settings/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/registrations/:path*",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/payments/:path*",
+      "destination": "/api/index.js"
     },
     {
       "source": "/(.*)",

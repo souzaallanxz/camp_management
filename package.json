@@ -4,9 +4,11 @@
   "version": "1.0.3",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"tsx server.ts\"",
-    "server": "tsx server.ts",
-    "build": "node ./node_modules/vite/bin/vite.js build",
+    "dev": "concurrently \"vite\" \"node api/index.js\"",
+    "dev:frontend": "vite",
+    "dev:backend": "node api/index.js",
+    "server": "node api/index.js",
+    "build": "vite build && cp -r api dist/",
     "lint": "eslint .",
     "preview": "vite preview",
     "format:check": "prettier --check .",
@@ -82,7 +84,10 @@
     "uuid": "^11.0.5",
     "vite": "^6.0.9",
     "zod": "^3.24.2",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",
@@ -96,12 +101,9 @@
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
     "concurrently": "^9.1.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
     "eslint": "^9.16.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
-    "express": "^4.21.2",
     "globals": "^15.13.0",
     "knip": "^5.41.1",
     "prettier": "^3.4.2",
@@ -110,5 +112,8 @@
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.17.0",
     "uploadthing": "^7.4.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
