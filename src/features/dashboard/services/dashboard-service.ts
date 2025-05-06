@@ -22,7 +22,7 @@ export interface RecentRegistration {
   campName: string
 }
 
-// Função auxiliar para requisições com timeout
+// Função auxiliar para requisições com timeout e sem cache
 const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 10000) => {
   const controller = new AbortController();
   const { signal } = controller;
@@ -30,34 +30,28 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout 
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   
   try {
-    // Adicionar headers para prevenir cache 304
+    // Adicionar headers para prevenir cache
     const headers = {
       ...options.headers,
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
-      'Expires': '0',
-      // Adicionar timestamp para forçar requisição nova
-      'X-Timestamp': new Date().getTime().toString()
+      'Expires': '0'
     };
 
-    const response = await fetch(url, { 
+    // Adicionar timestamp como query param para garantir resposta fresca
+    const separator = url.includes('?') ? '&' : '?';
+    const urlWithTimestamp = `${url}${separator}_=${Date.now()}`;
+
+    const response = await fetch(urlWithTimestamp, { 
       ...options, 
       signal,
       headers,
-      cache: 'no-store' 
+      cache: 'no-store',
+      // Definir referrerPolicy para evitar cache
+      referrerPolicy: 'no-referrer'
     });
     
     clearTimeout(timeoutId);
-    
-    // Tratar resposta 304 como sucesso
-    if (response.status === 304) {
-      // Tentar novamente sem cache
-      return fetch(url + `?_nocache=${Date.now()}`, {
-        ...options,
-        headers,
-        cache: 'no-store'
-      });
-    }
     
     return response;
   } catch (error) {
@@ -74,7 +68,7 @@ export const dashboardService = {
   },
 
   async getMonthlyPayments(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-payments?_=${Date.now()}`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-payments`, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -83,7 +77,7 @@ export const dashboardService = {
   },
 
   async getMonthlyRegistrations(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-registrations?_=${Date.now()}`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-registrations`, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -92,7 +86,7 @@ export const dashboardService = {
   },
 
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-snackbar?_=${Date.now()}`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -101,7 +95,7 @@ export const dashboardService = {
   },
 
   async getYearlyCampers(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/yearly-campers?_=${Date.now()}`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/yearly-campers`, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -110,7 +104,7 @@ export const dashboardService = {
   },
 
   async getCampPayments(): Promise<CampPaymentsData[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/camp-payments?_=${Date.now()}`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/camp-payments`, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -119,7 +113,7 @@ export const dashboardService = {
   },
 
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}&_=${Date.now()}`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     

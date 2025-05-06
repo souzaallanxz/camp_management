@@ -4,6 +4,7 @@ import { dashboardService, CampPaymentsData } from '../services/dashboard-servic
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from './empty-state'
+import { useState } from 'react'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-PT', {
@@ -48,15 +49,17 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
 }
 
 export function Overview() {
+  const [timestamp] = useState(() => Date.now())
+
   const { data: campPayments, isLoading, error } = useQuery({
-    queryKey: ['dashboard', 'camp-payments', Date.now()],
+    queryKey: ['dashboard', 'camp-payments', timestamp],
     queryFn: () => dashboardService.getCampPayments(),
     staleTime: 0,
     gcTime: 0,
     retry: 2,
     retryDelay: 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: true
+    refetchOnMount: 'always'
   })
 
   if (isLoading) {

@@ -16,25 +16,27 @@ import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 
-// Criar QueryClient com configurações padrão para evitar cache para os endpoints do dashboard
+// Criar QueryClient com configurações para evitar cache desnecessário nos endpoints
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
         // Limitar tentativas
         if (failureCount >= 0 && import.meta.env.DEV) return false
-        if (failureCount > 2 && import.meta.env.PROD) return false
+        if (failureCount > 1 && import.meta.env.PROD) return false
 
         return !(
           error instanceof AxiosError &&
           [401, 403, 408, 429].includes(error.response?.status ?? 0)
         )
       },
+      // Configurações padrão para não-dashboard
       refetchOnWindowFocus: false,
-      staleTime: 0, // Sem stale time para sempre buscar dados frescos
-      gcTime: 1000, // Manter no cache por apenas 1 segundo
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      networkMode: 'always', // Sempre fazer requisições na rede
+      staleTime: 30000, // 30 segundos para páginas regulares
+      gcTime: 5 * 60 * 1000, // 5 minutos
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+      // Fazer requisições sempre que houver rede
+      networkMode: 'online',
     },
     mutations: {
       retry: 1,
@@ -62,8 +64,7 @@ const queryClient = new QueryClient({
             title: 'Session expired!',
           })
           useAuthStore.getState().auth.reset()
-          const redirect = `${router.history.location.href}`
-          router.navigate({ to: '/sign-in', search: { redirect } })
+          router.navigate({ to: '/sign-in' })
         }
         if (error.response?.status === 500) {
           toast({
