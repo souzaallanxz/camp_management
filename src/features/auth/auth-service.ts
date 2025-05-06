@@ -33,9 +33,9 @@ export async function signIn(credentials: SignInCredentials) {
       localStorage.setItem('token', response.session.token);
     }
     
-    return { error: null, user: response.user };
+    return { error: null, user: response.user, session: response.session };
   } catch {
-    return { error: 'Invalid credentials', user: null };
+    return { error: 'Invalid credentials', user: null, session: null };
   }
 }
 
@@ -87,9 +87,9 @@ export async function signUp(credentials: SignUpCredentials) {
       localStorage.setItem('token', response.session.token);
     }
     
-    return { error: null, user: response.user };
+    return { error: null, user: response.user, session: response.session };
   } catch {
-    return { error: 'Failed to create account', user: null };
+    return { error: 'Failed to create account', user: null, session: null };
   }
 }
 
