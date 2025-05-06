@@ -16,12 +16,14 @@ import './index.css'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 
+// Criar QueryClient com configurações padrão para evitar cache para os endpoints do dashboard
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
+        // Limitar tentativas
         if (failureCount >= 0 && import.meta.env.DEV) return false
-        if (failureCount > 1 && import.meta.env.PROD) return false
+        if (failureCount > 2 && import.meta.env.PROD) return false
 
         return !(
           error instanceof AxiosError &&
@@ -29,14 +31,15 @@ const queryClient = new QueryClient({
         )
       },
       refetchOnWindowFocus: false,
-      staleTime: 3 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
+      staleTime: 0, // Sem stale time para sempre buscar dados frescos
+      gcTime: 1000, // Manter no cache por apenas 1 segundo
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      networkMode: 'offlineFirst',
+      networkMode: 'always', // Sempre fazer requisições na rede
     },
     mutations: {
       retry: 1,
       onError: (error) => {
+        // Ignorar 304
         if (error instanceof AxiosError && error.response?.status === 304) {
           return
         }
@@ -48,6 +51,7 @@ const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error) => {
       if (error instanceof AxiosError) {
+        // Ignorar 304
         if (error.response?.status === 304) {
           return
         }

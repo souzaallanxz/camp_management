@@ -3,39 +3,47 @@ import { dashboardService } from '../services/dashboard-service'
 
 export function useDashboardMetrics() {
   const { data: monthlyPayments, isLoading: isLoadingPayments, error: paymentsError } = useQuery({
-    queryKey: ['dashboard', 'monthly-payments'],
+    queryKey: ['dashboard', 'monthly-payments', Date.now()],
     queryFn: () => dashboardService.getMonthlyPayments(),
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    retry: 1,
+    staleTime: 0,
+    gcTime: 0,
+    retry: 2,
     retryDelay: 1000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    refetchOnMount: true
   })
 
   const { data: monthlyRegistrations, isLoading: isLoadingRegistrations, error: registrationsError } = useQuery({
-    queryKey: ['dashboard', 'monthly-registrations'],
+    queryKey: ['dashboard', 'monthly-registrations', Date.now()],
     queryFn: () => dashboardService.getMonthlyRegistrations(),
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    retry: 1,
+    staleTime: 0,
+    gcTime: 0,
+    retry: 2,
     retryDelay: 1000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    refetchOnMount: true
   })
 
   const { data: monthlySnackbar, isLoading: isLoadingSnackbar, error: snackbarError } = useQuery({
-    queryKey: ['dashboard', 'monthly-snackbar'],
+    queryKey: ['dashboard', 'monthly-snackbar', Date.now()],
     queryFn: () => dashboardService.getMonthlySnackbarTransactions(),
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    retry: 1,
+    staleTime: 0,
+    gcTime: 0,
+    retry: 2,
     retryDelay: 1000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    refetchOnMount: true
   })
 
   const { data: yearlyCampers, isLoading: isLoadingCampers, error: campersError } = useQuery({
-    queryKey: ['dashboard', 'yearly-campers'],
+    queryKey: ['dashboard', 'yearly-campers', Date.now()],
     queryFn: () => dashboardService.getYearlyCampers(),
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    retry: 1,
+    staleTime: 0,
+    gcTime: 0,
+    retry: 2,
     retryDelay: 1000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    refetchOnMount: true
   })
 
   const isLoading = isLoadingPayments || isLoadingRegistrations || isLoadingSnackbar || isLoadingCampers

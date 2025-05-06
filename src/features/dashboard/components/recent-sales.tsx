@@ -22,12 +22,14 @@ function getInitials(name: string) {
 
 export function RecentSales() {
   const { data: registrations, isLoading, error } = useQuery({
-    queryKey: ['dashboard', 'recent-registrations'],
+    queryKey: ['dashboard', 'recent-registrations', Date.now()],
     queryFn: () => dashboardService.getRecentRegistrations(5),
-    staleTime: 5 * 60 * 1000, // 5 minutos
-    retry: 1,
+    staleTime: 0,
+    gcTime: 0,
+    retry: 2,
     retryDelay: 1000,
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
+    refetchOnMount: true
   })
 
   if (isLoading) {
