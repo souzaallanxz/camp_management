@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { PaymentMethod, Registration } from '../data/schema'
 import { createPayment } from '../services/payment-service'
 import { MBWayService } from '../services/mbway-service'
-import { getRegistrationById } from '../services/registration-service'
+import { registrationService } from '../services/registration-service'
 
 interface PaymentFormProps {
   registrationId: string
@@ -31,7 +31,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
   useEffect(() => {
     async function loadRegistration() {
       try {
-        const data = await getRegistrationById(registrationId)
+        const data = await registrationService.getRegistration(registrationId)
         setRegistration(data)
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to load registration'
