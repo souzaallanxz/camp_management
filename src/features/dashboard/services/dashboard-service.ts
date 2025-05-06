@@ -1,3 +1,5 @@
+import { api, API_PATHS } from '@/services/api';
+
 // Hard-code the direct base URL for endpoints
 const API_BASE_URL = 'https://campmanagement.vercel.app';
 
@@ -84,13 +86,10 @@ export const dashboardService = {
 
   async getMonthlyPayments(): Promise<MetricData> {
     try {
-      const headers = await this.getTeamIdHeader();
-      const response = await simpleFetch(`${API_BASE_URL}/dashboard/monthly-payments`, {
-        headers,
-        method: 'GET'
-      });
+      const data = await api.get<{ current: number; previous: number }>(
+        API_PATHS.DASHBOARD_MONTHLY_PAYMENTS
+      );
       
-      const data = await response.json();
       return {
         total: data.current || 0,
         previousTotal: data.previous || 0,
@@ -99,7 +98,6 @@ export const dashboardService = {
           : null
       };
     } catch {
-      // Return default values if the request fails
       return {
         total: 0,
         previousTotal: 0,
@@ -110,13 +108,10 @@ export const dashboardService = {
 
   async getMonthlyRegistrations(): Promise<MetricData> {
     try {
-      const headers = await this.getTeamIdHeader();
-      const response = await simpleFetch(`${API_BASE_URL}/dashboard/monthly-registrations`, {
-        headers,
-        method: 'GET'
-      });
+      const data = await api.get<{ current: number; previous: number }>(
+        API_PATHS.DASHBOARD_MONTHLY_REGISTRATIONS
+      );
       
-      const data = await response.json();
       return {
         total: data.current || 0,
         previousTotal: data.previous || 0,
@@ -125,7 +120,6 @@ export const dashboardService = {
           : null
       };
     } catch {
-      // Return default values if the request fails
       return {
         total: 0,
         previousTotal: 0,
@@ -136,13 +130,10 @@ export const dashboardService = {
 
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
     try {
-      const headers = await this.getTeamIdHeader();
-      const response = await simpleFetch(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
-        headers,
-        method: 'GET'
-      });
+      const data = await api.get<{ current: number; previous: number }>(
+        API_PATHS.DASHBOARD_MONTHLY_SNACKBAR
+      );
       
-      const data = await response.json();
       return {
         total: data.current || 0,
         previousTotal: data.previous || 0,
@@ -151,7 +142,6 @@ export const dashboardService = {
           : null
       };
     } catch {
-      // Return default values if the request fails
       return {
         total: 0,
         previousTotal: 0,
@@ -162,13 +152,10 @@ export const dashboardService = {
 
   async getYearlyCampers(): Promise<MetricData> {
     try {
-      const headers = await this.getTeamIdHeader();
-      const response = await simpleFetch(`${API_BASE_URL}/dashboard/yearly-campers`, {
-        headers,
-        method: 'GET'
-      });
+      const data = await api.get<{ current: number; previous: number }>(
+        API_PATHS.DASHBOARD_YEARLY_CAMPERS
+      );
       
-      const data = await response.json();
       return {
         total: data.current || 0,
         previousTotal: data.previous || 0,
@@ -177,7 +164,6 @@ export const dashboardService = {
           : null
       };
     } catch {
-      // Return default values if the request fails
       return {
         total: 0,
         previousTotal: 0,
@@ -188,15 +174,8 @@ export const dashboardService = {
 
   async getCampPayments(): Promise<CampPaymentsData[]> {
     try {
-      const headers = await this.getTeamIdHeader();
-      const response = await simpleFetch(`${API_BASE_URL}/dashboard/camp-payments`, {
-        headers,
-        method: 'GET'
-      });
-      
-      return await response.json();
+      return await api.get<CampPaymentsData[]>(API_PATHS.DASHBOARD_CAMP_PAYMENTS);
     } catch {
-      // Return empty array if the request fails
       return [];
     }
   },

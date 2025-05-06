@@ -1,3 +1,4 @@
+import { api, API_PATHS } from '@/services/api';
 import { User } from '../data/schema'
 
 // Usar o mesmo padrão de URL que funciona no dashboard
@@ -13,20 +14,7 @@ function getTeamIdHeader() {
 // Busca apenas usuários da equipe atual do usuário logado
 export async function getUsers(): Promise<User[]> {
   try {
-    const headers = { 
-      'Content-Type': 'application/json', 
-      ...getTeamIdHeader()
-    };
-    
-    // Usar o mesmo formato de URL que funciona no dashboard
-    const response = await fetch(`${API_BASE_URL}/users`, {
-      headers,
-      method: 'GET',
-      credentials: 'include'
-    });
-    
-    if (!response.ok) return [];
-    return response.json();
+    return await api.get<User[]>(API_PATHS.USERS);
   } catch {
     return [];
   }
