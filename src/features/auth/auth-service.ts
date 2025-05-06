@@ -46,17 +46,25 @@ export async function getCurrentUser() {
     throw new Error('No token found')
   }
 
-  const response = await fetch(buildApiUrl('/api/auth/me'), {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  })
+  try {
+    const response = await fetch(buildApiUrl('/api/auth/me'), {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
 
-  if (!response.ok) {
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to get current user')
+    }
+
+    return response.json()
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error
+    }
     throw new Error('Failed to get current user')
   }
-
-  return response.json()
 }
 
 export async function getCurrentUserTeam() {

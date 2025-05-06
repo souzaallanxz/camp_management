@@ -15,6 +15,11 @@ export function buildApiUrl(path: string): string {
     path = '/' + path;
   }
   
+  // For production, we want to use the same domain
+  if (import.meta.env.PROD) {
+    return path;
+  }
+  
   // Check if the API_BASE_URL already ends with '/api'
   if (API_BASE_URL.endsWith('/api')) {
     // If path starts with '/api/', remove the duplicate '/api'

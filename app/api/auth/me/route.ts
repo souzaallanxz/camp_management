@@ -6,7 +6,11 @@ if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is not defined')
 }
 
-const sql = neon(process.env.DATABASE_URL)
+// Create a more robust database connection
+const sql = neon({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+})
 
 export async function GET(request: Request) {
   try {
@@ -20,29 +24,48 @@ export async function GET(request: Request) {
 
     const token = authHeader.split(' ')[1]
 
-    // Find user by token (which is the user ID)
-    const userResult = await sql`
-      SELECT id, email, name, team_id, role, created_at, updated_at 
-      FROM public.users 
-      WHERE id = ${token}::uuid
-    `
-
-    const user = userResult[0]
-
-    if (!user) {
+    // Validate token format
+    if (!token || token.length < 10) {
       return NextResponse.json(
-        { error: 'User not found' },
+        { error: 'Invalid token format' },
         { status: 401 }
       )
     }
 
-    return NextResponse.json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      team_id: user.team_id,
-      role: user.role
-    })
+    try {
+      // Find user by token (which is the user ID)
+      const userResult = await sql`
+        SELECT id, email, name, team_id, role, created_at, updated_at 
+        FROM public.users 
+        WHERE id = ${token}::uuid
+      `
+
+      const user = userResult[0]
+
+      if (!user) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 401 }
+        )
+      }
+
+      return NextResponse.json({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        team_id: user.team_id,
+        role: user.role
+      })
+    } catch (dbError) {
+      console.error('Database error:', dbError)
+      return NextResponse.json(
+        { 
+          error: 'Database error',
+          message: dbError instanceof Error ? dbError.message : 'Unknown database error'
+        },
+        { status: 500 }
+      )
+    }
   } catch (error) {
     // Log the error for debugging
     console.error('Error in /api/auth/me:', error)
