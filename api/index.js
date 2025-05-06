@@ -1239,39 +1239,6 @@ app.get('/settings/profile', async (req, res) => {
   }
 });
 
-// Get profile settings - with /api prefix
-app.get('/api/settings/profile', async (req, res) => {
-  try {
-    // Set cache control headers to prevent 304 responses
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
-    
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    
-    const token = authHeader.split(' ')[1];
-    
-    const result = await sql`
-      SELECT id, email, name, role, team_id, created_at, updated_at
-      FROM users
-      WHERE id = ${token}::uuid
-    `;
-    
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    return res.json(result[0]);
-  } catch (error) {
-    console.error('Error getting profile settings:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // Get organization settings
 app.get('/settings/organization', async (req, res) => {
   try {
@@ -1311,15 +1278,185 @@ app.get('/settings/organization', async (req, res) => {
   }
 });
 
-// Get organization settings - with /api prefix
-app.get('/api/settings/organization', async (req, res) => {
+// ===== VERSÃO COM PREFIXO /API =====
+
+// Get all registrations
+app.get('/api/registrations', async (req, res) => {
+  console.log('Recebendo requisição para /api/registrations');
+  
   try {
-    // Set cache control headers to prevent 304 responses
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
+    const teamId = getTeamId(req);
+    console.log('Team ID obtido:', teamId);
     
+    let results;
+    if (teamId) {
+      results = await sql`
+        SELECT r.*, c.name as camp_name
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}::uuid
+        ORDER BY r.created_at DESC
+      `;
+    } else {
+      // Modo diagnóstico
+      results = await sql`
+        SELECT r.*, c.name as camp_name
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        ORDER BY r.created_at DESC
+        LIMIT 20
+      `;
+    }
+    
+    return res.json(results);
+  } catch (error) {
+    console.error('Error getting registrations:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
+  }
+});
+
+// Get registration by ID
+app.get('/api/registrations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await sql`
+      SELECT r.*, c.name as camp_name
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${id}::uuid
+    `;
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+    
+    return res.json(result[0]);
+  } catch (error) {
+    console.error('Error getting registration by ID:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all campers
+app.get('/api/campers', async (req, res) => {
+  console.log('Recebendo requisição para /api/campers');
+  
+  try {
+    const teamId = getTeamId(req);
+    console.log('Team ID obtido:', teamId);
+    
+    let results;
+    if (teamId) {
+      results = await sql`
+        SELECT cm.*, r.name as registration_name, c.name as camp_name
+        FROM campers cm
+        JOIN registrations r ON cm.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}::uuid
+        ORDER BY cm.created_at DESC
+      `;
+    } else {
+      // Modo diagnóstico
+      results = await sql`
+        SELECT cm.*, r.name as registration_name, c.name as camp_name
+        FROM campers cm
+        JOIN registrations r ON cm.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        ORDER BY cm.created_at DESC
+        LIMIT 20
+      `;
+    }
+    
+    return res.json(results);
+  } catch (error) {
+    console.error('Error getting campers:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
+  }
+});
+
+// Get all users
+app.get('/api/users', async (req, res) => {
+  console.log('Recebendo requisição para /api/users');
+  
+  try {
+    const teamId = getTeamId(req);
+    console.log('Team ID obtido:', teamId);
+    
+    // Usuários só são acessíveis para a mesma equipe ou superadmin
+    let results;
+    if (teamId) {
+      results = await sql`
+        SELECT id, email, name, role, team_id, created_at, updated_at
+        FROM users
+        WHERE team_id = ${teamId}::uuid
+        ORDER BY created_at DESC
+      `;
+    } else {
+      // Modo diagnóstico - omite informações sensíveis
+      results = await sql`
+        SELECT id, email, name, role, team_id, created_at, updated_at
+        FROM users
+        ORDER BY created_at DESC
+        LIMIT 20
+      `;
+    }
+    
+    return res.json(results);
+  } catch (error) {
+    console.error('Error getting users:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
+  }
+});
+
+// Get all camps
+app.get('/api/camps', async (req, res) => {
+  console.log('Recebendo requisição para /api/camps');
+  
+  try {
+    const teamId = getTeamId(req);
+    console.log('Team ID obtido:', teamId);
+    
+    let results;
+    if (teamId) {
+      results = await sql`
+        SELECT *
+        FROM camps
+        WHERE team_id = ${teamId}::uuid
+        ORDER BY created_at DESC
+      `;
+    } else {
+      // Modo diagnóstico
+      results = await sql`
+        SELECT *
+        FROM camps
+        ORDER BY created_at DESC
+        LIMIT 20
+      `;
+    }
+    
+    return res.json(results);
+  } catch (error) {
+    console.error('Error getting camps:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
+  }
+});
+
+// Get profile settings
+app.get('/api/settings/profile', async (req, res) => {
+  try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -1327,31 +1464,19 @@ app.get('/api/settings/organization', async (req, res) => {
     
     const token = authHeader.split(' ')[1];
     
-    const userResult = await sql`
-      SELECT team_id
+    const result = await sql`
+      SELECT id, email, name, role, team_id, created_at, updated_at
       FROM users
       WHERE id = ${token}::uuid
     `;
     
-    if (userResult.length === 0 || !userResult[0].team_id) {
-      return res.status(404).json({ error: 'Team not found' });
-    }
-    
-    const teamId = userResult[0].team_id;
-    
-    const result = await sql`
-      SELECT *
-      FROM teams
-      WHERE id = ${teamId}::uuid
-    `;
-    
     if (result.length === 0) {
-      return res.status(404).json({ error: 'Team not found' });
+      return res.status(404).json({ error: 'User not found' });
     }
     
     return res.json(result[0]);
   } catch (error) {
-    console.error('Error getting organization settings:', error);
+    console.error('Error getting profile settings:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
