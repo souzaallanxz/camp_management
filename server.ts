@@ -465,12 +465,35 @@ app.get('/api/settings/profile', (async (req: Request, res: Response) => {
 
 // Helper para obter o teamId do header (produção)
 function getTeamId(req: Request) {
-  // Check for x-team-id header
-  const teamId = req.headers['x-team-id']
-  if (!teamId || typeof teamId !== 'string') {
-    return null
+  // Log all headers for debugging
+  console.log('All headers:', req.headers);
+  
+  // Check for x-team-id header (primary)
+  const teamIdHeader = req.headers['x-team-id'];
+  if (teamIdHeader && typeof teamIdHeader === 'string') {
+    console.log('Found teamId in x-team-id header:', teamIdHeader);
+    return teamIdHeader;
   }
-  return teamId
+  
+  // Check for authorization header as fallback
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    console.log('Using token from authorization header:', token);
+    // Here we could potentially look up the user's team_id using the token
+    // but for now we'll return null as we need the explicit x-team-id header
+  }
+  
+  // Check if the team ID is in X-Debug-Info header (for debugging)
+  const debugHeader = req.headers['x-debug-info'];
+  if (debugHeader && typeof debugHeader === 'string' && debugHeader.includes('teamId=')) {
+    const teamId = debugHeader.split('teamId=')[1].split('&')[0];
+    console.log('Found teamId in X-Debug-Info header:', teamId);
+    return teamId;
+  }
+  
+  console.log('No teamId found in headers');
+  return null;
 }
 
 app.get('/api/dashboard/monthly-payments', (async (req: Request, res: Response) => {
@@ -732,24 +755,47 @@ app.get('/api/camps', (async (req: Request, res: Response) => {
 
 // Create a new camp
 app.post('/api/camps', (async (req: Request, res: Response) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
   try {
+    // Set cache control headers to prevent 304 responses
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+
+    // Log the request for debugging
+    console.log('POST /api/camps request received');
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+    
+    const teamId = getTeamId(req);
+    console.log('TeamId from request:', teamId);
+    
+    if (!teamId) {
+      return res.status(401).json({ error: 'Missing x-team-id header' });
+    }
+    
     const { name, start_date, end_date, price } = req.body;
     if (!name || !start_date || !end_date || price === undefined) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ error: 'Missing required fields', received: { name, start_date, end_date, price } });
     }
+    
     const now = new Date().toISOString();
+    console.log('Inserting camp with teamId:', teamId);
+    
     const result = await sql`
       INSERT INTO camps (name, start_date, end_date, price, team_id, created_at, updated_at)
       VALUES (${name}, ${start_date}, ${end_date}, ${price}, ${teamId}, ${now}, ${now})
       RETURNING *
     `;
+    
+    console.log('Camp created successfully:', result[0]);
     res.status(201).json(result[0]);
-  } catch {
-    res.status(500).json({ error: 'Erro ao criar acampamento.' });
+  } catch (error) {
+    console.error('Error creating camp:', error);
+    res.status(500).json({ 
+      error: 'Erro ao criar acampamento.',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }) as any);
 
