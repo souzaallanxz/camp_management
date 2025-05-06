@@ -383,6 +383,84 @@ app.get('/api/teams/current', (async (req: Request, res: Response) => {
   }
 }) as any)
 
+// Get organization settings
+app.get('/api/settings/organization', (async (req: Request, res: Response) => {
+  try {
+    // Set cache control headers to prevent 304 responses
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    
+    const userResult = await sql`
+      SELECT team_id
+      FROM users
+      WHERE id = ${token}::uuid
+    `;
+    
+    if (userResult.length === 0 || !userResult[0].team_id) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+    
+    const teamId = userResult[0].team_id;
+    
+    const result = await sql`
+      SELECT *
+      FROM teams
+      WHERE id = ${teamId}::uuid
+    `;
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+    
+    return res.json(result[0]);
+  } catch (error) {
+    console.error('Error getting organization settings:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}) as any)
+
+// Get profile settings
+app.get('/api/settings/profile', (async (req: Request, res: Response) => {
+  try {
+    // Set cache control headers to prevent 304 responses
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    
+    const result = await sql`
+      SELECT id, email, name, role, team_id, created_at, updated_at
+      FROM users
+      WHERE id = ${token}::uuid
+    `;
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    return res.json(result[0]);
+  } catch (error) {
+    console.error('Error getting profile settings:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}) as any)
+
 // ===== DASHBOARD ENDPOINTS =====
 
 // Helper para obter o teamId do header (produção)

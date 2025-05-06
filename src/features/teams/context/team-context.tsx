@@ -41,8 +41,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       setTeam(team);
       if (team && team.id) {
         localStorage.setItem('teamId', team.id);
+        console.log('Team ID set in localStorage:', team.id);
       } else {
         localStorage.removeItem('teamId');
+        console.log('Team ID removed from localStorage - no team found');
       }
       const shouldShowOnboarding = !team;
       setShowOnboarding(shouldShowOnboarding);
@@ -50,6 +52,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       setTeam(null);
       setShowOnboarding(true);
       localStorage.removeItem('teamId');
+      console.error('Error fetching team:', error);
       toast({
         variant: 'destructive',
         title: 'Error',

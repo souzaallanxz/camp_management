@@ -6,6 +6,25 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 /**
+ * Standardized API paths to ensure consistency
+ */
+export const API_PATHS = {
+  // Auth
+  AUTH_ME: '/auth/me',
+  AUTH_SIGN_IN: '/auth/sign-in',
+  AUTH_SIGN_UP: '/auth/sign-up',
+  
+  // Teams
+  TEAMS_CURRENT: '/teams/current',
+  
+  // Settings
+  SETTINGS_PROFILE: '/api/settings/profile',
+  SETTINGS_ORGANIZATION: '/api/settings/organization',
+
+  // Other paths can be added here
+};
+
+/**
  * Builds an API URL correctly handling the path
  * It prevents the '/api' duplication issue when the base URL already includes '/api'
  */

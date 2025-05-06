@@ -3,7 +3,15 @@ import { buildApiUrl, fetchWithNoCache } from '@/services/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
-  if (!teamId) throw new Error('No team ID found');
+  if (!teamId) {
+    console.error('teamId not found in localStorage');
+    // Check if we can get team ID from user data
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication data found. Please login again.');
+    }
+    throw new Error('No team ID found. Please refresh the page or login again.');
+  }
   return { 'x-team-id': teamId };
 }
 
@@ -27,13 +35,27 @@ export const campService = {
   },
 
   async create(camp: InsertCamp) {
+    // Log teamId for debugging
+    console.log('Creating camp with teamId:', localStorage.getItem('teamId'));
+    
     const response = await fetchWithNoCache(buildApiUrl('/camps'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
+      headers: { 
+        'Content-Type': 'application/json', 
+        ...getTeamIdHeader(),
+        // Add debug header
+        'X-Debug-Info': `teamId=${localStorage.getItem('teamId')}`
+      },
       credentials: 'include',
       body: JSON.stringify(camp)
     });
-    if (!response.ok) throw new Error('Erro ao criar acampamento');
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error creating camp:', error);
+      throw new Error(`Erro ao criar acampamento: ${error}`);
+    }
+    
     return response.json();
   },
 

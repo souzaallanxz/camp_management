@@ -82,10 +82,23 @@ export function CampDialog({ open, onOpenChange, camp }: CampDialogProps) {
       if (camp) {
         await updateCamp({ id: camp.id, data })
       } else {
-        await createCamp(data)
+        // Check if teamId is set in localStorage
+        const teamId = localStorage.getItem('teamId');
+        if (!teamId) {
+          toast.error('TeamID não encontrado. Por favor, atualize a página ou faça login novamente.');
+          return;
+        }
+        
+        try {
+          await createCamp(data)
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+          toast.error(`Erro ao criar acampamento: ${errorMessage}`);
+        }
       }
-    } catch {
-      toast.error('Erro ao salvar acampamento')
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error(`Erro ao salvar acampamento: ${errorMessage}`);
     }
   }
 
