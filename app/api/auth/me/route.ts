@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 import { neon } from '@neondatabase/serverless'
 
-const sql = neon(process.env.DATABASE_URL!)
+// Ensure DATABASE_URL is available
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is not defined')
+}
+
+const sql = neon(process.env.DATABASE_URL)
 
 export async function GET(request: Request) {
   try {
@@ -38,9 +43,17 @@ export async function GET(request: Request) {
       team_id: user.team_id,
       role: user.role
     })
-  } catch {
+  } catch (error) {
+    // Log the error for debugging
+    console.error('Error in /api/auth/me:', error)
+    
+    // Return a more detailed error response
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        database_url_set: !!process.env.DATABASE_URL
+      },
       { status: 500 }
     )
   }
