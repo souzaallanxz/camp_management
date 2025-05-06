@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -13,15 +13,22 @@ import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersTable } from './components/users-table'
 import UsersProvider from './context/users-context'
 import { getUsers } from './services/user-service'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { ReloadIcon } from '@radix-ui/react-icons'
+import { Button } from '@/components/ui/button'
 
 function UsersContent() {
-  const { data: users = [], refetch, isLoading, error } = useQuery({
-    queryKey: ['users'],
+  // Use a stable timestamp for the initial query
+  const [timestamp] = useState(() => Date.now())
+  
+  const { data: users = [], refetch, isLoading, isError } = useQuery({
+    queryKey: ['users', timestamp],
     queryFn: getUsers,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
-    retry: 2
+    retry: 2,
+    retryDelay: 2000
   });
 
   const handleRefetch = () => {
@@ -49,11 +56,27 @@ function UsersContent() {
           <UsersPrimaryButtons />
         </div>
 
+        {isError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTitle>Erro</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2">
+              <div>Não foi possível carregar a lista de usuários. Tente novamente mais tarde.</div>
+              <Button variant="outline" size="sm" className="w-fit" onClick={handleRefetch}>
+                <ReloadIcon className="mr-2 h-4 w-4" />
+                Tentar novamente
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className='-mx-4 flex-1 overflow-auto px-4 py-1'>
           {isLoading ? (
-            <div className="text-center p-4">Carregando usuários...</div>
-          ) : error ? (
-            <div className="text-center p-4 text-red-500">Erro ao carregar usuários: {error instanceof Error ? error.message : 'Erro desconhecido'}</div>
+            <div className="flex justify-center items-center p-8">
+              <div className="flex flex-col items-center gap-2">
+                <ReloadIcon className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Carregando usuários...</p>
+              </div>
+            </div>
           ) : (
             <UsersTable data={users} columns={columns} />
           )}
@@ -66,7 +89,7 @@ function UsersContent() {
 }
 
 export default function Users() {
-  const { role, user } = useUser()
+  const { role } = useUser()
   const navigate = useNavigate()
 
   useEffect(() => {
