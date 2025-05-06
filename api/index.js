@@ -1351,5 +1351,78 @@ app.get('/api/camps/:id', async (req, res) => {
   }
 });
 
+// Camps e Registrations
+app.get('/api/camps', async (req, res) => {
+  console.log('Recebendo requisição para /api/camps');
+  
+  try {
+    const teamId = getTeamId(req);
+    console.log('Team ID obtido:', teamId);
+    
+    let results;
+    if (teamId) {
+      results = await sql`
+        SELECT *
+        FROM camps
+        WHERE team_id = ${teamId}::uuid
+        ORDER BY start_date DESC
+      `;
+    } else {
+      // Modo diagnóstico - retornar alguns acampamentos para verificação
+      results = await sql`
+        SELECT *
+        FROM camps
+        ORDER BY start_date DESC
+        LIMIT 20
+      `;
+    }
+    
+    return res.json(results);
+  } catch (error) {
+    console.error('Error getting camps:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message 
+    });
+  }
+});
+
+app.get('/api/registrations', async (req, res) => {
+  console.log('Recebendo requisição para /api/registrations');
+  
+  try {
+    const teamId = getTeamId(req);
+    console.log('Team ID obtido:', teamId);
+    
+    let results;
+    if (teamId) {
+      results = await sql`
+        SELECT r.*, c.name as camp_name
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}::uuid
+        ORDER BY r.created_at DESC
+      `;
+    } else {
+      // Modo diagnóstico - retornar alguns registros para verificação
+      results = await sql`
+        SELECT r.*, c.name as camp_name
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        ORDER BY r.created_at DESC
+        LIMIT 20
+      `;
+    }
+    
+    return res.json(results);
+  } catch (error) {
+    console.error('Error getting registrations:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
+  }
+});
+
 // Export the Express app as a serverless function
 export default app; 
