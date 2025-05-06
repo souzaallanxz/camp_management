@@ -8,7 +8,7 @@ const app = express();
 
 // Enable CORS
 app.use(cors({
-  origin: '*',
+  origin: ['http://localhost:5173', 'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app', 'https://campmanagement.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id']
@@ -21,12 +21,10 @@ app.use(express.json());
 const sql = neon(process.env.DATABASE_URL);
 
 // Initialize Resend
-const resend = new Resend(process.env.VITE_RESEND_API_KEY || process.env.RESEND_API_KEY);
-
-// === AUTH ROUTES === //
+const resend = new Resend(process.env.VITE_RESEND_API_KEY);
 
 // Sign in route
-app.post('/auth/sign-in', async (req, res) => {
+app.post('/api/auth/sign-in', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -61,14 +59,13 @@ app.post('/auth/sign-in', async (req, res) => {
         token: user.id // Using user ID as token for now
       }
     });
-  } catch (error) {
-    console.error('Error in sign-in:', error);
+  } catch {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Sign up route
-app.post('/auth/sign-up', async (req, res) => {
+app.post('/api/auth/sign-up', async (req, res) => {
   try {
     const { email, password, name } = req.body;
 
@@ -105,50 +102,7 @@ app.post('/auth/sign-up', async (req, res) => {
         token: user.id // Using user ID as token for now
       }
     });
-  } catch (error) {
-    console.error('Error in sign-up:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Get current user route
-app.get('/auth/me', async (req, res) => {
-  try {
-    // Set cache control headers to prevent 304 responses
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Surrogate-Control', 'no-store');
-    
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const token = authHeader.split(' ')[1];
-
-    // Find user by token (which is the user ID)
-    const userResult = await sql`
-      SELECT id, email, name, team_id, role, created_at, updated_at
-      FROM public.users
-      WHERE id = ${token}::uuid
-    `;
-
-    const user = userResult[0];
-
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    return res.status(200).json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      team_id: user.team_id,
-      role: user.role
-    });
-  } catch (error) {
-    console.error('Error in get current user:', error);
+  } catch {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

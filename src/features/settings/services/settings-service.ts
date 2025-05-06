@@ -1,43 +1,66 @@
-import api from '@/services/api';
+import { buildApiUrl, fetchWithNoCache, API_PATHS } from '@/services/api';
 
-// Define the Settings type locally since it's not found in @/types
-interface Settings {
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  team_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface OrganizationSettings {
   id: string;
   name: string;
-  value: string;
-  description?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  logo_url: string | null;
+  tier: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export async function findAll() {
-  return api.get<Settings[]>("/settings", { requireTeam: true });
-}
-
-export async function findById(id: string) {
-  return api.get<Settings>(`/settings/${id}`, { requireTeam: true });
-}
-
-export async function create(data: Partial<Settings>) {
-  return api.post<Settings>("/settings", data, { requireTeam: true });
-}
-
-export async function update(id: string, data: Partial<Settings>) {
-  return api.put<Settings>(`/settings/${id}`, data, { requireTeam: true });
-}
-
-export async function remove(id: string) {
-  return api.delete<void>(`/settings/${id}`, { requireTeam: true });
-}
-
-// Convenience function for fetching settings
-export async function getSettings() {
-  const response = await findAll();
-  return response;
-}
-
-// Convenience function for fetching a specific setting
-export async function getSettingById(id: string) {
-  const response = await findById(id);
-  return response;
-} 
+export const settingsService = {
+  async getProfile(): Promise<UserProfile> {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No authenticated user found');
+    
+    const response = await fetchWithNoCache(buildApiUrl(API_PATHS.SETTINGS_PROFILE), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please log in again');
+      }
+      throw new Error('Failed to get profile settings');
+    }
+    
+    return response.json();
+  },
+  
+  async getOrganization(): Promise<OrganizationSettings> {
+    const token = localStorage.getItem('token');
+    if (!token) throw new Error('No authenticated user found');
+    
+    const response = await fetchWithNoCache(buildApiUrl(API_PATHS.SETTINGS_ORGANIZATION), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Unauthorized - Please log in again');
+      }
+      throw new Error('Failed to get organization settings');
+    }
+    
+    return response.json();
+  }
+}; 

@@ -1,5 +1,5 @@
 import type { SignInCredentials, SignUpCredentials } from './types'
-import { API_PATHS, api } from '@/services/api'
+import { buildApiUrl, fetchWithNoCache } from '@/services/api'
 
 export type User = {
   id: string
@@ -16,70 +16,52 @@ export type Session = {
 
 export type AuthChangeEvent = 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED' | 'USER_UPDATED'
 
-export type AuthResponse = {
+export interface AuthResponse {
   user: User
   session: Session
 }
 
-export type OtpVerificationResponse = {
-  user: User
-  session: Session
+export async function signIn(credentials: SignInCredentials) {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/sign-in'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(credentials),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to sign in')
+  }
+
+  const data = await response.json()
+  return data
 }
 
-export type ResetPasswordResponse = {
-  success: boolean
-}
-
-export type ForgotPasswordResponse = {
-  success: boolean
-}
-
-export async function signIn(credentials: SignInCredentials): Promise<AuthResponse> {
-  return api.post<AuthResponse>(API_PATHS.AUTH_SIGN_IN, credentials)
-}
-
-export async function signOut(): Promise<void> {
+export async function signOut() {
+  // Clear local storage
   localStorage.removeItem('token')
-  localStorage.removeItem('team_id')
-  localStorage.removeItem('user')
+  return { error: null }
 }
 
-export async function getCurrentUser(): Promise<User> {
-  return api.get<User>(API_PATHS.AUTH_ME, { requireAuth: true })
-}
-
-export async function storeSession(session: Session): Promise<void> {
-  localStorage.setItem('token', session.token)
-  if (session.user.team_id) {
-    localStorage.setItem('team_id', session.user.team_id)
+export async function getCurrentUser() {
+  const token = localStorage.getItem('token')
+  if (!token) {
+    throw new Error('No token found')
   }
-  localStorage.setItem('user', JSON.stringify(session.user))
-}
 
-export function getStoredUser(): User | null {
-  const userJson = localStorage.getItem('user')
-  if (!userJson) return null
-  try {
-    return JSON.parse(userJson)
-  } catch {
-    return null
+  const response = await fetchWithNoCache(buildApiUrl('/auth/me'), {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to get current user')
   }
-}
 
-export async function signUp(credentials: SignUpCredentials): Promise<AuthResponse> {
-  return api.post<AuthResponse>(API_PATHS.AUTH_SIGN_UP, credentials)
-}
-
-export async function verifyOtp(email: string, otp: string): Promise<OtpVerificationResponse> {
-  return api.post<OtpVerificationResponse>(API_PATHS.AUTH_VERIFY_OTP, { email, otp })
-}
-
-export async function forgotPassword(email: string): Promise<ForgotPasswordResponse> {
-  return api.post<ForgotPasswordResponse>(API_PATHS.AUTH_FORGOT_PASSWORD, { email })
-}
-
-export async function resetPassword(token: string, password: string): Promise<ResetPasswordResponse> {
-  return api.post<ResetPasswordResponse>(API_PATHS.AUTH_RESET_PASSWORD, { token, password })
+  return response.json()
 }
 
 export async function getCurrentUserTeam() {
@@ -99,6 +81,91 @@ export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Se
   return () => {
     // Cleanup function
   }
+}
+
+export async function signUp(credentials: SignUpCredentials) {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/sign-up'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(credentials),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to sign up')
+  }
+
+  return response.json()
+}
+
+export async function setupPassword(userId: string, password: string) {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/setup-password'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ userId, password }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Falha ao definir senha')
+  }
+
+  return response.json()
+}
+
+export async function verifyOtp(email: string, otp: string) {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/verify-otp'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, otp }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to verify OTP')
+  }
+
+  return response.json()
+}
+
+export async function forgotPassword(email: string) {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/forgot-password'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to send password reset email')
+  }
+
+  return response.json()
+}
+
+export async function resetPassword(token: string, password: string) {
+  const response = await fetchWithNoCache(buildApiUrl('/auth/reset-password'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token, password }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to reset password')
+  }
+
+  return response.json()
 }
 
 // Helper function for debugging team ID
