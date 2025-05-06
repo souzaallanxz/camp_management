@@ -1,10 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, TooltipProps } from 'recharts'
-import { dashboardService, CampPaymentsData } from '../services/dashboard-service'
+import { CampPaymentsData } from '../services/dashboard-service'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from './empty-state'
-import { useState } from 'react'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-PT', {
@@ -48,20 +46,13 @@ const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   return null
 }
 
-export function Overview() {
-  const [timestamp] = useState(() => Date.now())
+interface OverviewProps {
+  data?: CampPaymentsData[]
+  isLoading: boolean
+  error: Error | null
+}
 
-  const { data: campPayments, isLoading, error } = useQuery({
-    queryKey: ['dashboard', 'camp-payments', timestamp],
-    queryFn: () => dashboardService.getCampPayments(),
-    staleTime: 0,
-    gcTime: 0,
-    retry: 2,
-    retryDelay: 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always'
-  })
-
+export function Overview({ data: campPayments, isLoading, error }: OverviewProps) {
   if (isLoading) {
     return <Skeleton className="w-full h-[350px]" />
   }

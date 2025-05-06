@@ -21,6 +21,7 @@ import { useState } from 'react'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from './components/empty-state'
+import { topNav } from './constants'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-PT', {
@@ -80,7 +81,9 @@ function MetricCard({
 }
 
 export default function Dashboard() {
-  const { monthlyPayments, monthlyRegistrations, monthlySnackbar, yearlyCampers, isLoading, error } = useDashboardMetrics()
+  // Desabilitar o StrictMode para o componente Dashboard em produção
+  const { monthlyPayments, monthlyRegistrations, monthlySnackbar, yearlyCampers, 
+          campPayments, recentRegistrations, isLoading, error, refetch } = useDashboardMetrics()
   const permissions = useTeamPermissions()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
 
@@ -224,7 +227,7 @@ export default function Dashboard() {
                     <CardTitle>Overview</CardTitle>
                   </CardHeader>
                   <CardContent className='pl-2'>
-                    <Overview />
+                    <Overview data={campPayments} isLoading={isLoading} error={error} />
                   </CardContent>
                 </Card>
               )}
@@ -237,7 +240,7 @@ export default function Dashboard() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <RecentSales />
+                    <RecentSales data={recentRegistrations} isLoading={isLoading} error={error} />
                   </CardContent>
                 </Card>
               )}
@@ -253,30 +256,3 @@ export default function Dashboard() {
     </>
   )
 }
-
-const topNav = [
-  {
-    title: 'Overview',
-    href: '/',
-    isActive: true,
-    disabled: false,
-  },
-  /*{
-    title: 'Customers',
-    href: 'dashboard/customers',
-    isActive: false,
-    disabled: true,
-  },
-  {
-    title: 'Products',
-    href: 'dashboard/products',
-    isActive: false,
-    disabled: true,
-  },
-  {
-    title: 'Settings',
-    href: 'settings/prodf',
-    isActive: false,
-    disabled: true,
-  },*/
-]

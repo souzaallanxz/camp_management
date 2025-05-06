@@ -1,64 +1,68 @@
 import { useQuery } from '@tanstack/react-query'
-import { dashboardService } from '../services/dashboard-service'
-import { useState } from 'react'
+import { dashboardService, MetricData, CampPaymentsData, RecentRegistration } from '../services/dashboard-service'
+import { useState, useCallback } from 'react'
+
+interface DashboardData {
+  monthlyPayments: MetricData;
+  monthlyRegistrations: MetricData;
+  monthlySnackbar: MetricData;
+  yearlyCampers: MetricData;
+  campPayments: CampPaymentsData[];
+  recentRegistrations: RecentRegistration[];
+}
 
 export function useDashboardMetrics() {
   // Usar um timestamp estável durante a montagem do componente
   const [timestamp] = useState(() => Date.now())
 
-  const { data: monthlyPayments, isLoading: isLoadingPayments, error: paymentsError } = useQuery({
-    queryKey: ['dashboard', 'monthly-payments', timestamp],
-    queryFn: () => dashboardService.getMonthlyPayments(),
+  // Função para carregar todos os dados ao mesmo tempo
+  const fetchAllData = useCallback(async (): Promise<DashboardData> => {
+    const [
+      monthlyPayments,
+      monthlyRegistrations,
+      monthlySnackbar,
+      yearlyCampers,
+      campPayments,
+      recentRegistrations
+    ] = await Promise.all([
+      dashboardService.getMonthlyPayments(),
+      dashboardService.getMonthlyRegistrations(),
+      dashboardService.getMonthlySnackbarTransactions(),
+      dashboardService.getYearlyCampers(),
+      dashboardService.getCampPayments(),
+      dashboardService.getRecentRegistrations(5)
+    ])
+
+    return {
+      monthlyPayments,
+      monthlyRegistrations,
+      monthlySnackbar,
+      yearlyCampers,
+      campPayments,
+      recentRegistrations
+    }
+  }, [])
+
+  // Usar uma única query para todos os dados
+  const { data, isLoading, error, refetch } = useQuery<DashboardData, Error>({
+    queryKey: ['dashboard', 'all-data', timestamp],
+    queryFn: fetchAllData,
     staleTime: 0,
     gcTime: 0,
-    retry: 2,
+    retry: 1,
     retryDelay: 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always'
+    refetchOnWindowFocus: false
   })
-
-  const { data: monthlyRegistrations, isLoading: isLoadingRegistrations, error: registrationsError } = useQuery({
-    queryKey: ['dashboard', 'monthly-registrations', timestamp],
-    queryFn: () => dashboardService.getMonthlyRegistrations(),
-    staleTime: 0,
-    gcTime: 0,
-    retry: 2,
-    retryDelay: 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always'
-  })
-
-  const { data: monthlySnackbar, isLoading: isLoadingSnackbar, error: snackbarError } = useQuery({
-    queryKey: ['dashboard', 'monthly-snackbar', timestamp],
-    queryFn: () => dashboardService.getMonthlySnackbarTransactions(),
-    staleTime: 0,
-    gcTime: 0,
-    retry: 2,
-    retryDelay: 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always'
-  })
-
-  const { data: yearlyCampers, isLoading: isLoadingCampers, error: campersError } = useQuery({
-    queryKey: ['dashboard', 'yearly-campers', timestamp],
-    queryFn: () => dashboardService.getYearlyCampers(),
-    staleTime: 0,
-    gcTime: 0,
-    retry: 2,
-    retryDelay: 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always'
-  })
-
-  const isLoading = isLoadingPayments || isLoadingRegistrations || isLoadingSnackbar || isLoadingCampers
-  const error = paymentsError || registrationsError || snackbarError || campersError
 
   return {
-    monthlyPayments,
-    monthlyRegistrations,
-    monthlySnackbar,
-    yearlyCampers,
+    monthlyPayments: data?.monthlyPayments,
+    monthlyRegistrations: data?.monthlyRegistrations,
+    monthlySnackbar: data?.monthlySnackbar,
+    yearlyCampers: data?.yearlyCampers,
+    campPayments: data?.campPayments,
+    recentRegistrations: data?.recentRegistrations,
     isLoading,
-    error
+    error,
+    refetch
   }
 } 
