@@ -47,6 +47,10 @@ export function signOut() {
 
 export async function getCurrentUser() {
   try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      return null;
+    }
     return await api.get<User>(API_PATHS.AUTH_ME);
   } catch {
     return null;
