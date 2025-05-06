@@ -3,7 +3,7 @@
   "buildCommand": "pnpm run build",
   "devCommand": "pnpm run dev",
   "installCommand": "pnpm install",
-  "framework": "vite",
+  "framework": null,
   "outputDirectory": "dist",
   "regions": ["cdg1"],
   "headers": [

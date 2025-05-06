@@ -8,7 +8,7 @@
     "dev:frontend": "vite",
     "dev:backend": "node api/index.js",
     "server": "node api/index.js",
-    "build": "vite build && mkdir -p dist/api && cp -r api/*.js dist/api/",
+    "build": "node vercel-build.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "format:check": "prettier --check .",
@@ -104,7 +104,7 @@
     "typescript": "^5.4.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   },
   "packageManager": "pnpm@8.15.5"
 }
