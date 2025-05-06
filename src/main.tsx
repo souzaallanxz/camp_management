@@ -37,22 +37,21 @@ const queryClient = new QueryClient({
     mutations: {
       retry: 1,
       onError: (error) => {
-        handleServerError(error)
-
-        if (error instanceof AxiosError) {
-          if (error.response?.status === 304) {
-            toast({
-              variant: 'destructive',
-              title: 'Content not modified!',
-            })
-          }
+        if (error instanceof AxiosError && error.response?.status === 304) {
+          return
         }
+        
+        handleServerError(error)
       },
     },
   },
   queryCache: new QueryCache({
     onError: (error) => {
       if (error instanceof AxiosError) {
+        if (error.response?.status === 304) {
+          return
+        }
+        
         if (error.response?.status === 401) {
           toast({
             variant: 'destructive',
