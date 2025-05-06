@@ -24,13 +24,13 @@ export interface AuthResponse {
 
 export async function signIn(credentials: SignInCredentials) {
   try {
-    const response = await api.post<{ token: string; user: User }>(
+    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
       API_PATHS.AUTH_SIGN_IN,
       credentials
     );
     
-    if (response.token) {
-      localStorage.setItem('token', response.token);
+    if (response.session?.token) {
+      localStorage.setItem('token', response.session.token);
     }
     
     return { error: null, user: response.user };
@@ -74,13 +74,13 @@ export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Se
 
 export async function signUp(credentials: SignUpCredentials) {
   try {
-    const response = await api.post<{ token: string; user: User }>(
+    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
       API_PATHS.AUTH_SIGN_UP,
       credentials
     );
     
-    if (response.token) {
-      localStorage.setItem('token', response.token);
+    if (response.session?.token) {
+      localStorage.setItem('token', response.session.token);
     }
     
     return { error: null, user: response.user };
@@ -91,13 +91,13 @@ export async function signUp(credentials: SignUpCredentials) {
 
 export async function setupPassword(userId: string, password: string) {
   try {
-    const response = await api.post<{ token: string; user: User }>(
+    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
       API_PATHS.AUTH_SETUP_PASSWORD,
       { userId, password }
     );
 
-    if (response.token) {
-      localStorage.setItem('token', response.token);
+    if (response.session?.token) {
+      localStorage.setItem('token', response.session.token);
     }
 
     return response.user;
@@ -108,13 +108,13 @@ export async function setupPassword(userId: string, password: string) {
 
 export async function verifyOtp(email: string, otp: string) {
   try {
-    const response = await api.post<{ token: string; user: User }>(
+    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
       API_PATHS.AUTH_VERIFY_OTP,
       { email, otp }
     );
 
-    if (response.token) {
-      localStorage.setItem('token', response.token);
+    if (response.session?.token) {
+      localStorage.setItem('token', response.session.token);
     }
 
     return response.user;
@@ -125,13 +125,13 @@ export async function verifyOtp(email: string, otp: string) {
 
 export async function forgotPassword(email: string) {
   try {
-    const response = await api.post<{ token: string; user: User }>(
+    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
       API_PATHS.AUTH_FORGOT_PASSWORD,
       { email }
     );
 
-    if (response.token) {
-      localStorage.setItem('token', response.token);
+    if (response.session?.token) {
+      localStorage.setItem('token', response.session.token);
     }
 
     return response.user;
@@ -142,13 +142,13 @@ export async function forgotPassword(email: string) {
 
 export async function resetPassword(token: string, password: string) {
   try {
-    const response = await api.post<{ token: string; user: User }>(
+    const response = await api.post<{ user: User; session: { user: User; token: string } }>(
       API_PATHS.AUTH_RESET_PASSWORD,
       { token, password }
     );
 
-    if (response.token) {
-      localStorage.setItem('token', response.token);
+    if (response.session?.token) {
+      localStorage.setItem('token', response.session.token);
     }
 
     return response.user;
