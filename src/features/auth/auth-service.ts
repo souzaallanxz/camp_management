@@ -1,12 +1,13 @@
 import type { SignInCredentials, SignUpCredentials } from './types'
-import { buildApiUrl, fetchWithNoCache } from '@/services/api'
+import { api, API_PATHS } from '@/services/api'
 
 export type User = {
   id: string
   email: string
-  name?: string
-  team_id?: string | null
-  role?: string
+  name: string
+  team_id: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type Session = {
@@ -22,46 +23,34 @@ export interface AuthResponse {
 }
 
 export async function signIn(credentials: SignInCredentials) {
-  const response = await fetchWithNoCache(buildApiUrl('/auth/sign-in'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(credentials),
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to sign in')
+  try {
+    const response = await api.post<{ token: string; user: User }>(
+      API_PATHS.AUTH_SIGN_IN,
+      credentials
+    );
+    
+    if (response.token) {
+      localStorage.setItem('token', response.token);
+    }
+    
+    return { error: null, user: response.user };
+  } catch {
+    return { error: 'Invalid credentials', user: null };
   }
-
-  const data = await response.json()
-  return data
 }
 
-export async function signOut() {
-  // Clear local storage
-  localStorage.removeItem('token')
-  return { error: null }
+export function signOut() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('teamId');
+  window.location.href = '/auth/sign-in';
 }
 
 export async function getCurrentUser() {
-  const token = localStorage.getItem('token')
-  if (!token) {
-    throw new Error('No token found')
+  try {
+    return await api.get<User>(API_PATHS.AUTH_ME);
+  } catch {
+    return null;
   }
-
-  const response = await fetchWithNoCache(buildApiUrl('/auth/me'), {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  })
-
-  if (!response.ok) {
-    throw new Error('Failed to get current user')
-  }
-
-  return response.json()
 }
 
 export async function getCurrentUserTeam() {
@@ -84,88 +73,88 @@ export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Se
 }
 
 export async function signUp(credentials: SignUpCredentials) {
-  const response = await fetchWithNoCache(buildApiUrl('/auth/sign-up'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(credentials),
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to sign up')
+  try {
+    const response = await api.post<{ token: string; user: User }>(
+      API_PATHS.AUTH_SIGN_UP,
+      credentials
+    );
+    
+    if (response.token) {
+      localStorage.setItem('token', response.token);
+    }
+    
+    return { error: null, user: response.user };
+  } catch {
+    return { error: 'Failed to create account', user: null };
   }
-
-  return response.json()
 }
 
 export async function setupPassword(userId: string, password: string) {
-  const response = await fetchWithNoCache(buildApiUrl('/auth/setup-password'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ userId, password }),
-  })
+  try {
+    const response = await api.post<{ token: string; user: User }>(
+      API_PATHS.AUTH_SETUP_PASSWORD,
+      { userId, password }
+    );
 
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Falha ao definir senha')
+    if (response.token) {
+      localStorage.setItem('token', response.token);
+    }
+
+    return response.user;
+  } catch {
+    throw new Error('Failed to setup password');
   }
-
-  return response.json()
 }
 
 export async function verifyOtp(email: string, otp: string) {
-  const response = await fetchWithNoCache(buildApiUrl('/auth/verify-otp'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, otp }),
-  })
+  try {
+    const response = await api.post<{ token: string; user: User }>(
+      API_PATHS.AUTH_VERIFY_OTP,
+      { email, otp }
+    );
 
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to verify OTP')
+    if (response.token) {
+      localStorage.setItem('token', response.token);
+    }
+
+    return response.user;
+  } catch {
+    throw new Error('Failed to verify OTP');
   }
-
-  return response.json()
 }
 
 export async function forgotPassword(email: string) {
-  const response = await fetchWithNoCache(buildApiUrl('/auth/forgot-password'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email }),
-  })
+  try {
+    const response = await api.post<{ token: string; user: User }>(
+      API_PATHS.AUTH_FORGOT_PASSWORD,
+      { email }
+    );
 
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to send password reset email')
+    if (response.token) {
+      localStorage.setItem('token', response.token);
+    }
+
+    return response.user;
+  } catch {
+    throw new Error('Failed to send password reset email');
   }
-
-  return response.json()
 }
 
 export async function resetPassword(token: string, password: string) {
-  const response = await fetchWithNoCache(buildApiUrl('/auth/reset-password'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ token, password }),
-  })
+  try {
+    const response = await api.post<{ token: string; user: User }>(
+      API_PATHS.AUTH_RESET_PASSWORD,
+      { token, password }
+    );
 
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'Failed to reset password')
+    if (response.token) {
+      localStorage.setItem('token', response.token);
+    }
+
+    return response.user;
+  } catch {
+    throw new Error('Failed to reset password');
   }
-
-  return response.json()
 }
 
 // Helper function for debugging team ID

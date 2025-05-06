@@ -13,6 +13,10 @@ export const API_PATHS = {
   AUTH_ME: '/auth/me',
   AUTH_SIGN_IN: '/auth/sign-in',
   AUTH_SIGN_UP: '/auth/sign-up',
+  AUTH_SETUP_PASSWORD: '/auth/setup-password',
+  AUTH_VERIFY_OTP: '/auth/verify-otp',
+  AUTH_FORGOT_PASSWORD: '/auth/forgot-password',
+  AUTH_RESET_PASSWORD: '/auth/reset-password',
   
   // Teams
   TEAMS: '/teams',
@@ -36,7 +40,7 @@ export const API_PATHS = {
   
   // Snackbar
   SNACKBAR_BALANCE: '/snackbar-balance',
-};
+} as const;
 
 /**
  * Default headers for all requests
