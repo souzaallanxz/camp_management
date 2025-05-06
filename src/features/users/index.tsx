@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -15,20 +15,20 @@ import UsersProvider from './context/users-context'
 import { getUsers } from './services/user-service'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { ReloadIcon } from '@radix-ui/react-icons'
-import { Button } from '@/components/ui/button'
 
 function UsersContent() {
-  // Use a stable timestamp for the initial query
-  const [timestamp] = useState(() => Date.now())
-  
-  const { data: users = [], refetch, isLoading, isError } = useQuery({
-    queryKey: ['users', timestamp],
+  const { 
+    data: users = [], 
+    refetch,
+    isLoading, 
+    isError 
+  } = useQuery({
+    queryKey: ['users'],
     queryFn: getUsers,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
     refetchOnWindowFocus: false,
-    retry: 2,
-    retryDelay: 2000
+    retry: 3
   });
 
   const handleRefetch = () => {
@@ -59,12 +59,8 @@ function UsersContent() {
         {isError && (
           <Alert variant="destructive" className="mb-4">
             <AlertTitle>Erro</AlertTitle>
-            <AlertDescription className="flex flex-col gap-2">
-              <div>Não foi possível carregar a lista de usuários. Tente novamente mais tarde.</div>
-              <Button variant="outline" size="sm" className="w-fit" onClick={handleRefetch}>
-                <ReloadIcon className="mr-2 h-4 w-4" />
-                Tentar novamente
-              </Button>
+            <AlertDescription>
+              Não foi possível carregar a lista de usuários. Tente novamente mais tarde.
             </AlertDescription>
           </Alert>
         )}

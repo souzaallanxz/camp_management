@@ -1,11 +1,5 @@
-// Get API URL from environment with proper handling for production vs development
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
-// Check if we're in production environment (campmanagement.vercel.app)
-const isProduction = API_URL.includes('campmanagement.vercel.app');
-
-// In production, the API endpoints don't have /api prefix
-const API_BASE_URL = isProduction ? API_URL : (API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`);
+// Hard-code the direct base URL for endpoints
+const API_BASE_URL = 'https://campmanagement.vercel.app';
 
 export interface MetricData {
   total: number
@@ -38,47 +32,15 @@ export interface DashboardData {
   recentRegistrations: RecentRegistration[];
 }
 
-// Função auxiliar para requisições com timeout e sem cache
-const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 10000) => {
-  const controller = new AbortController();
-  const { signal } = controller;
+// Simple fetch helper without caching logic
+const simpleFetch = async (url: string, options: RequestInit = {}) => {
+  const response = await fetch(url, options);
   
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  try {
-    // Adicionar headers para prevenir cache
-    const headers = {
-      ...options.headers,
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    };
-
-    // Adicionar timestamp como query param para garantir resposta fresca
-    const separator = url.includes('?') ? '&' : '?';
-    const timestamp = Date.now();
-    const urlWithTimestamp = `${url}${separator}_=${timestamp}`;
-
-    const response = await fetch(urlWithTimestamp, { 
-      ...options, 
-      signal,
-      headers,
-      cache: 'no-store',
-      // Definir referrerPolicy para evitar cache
-      referrerPolicy: 'no-referrer'
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
-    }
-    
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
   }
+  
+  return response;
 };
 
 export const dashboardService = {
@@ -123,10 +85,10 @@ export const dashboardService = {
   async getMonthlyPayments(): Promise<MetricData> {
     try {
       const headers = await this.getTeamIdHeader();
-      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-payments`, {
+      const response = await simpleFetch(`${API_BASE_URL}/dashboard/monthly-payments`, {
         headers,
         method: 'GET'
-      }, 8000);
+      });
       
       const data = await response.json();
       return {
@@ -149,10 +111,10 @@ export const dashboardService = {
   async getMonthlyRegistrations(): Promise<MetricData> {
     try {
       const headers = await this.getTeamIdHeader();
-      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-registrations`, {
+      const response = await simpleFetch(`${API_BASE_URL}/dashboard/monthly-registrations`, {
         headers,
         method: 'GET'
-      }, 8000);
+      });
       
       const data = await response.json();
       return {
@@ -175,10 +137,10 @@ export const dashboardService = {
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
     try {
       const headers = await this.getTeamIdHeader();
-      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
+      const response = await simpleFetch(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
         headers,
         method: 'GET'
-      }, 8000);
+      });
       
       const data = await response.json();
       return {
@@ -201,10 +163,10 @@ export const dashboardService = {
   async getYearlyCampers(): Promise<MetricData> {
     try {
       const headers = await this.getTeamIdHeader();
-      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/yearly-campers`, {
+      const response = await simpleFetch(`${API_BASE_URL}/dashboard/yearly-campers`, {
         headers,
         method: 'GET'
-      }, 8000);
+      });
       
       const data = await response.json();
       return {
@@ -227,10 +189,10 @@ export const dashboardService = {
   async getCampPayments(): Promise<CampPaymentsData[]> {
     try {
       const headers = await this.getTeamIdHeader();
-      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/camp-payments`, {
+      const response = await simpleFetch(`${API_BASE_URL}/dashboard/camp-payments`, {
         headers,
         method: 'GET'
-      }, 8000);
+      });
       
       return await response.json();
     } catch {
@@ -242,10 +204,10 @@ export const dashboardService = {
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
     try {
       const headers = await this.getTeamIdHeader();
-      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
+      const response = await simpleFetch(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
         headers,
         method: 'GET'
-      }, 8000);
+      });
       
       const data = await response.json();
       return data.map((item: Record<string, unknown>) => ({
