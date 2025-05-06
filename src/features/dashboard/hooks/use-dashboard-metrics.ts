@@ -27,9 +27,18 @@ export function useDashboardMetrics() {
     queryFn: fetchAllData,
     staleTime: 5 * 60 * 1000, // 5 minutos
     gcTime: 10 * 60 * 1000, // 10 minutos
-    retry: 1,
-    retryDelay: 1000,
-    refetchOnWindowFocus: false
+    retry: 2, // Increased from 1 to 2
+    retryDelay: 2000, // Increased from 1000 to 2000
+    refetchOnWindowFocus: false,
+    // Initialize with default values to prevent UI errors
+    placeholderData: {
+      monthlyPayments: { total: 0, previousTotal: 0, percentageChange: null },
+      monthlyRegistrations: { total: 0, previousTotal: 0, percentageChange: null },
+      monthlySnackbar: { total: 0, previousTotal: 0, percentageChange: null },
+      yearlyCampers: { total: 0, previousTotal: 0, percentageChange: null },
+      campPayments: [],
+      recentRegistrations: []
+    }
   })
 
   return {

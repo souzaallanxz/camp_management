@@ -1,4 +1,7 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Get API URL from environment with proper handling for production vs development
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Make sure we have /api at the end but avoid double /api/api
+const API_BASE_URL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
 
 export interface MetricData {
   total: number
@@ -49,7 +52,8 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout 
 
     // Adicionar timestamp como query param para garantir resposta fresca
     const separator = url.includes('?') ? '&' : '?';
-    const urlWithTimestamp = `${url}${separator}_=${Date.now()}`;
+    const timestamp = Date.now();
+    const urlWithTimestamp = `${url}${separator}_=${timestamp}`;
 
     const response = await fetch(urlWithTimestamp, { 
       ...options, 
@@ -61,6 +65,10 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout 
     });
     
     clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`);
+    }
     
     return response;
   } catch (error) {
@@ -103,104 +111,150 @@ export const dashboardService = {
         campPayments,
         recentRegistrations
       };
-    } catch (_) {
+    } catch {
       throw new Error('Erro ao buscar dados do dashboard');
     }
   },
 
   async getMonthlyPayments(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-payments`, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar pagamentos');
-    
-    const data = await response.json();
-    return {
-      total: data.current || 0,
-      previousTotal: data.previous || 0,
-      percentageChange: data.current > 0 && data.previous > 0 
-        ? ((data.current - data.previous) / data.previous) * 100 
-        : null
-    };
+    try {
+      const headers = await this.getTeamIdHeader();
+      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-payments`, {
+        headers,
+        method: 'GET'
+      }, 8000);
+      
+      const data = await response.json();
+      return {
+        total: data.current || 0,
+        previousTotal: data.previous || 0,
+        percentageChange: data.current > 0 && data.previous > 0 
+          ? ((data.current - data.previous) / data.previous) * 100 
+          : null
+      };
+    } catch {
+      // Return default values if the request fails
+      return {
+        total: 0,
+        previousTotal: 0,
+        percentageChange: null
+      };
+    }
   },
 
   async getMonthlyRegistrations(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-registrations`, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar inscrições');
-    
-    const data = await response.json();
-    return {
-      total: data.current || 0,
-      previousTotal: data.previous || 0,
-      percentageChange: data.current > 0 && data.previous > 0 
-        ? ((data.current - data.previous) / data.previous) * 100 
-        : null
-    };
+    try {
+      const headers = await this.getTeamIdHeader();
+      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-registrations`, {
+        headers,
+        method: 'GET'
+      }, 8000);
+      
+      const data = await response.json();
+      return {
+        total: data.current || 0,
+        previousTotal: data.previous || 0,
+        percentageChange: data.current > 0 && data.previous > 0 
+          ? ((data.current - data.previous) / data.previous) * 100 
+          : null
+      };
+    } catch {
+      // Return default values if the request fails
+      return {
+        total: 0,
+        previousTotal: 0,
+        percentageChange: null
+      };
+    }
   },
 
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar carregamentos');
-    
-    const data = await response.json();
-    return {
-      total: data.current || 0,
-      previousTotal: data.previous || 0,
-      percentageChange: data.current > 0 && data.previous > 0 
-        ? ((data.current - data.previous) / data.previous) * 100 
-        : null
-    };
+    try {
+      const headers = await this.getTeamIdHeader();
+      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
+        headers,
+        method: 'GET'
+      }, 8000);
+      
+      const data = await response.json();
+      return {
+        total: data.current || 0,
+        previousTotal: data.previous || 0,
+        percentageChange: data.current > 0 && data.previous > 0 
+          ? ((data.current - data.previous) / data.previous) * 100 
+          : null
+      };
+    } catch {
+      // Return default values if the request fails
+      return {
+        total: 0,
+        previousTotal: 0,
+        percentageChange: null
+      };
+    }
   },
 
   async getYearlyCampers(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/yearly-campers`, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar campistas');
-    
-    const data = await response.json();
-    return {
-      total: data.current || 0,
-      previousTotal: data.previous || 0,
-      percentageChange: data.current > 0 && data.previous > 0 
-        ? ((data.current - data.previous) / data.previous) * 100 
-        : null
-    };
+    try {
+      const headers = await this.getTeamIdHeader();
+      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/yearly-campers`, {
+        headers,
+        method: 'GET'
+      }, 8000);
+      
+      const data = await response.json();
+      return {
+        total: data.current || 0,
+        previousTotal: data.previous || 0,
+        percentageChange: data.current > 0 && data.previous > 0 
+          ? ((data.current - data.previous) / data.previous) * 100 
+          : null
+      };
+    } catch {
+      // Return default values if the request fails
+      return {
+        total: 0,
+        previousTotal: 0,
+        percentageChange: null
+      };
+    }
   },
 
   async getCampPayments(): Promise<CampPaymentsData[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/camp-payments`, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar pagamentos por acampamento');
-    
-    return await response.json();
+    try {
+      const headers = await this.getTeamIdHeader();
+      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/camp-payments`, {
+        headers,
+        method: 'GET'
+      }, 8000);
+      
+      return await response.json();
+    } catch {
+      // Return empty array if the request fails
+      return [];
+    }
   },
 
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
-      headers: { ...await this.getTeamIdHeader() }
-    }, 8000);
-    
-    if (!response.ok) throw new Error('Erro ao buscar inscrições recentes');
-    
-    const data = await response.json();
-    return data.map((item: Record<string, unknown>) => ({
-      id: item.id as string,
-      name: (item.camper_name || item.name) as string,
-      email: (item.camper_email || item.email) as string,
-      totalPaid: (item.total_paid || 0) as number,
-      createdAt: (item.created_at || item.createdAt) as string,
-      campName: (item.camp_name || item.campName) as string
-    }));
+    try {
+      const headers = await this.getTeamIdHeader();
+      const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
+        headers,
+        method: 'GET'
+      }, 8000);
+      
+      const data = await response.json();
+      return data.map((item: Record<string, unknown>) => ({
+        id: item.id as string,
+        name: (item.camper_name || item.name) as string,
+        email: (item.camper_email || item.email) as string,
+        totalPaid: (item.total_paid || 0) as number,
+        createdAt: (item.created_at || item.createdAt) as string,
+        campName: (item.camp_name || item.campName) as string
+      }));
+    } catch {
+      // Return empty array if the request fails
+      return [];
+    }
   }
 } 

@@ -77,9 +77,19 @@ export function Overview({ data: campPayments, isLoading, error }: OverviewProps
     )
   }
 
+  // Ensure we have valid data for the chart
+  const validData = campPayments.map(item => ({
+    ...item,
+    // Ensure we have numbers, not undefined or NaN
+    totalPayments: typeof item.totalPayments === 'number' ? item.totalPayments : 0,
+    totalRegistrations: typeof item.totalRegistrations === 'number' ? item.totalRegistrations : 0,
+    // Ensure campName is a string
+    campName: item.campName || 'Desconhecido'
+  }));
+
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={campPayments}>
+      <BarChart data={validData}>
         <XAxis
           dataKey="campName"
           stroke="#888888"

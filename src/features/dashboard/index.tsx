@@ -90,14 +90,32 @@ function MetricCard({
 }
 
 export default function Dashboard() {
-  const { monthlyPayments, monthlyRegistrations, monthlySnackbar, yearlyCampers, 
-          campPayments, recentRegistrations, isLoading, error, refetch } = useDashboardMetrics()
+  const { 
+    monthlyPayments, 
+    monthlyRegistrations, 
+    monthlySnackbar, 
+    yearlyCampers, 
+    campPayments, 
+    recentRegistrations, 
+    isLoading, 
+    error, 
+    refetch 
+  } = useDashboardMetrics()
+  
   const permissions = useTeamPermissions()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
 
   const handleRetry = () => {
     refetch()
   }
+
+  // Use default empty values to prevent UI errors
+  const safeMonthlyPayments = monthlyPayments || { total: 0, previousTotal: 0, percentageChange: null }
+  const safeMonthlyRegistrations = monthlyRegistrations || { total: 0, previousTotal: 0, percentageChange: null }
+  const safeMonthlySnackbar = monthlySnackbar || { total: 0, previousTotal: 0, percentageChange: null }
+  const safeYearlyCampers = yearlyCampers || { total: 0, previousTotal: 0, percentageChange: null }
+  const safeCampPayments = campPayments || []
+  const safeRecentRegistrations = recentRegistrations || []
 
   return (
     <>
@@ -155,8 +173,8 @@ export default function Dashboard() {
               <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
                 <MetricCard
                   title='Total Pagamentos'
-                  value={monthlyPayments?.total || 0}
-                  percentageChange={monthlyPayments?.percentageChange || null}
+                  value={safeMonthlyPayments.total}
+                  percentageChange={safeMonthlyPayments.percentageChange}
                   isLoading={isLoading}
                   valueFormatter={formatCurrency}
                   icon={
@@ -176,8 +194,8 @@ export default function Dashboard() {
                 />
                 <MetricCard
                   title='Total de Inscrições'
-                  value={monthlyRegistrations?.total || 0}
-                  percentageChange={monthlyRegistrations?.percentageChange || null}
+                  value={safeMonthlyRegistrations.total}
+                  percentageChange={safeMonthlyRegistrations.percentageChange}
                   isLoading={isLoading}
                   icon={
                     <svg
@@ -198,8 +216,8 @@ export default function Dashboard() {
                 />
                 <MetricCard
                   title='Total de Carregamentos'
-                  value={monthlySnackbar?.total || 0}
-                  percentageChange={monthlySnackbar?.percentageChange || null}
+                  value={safeMonthlySnackbar.total}
+                  percentageChange={safeMonthlySnackbar.percentageChange}
                   isLoading={isLoading}
                   valueFormatter={formatCurrency}
                   isLocked={!permissions.dashboard.viewRechargesTotal}
@@ -221,8 +239,8 @@ export default function Dashboard() {
                 />
                 <MetricCard
                   title='Total de Campistas'
-                  value={yearlyCampers?.total || 0}
-                  percentageChange={yearlyCampers?.percentageChange || null}
+                  value={safeYearlyCampers.total}
+                  percentageChange={safeYearlyCampers.percentageChange}
                   isLoading={isLoading}
                   icon={
                     <svg
@@ -247,33 +265,34 @@ export default function Dashboard() {
                       <CardTitle>Overview</CardTitle>
                     </CardHeader>
                     <CardContent className='pl-2'>
-                      <Overview data={campPayments} isLoading={isLoading} error={error} />
+                      <Overview data={safeCampPayments} isLoading={isLoading} error={error} />
                     </CardContent>
                   </Card>
                 )}
-                {permissions.dashboard.viewLatestRegistrations && (
-                  <Card className='col-span-1 lg:col-span-3'>
-                    <CardHeader>
-                      <CardTitle>Últimas Inscrições</CardTitle>
-                      <CardDescription>
-                        {monthlyRegistrations?.total || 0} inscrições este mês
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <RecentSales data={recentRegistrations} isLoading={isLoading} error={error} />
-                    </CardContent>
-                  </Card>
-                )}
+                <Card className='col-span-1 lg:col-span-3'>
+                  <CardHeader>
+                    <CardTitle>Inscrições Recentes</CardTitle>
+                    <CardDescription>
+                      Últimas inscrições nos acampamentos.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <RecentSales data={safeRecentRegistrations} isLoading={isLoading} error={error} />
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
           </Tabs>
         )}
       </Main>
 
-      <TierUpgradeDialog
-        open={showUpgradeDialog}
-        onOpenChange={setShowUpgradeDialog}
-      />
+      {/* Premium tier upgrade dialog */}
+      {showUpgradeDialog && (
+        <TierUpgradeDialog 
+          open={showUpgradeDialog} 
+          onOpenChange={setShowUpgradeDialog} 
+        />
+      )}
     </>
   )
 }
