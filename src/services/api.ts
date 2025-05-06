@@ -3,8 +3,8 @@
  */
 import { toast } from 'sonner';
 
-// Get API URL from environment variable or use fallback
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Get API URL from environment variable or use empty string for relative URLs in production
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 /**
  * Standardized API paths to ensure consistency
@@ -77,6 +77,11 @@ export function buildApiUrl(path: string): string {
   
   // Remove any leading '/api' from the path if present
   const cleanPath = path.startsWith('/api/') ? path.substring(4) : path;
+  
+  // If API_BASE_URL is empty, just return the path (for relative URLs in production)
+  if (!API_BASE_URL) {
+    return cleanPath;
+  }
   
   return `${API_BASE_URL}${cleanPath}`;
 }
@@ -164,8 +169,14 @@ export async function apiRequest<T = any>(url: string, options: ApiRequestOption
     
     // Handle non-success responses
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      const errorMessage = errorData.error || `Error: ${response.status}`;
+      let errorMessage = `Error: ${response.status}`;
+      
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        // Ignore JSON parsing errors for non-JSON responses
+      }
       
       if (handleError) {
         // Handle common error codes
@@ -173,6 +184,7 @@ export async function apiRequest<T = any>(url: string, options: ApiRequestOption
           // Unauthorized, clear token and redirect to login
           localStorage.removeItem('token');
           localStorage.removeItem('team_id');
+          localStorage.removeItem('user');
           window.location.href = '/sign-in';
           throw new Error('Session expired. Please sign in again.');
         }
@@ -184,16 +196,16 @@ export async function apiRequest<T = any>(url: string, options: ApiRequestOption
       throw new Error(errorMessage);
     }
     
-    // Parse response
+    // Parse response as JSON if it has JSON content type
     if (response.headers.get('content-type')?.includes('application/json')) {
       return await response.json();
     }
     
+    // For empty responses or non-JSON responses
     return {} as T;
   } catch (error) {
-    if (handleError) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(message);
+    if (handleError && error instanceof Error && error.message !== 'Session expired. Please sign in again.') {
+      toast.error(error.message || 'Unknown error');
     }
     throw error;
   }
