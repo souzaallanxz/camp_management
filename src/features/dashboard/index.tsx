@@ -21,7 +21,16 @@ import { useState } from 'react'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from './components/empty-state'
-import { topNav } from './constants'
+
+// Define links para o TopNav
+const topNav = [
+  {
+    title: 'Overview',
+    href: '/',
+    isActive: true,
+    disabled: false,
+  }
+]
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-PT', {
@@ -81,11 +90,14 @@ function MetricCard({
 }
 
 export default function Dashboard() {
-  // Desabilitar o StrictMode para o componente Dashboard em produção
   const { monthlyPayments, monthlyRegistrations, monthlySnackbar, yearlyCampers, 
           campPayments, recentRegistrations, isLoading, error, refetch } = useDashboardMetrics()
   const permissions = useTeamPermissions()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+
+  const handleRetry = () => {
+    refetch()
+  }
 
   return (
     <>
@@ -104,149 +116,158 @@ export default function Dashboard() {
         <div className='mb-2 flex items-center justify-between space-y-2'>
           <h1 className='text-2xl font-bold tracking-tight'>Dashboard</h1>
           <div className='flex items-center space-x-2'>
+            {isLoading && 
+              <div className="text-sm text-muted-foreground">A carregar dados...</div>
+            }
           </div>
         </div>
 
         {error && (
-          <EmptyState
-            variant="card"
-            title="Erro ao carregar dados"
-            description="Não foi possível carregar os dados do dashboard. Tente novamente mais tarde."
-          />
+          <div className="mb-6">
+            <EmptyState
+              variant="card"
+              title="Erro ao carregar dados"
+              description="Não foi possível carregar os dados do dashboard. Tente novamente mais tarde."
+              actionLabel="Tentar novamente"
+              onAction={handleRetry}
+            />
+          </div>
         )}
 
-        <Tabs
-          orientation='vertical'
-          defaultValue='overview'
-          className='space-y-4'
-        >
-          <div className='w-full overflow-x-auto pb-2'>
-            <TabsList>
-              <TabsTrigger value='overview'>Overview</TabsTrigger>
-              <TabsTrigger value='analytics' disabled>
-                Analytics
-              </TabsTrigger>
-              <TabsTrigger value='reports' disabled>
-                Reports
-              </TabsTrigger>
-            </TabsList>
-          </div>
-          <TabsContent value='overview' className='space-y-4'>
-            <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-              <MetricCard
-                title='Total Pagamentos'
-                value={monthlyPayments?.total || 0}
-                percentageChange={monthlyPayments?.percentageChange || null}
-                isLoading={isLoading}
-                valueFormatter={formatCurrency}
-                icon={
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth='2'
-                    className='h-4 w-4 text-muted-foreground'
-                  >
-                    <path d='M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' />
-                  </svg>
-                }
-              />
-              <MetricCard
-                title='Total de Inscrições'
-                value={monthlyRegistrations?.total || 0}
-                percentageChange={monthlyRegistrations?.percentageChange || null}
-                isLoading={isLoading}
-                icon={
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth='2'
-                    className='h-4 w-4 text-muted-foreground'
-                  >
-                    <path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' />
-                    <circle cx='9' cy='7' r='4' />
-                    <path d='M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' />
-                  </svg>
-                }
-              />
-              <MetricCard
-                title='Total de Carregamentos'
-                value={monthlySnackbar?.total || 0}
-                percentageChange={monthlySnackbar?.percentageChange || null}
-                isLoading={isLoading}
-                valueFormatter={formatCurrency}
-                isLocked={!permissions.dashboard.viewRechargesTotal}
-                icon={
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth='2'
-                    className='h-4 w-4 text-muted-foreground'
-                  >
-                    <rect width='20' height='14' x='2' y='5' rx='2' />
-                    <path d='M2 10h20' />
-                  </svg>
-                }
-              />
-              <MetricCard
-                title='Total de Campistas'
-                value={yearlyCampers?.total || 0}
-                percentageChange={yearlyCampers?.percentageChange || null}
-                isLoading={isLoading}
-                icon={
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth='2'
-                    className='h-4 w-4 text-muted-foreground'
-                  >
-                    <path d='M22 12h-4l-3 9L9 3l-3 9H2' />
-                  </svg>
-                }
-              />
+        {!error && (
+          <Tabs
+            orientation='vertical'
+            defaultValue='overview'
+            className='space-y-4'
+          >
+            <div className='w-full overflow-x-auto pb-2'>
+              <TabsList>
+                <TabsTrigger value='overview'>Overview</TabsTrigger>
+                <TabsTrigger value='analytics' disabled>
+                  Analytics
+                </TabsTrigger>
+                <TabsTrigger value='reports' disabled>
+                  Reports
+                </TabsTrigger>
+              </TabsList>
             </div>
-            <div className='grid grid-cols-1 gap-4 lg:grid-cols-7'>
-              {permissions.dashboard.viewOverview && (
-                <Card className='col-span-1 lg:col-span-4'>
-                  <CardHeader>
-                    <CardTitle>Overview</CardTitle>
-                  </CardHeader>
-                  <CardContent className='pl-2'>
-                    <Overview data={campPayments} isLoading={isLoading} error={error} />
-                  </CardContent>
-                </Card>
-              )}
-              {permissions.dashboard.viewLatestRegistrations && (
-                <Card className='col-span-1 lg:col-span-3'>
-                  <CardHeader>
-                    <CardTitle>Últimas Inscrições</CardTitle>
-                    <CardDescription>
-                      {monthlyRegistrations?.total || 0} inscrições este mês
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <RecentSales data={recentRegistrations} isLoading={isLoading} error={error} />
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+            <TabsContent value='overview' className='space-y-4'>
+              <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+                <MetricCard
+                  title='Total Pagamentos'
+                  value={monthlyPayments?.total || 0}
+                  percentageChange={monthlyPayments?.percentageChange || null}
+                  isLoading={isLoading}
+                  valueFormatter={formatCurrency}
+                  icon={
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      className='h-4 w-4 text-muted-foreground'
+                    >
+                      <path d='M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6' />
+                    </svg>
+                  }
+                />
+                <MetricCard
+                  title='Total de Inscrições'
+                  value={monthlyRegistrations?.total || 0}
+                  percentageChange={monthlyRegistrations?.percentageChange || null}
+                  isLoading={isLoading}
+                  icon={
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      className='h-4 w-4 text-muted-foreground'
+                    >
+                      <path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' />
+                      <circle cx='9' cy='7' r='4' />
+                      <path d='M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' />
+                    </svg>
+                  }
+                />
+                <MetricCard
+                  title='Total de Carregamentos'
+                  value={monthlySnackbar?.total || 0}
+                  percentageChange={monthlySnackbar?.percentageChange || null}
+                  isLoading={isLoading}
+                  valueFormatter={formatCurrency}
+                  isLocked={!permissions.dashboard.viewRechargesTotal}
+                  icon={
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      className='h-4 w-4 text-muted-foreground'
+                    >
+                      <rect width='20' height='14' x='2' y='5' rx='2' />
+                      <path d='M2 10h20' />
+                    </svg>
+                  }
+                />
+                <MetricCard
+                  title='Total de Campistas'
+                  value={yearlyCampers?.total || 0}
+                  percentageChange={yearlyCampers?.percentageChange || null}
+                  isLoading={isLoading}
+                  icon={
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      className='h-4 w-4 text-muted-foreground'
+                    >
+                      <path d='M22 12h-4l-3 9L9 3l-3 9H2' />
+                    </svg>
+                  }
+                />
+              </div>
+              <div className='grid grid-cols-1 gap-4 lg:grid-cols-7'>
+                {permissions.dashboard.viewOverview && (
+                  <Card className='col-span-1 lg:col-span-4'>
+                    <CardHeader>
+                      <CardTitle>Overview</CardTitle>
+                    </CardHeader>
+                    <CardContent className='pl-2'>
+                      <Overview data={campPayments} isLoading={isLoading} error={error} />
+                    </CardContent>
+                  </Card>
+                )}
+                {permissions.dashboard.viewLatestRegistrations && (
+                  <Card className='col-span-1 lg:col-span-3'>
+                    <CardHeader>
+                      <CardTitle>Últimas Inscrições</CardTitle>
+                      <CardDescription>
+                        {monthlyRegistrations?.total || 0} inscrições este mês
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <RecentSales data={recentRegistrations} isLoading={isLoading} error={error} />
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
       </Main>
 
       <TierUpgradeDialog

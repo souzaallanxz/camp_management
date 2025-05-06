@@ -22,6 +22,15 @@ export interface RecentRegistration {
   campName: string
 }
 
+export interface DashboardData {
+  monthlyPayments: MetricData;
+  monthlyRegistrations: MetricData;
+  monthlySnackbar: MetricData;
+  yearlyCampers: MetricData;
+  campPayments: CampPaymentsData[];
+  recentRegistrations: RecentRegistration[];
+}
+
 // Função auxiliar para requisições com timeout e sem cache
 const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 10000) => {
   const controller = new AbortController();
@@ -65,6 +74,15 @@ export const dashboardService = {
     const teamId = localStorage.getItem('team_id');
     if (!teamId) throw new Error('team_id não encontrado no localStorage');
     return { 'x-team-id': teamId };
+  },
+  
+  async getDashboardData(): Promise<DashboardData> {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/data`, {
+      headers: { ...await this.getTeamIdHeader() }
+    }, 10000);
+    
+    if (!response.ok) throw new Error('Erro ao buscar dados do dashboard');
+    return response.json();
   },
 
   async getMonthlyPayments(): Promise<MetricData> {

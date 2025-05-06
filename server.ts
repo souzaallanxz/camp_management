@@ -423,7 +423,6 @@ app.get('/api/settings/organization', (async (req: Request, res: Response) => {
     
     return res.json(result[0]);
   } catch (error) {
-    console.error('Error getting organization settings:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }) as any)
@@ -456,7 +455,6 @@ app.get('/api/settings/profile', (async (req: Request, res: Response) => {
     
     return res.json(result[0]);
   } catch (error) {
-    console.error('Error getting profile settings:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }) as any)
@@ -465,34 +463,22 @@ app.get('/api/settings/profile', (async (req: Request, res: Response) => {
 
 // Helper para obter o teamId do header (produção)
 function getTeamId(req: Request) {
-  // Log all headers for debugging
-  console.log('All headers:', req.headers);
-  
-  // Check for x-team-id header (primary)
   const teamIdHeader = req.headers['x-team-id'];
   if (teamIdHeader && typeof teamIdHeader === 'string') {
-    console.log('Found teamId in x-team-id header:', teamIdHeader);
     return teamIdHeader;
   }
   
-  // Check for authorization header as fallback
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
-    console.log('Using token from authorization header:', token);
-    // Here we could potentially look up the user's team_id using the token
-    // but for now we'll return null as we need the explicit x-team-id header
   }
   
-  // Check if the team ID is in X-Debug-Info header (for debugging)
   const debugHeader = req.headers['x-debug-info'];
   if (debugHeader && typeof debugHeader === 'string' && debugHeader.includes('teamId=')) {
     const teamId = debugHeader.split('teamId=')[1].split('&')[0];
-    console.log('Found teamId in X-Debug-Info header:', teamId);
     return teamId;
   }
   
-  console.log('No teamId found in headers');
   return null;
 }
 
@@ -761,14 +747,8 @@ app.post('/api/camps', (async (req: Request, res: Response) => {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('Surrogate-Control', 'no-store');
-
-    // Log the request for debugging
-    console.log('POST /api/camps request received');
-    console.log('Headers:', req.headers);
-    console.log('Body:', req.body);
     
     const teamId = getTeamId(req);
-    console.log('TeamId from request:', teamId);
     
     if (!teamId) {
       return res.status(401).json({ error: 'Missing x-team-id header' });
@@ -777,6 +757,7 @@ app.post('/api/camps', (async (req: Request, res: Response) => {
     const { name, start_date, end_date, price } = req.body;
     if (!name || !start_date || !end_date || price === undefined) {
       return res.status(400).json({ error: 'Missing required fields', received: { name, start_date, end_date, price } });
+      
     }
     
     const now = new Date().toISOString();

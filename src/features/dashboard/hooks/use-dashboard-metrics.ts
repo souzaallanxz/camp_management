@@ -15,40 +15,18 @@ export function useDashboardMetrics() {
   // Usar um timestamp estável durante a montagem do componente
   const [timestamp] = useState(() => Date.now())
 
-  // Função para carregar todos os dados ao mesmo tempo
+  // Função para carregar todos os dados de uma única vez
   const fetchAllData = useCallback(async (): Promise<DashboardData> => {
-    const [
-      monthlyPayments,
-      monthlyRegistrations,
-      monthlySnackbar,
-      yearlyCampers,
-      campPayments,
-      recentRegistrations
-    ] = await Promise.all([
-      dashboardService.getMonthlyPayments(),
-      dashboardService.getMonthlyRegistrations(),
-      dashboardService.getMonthlySnackbarTransactions(),
-      dashboardService.getYearlyCampers(),
-      dashboardService.getCampPayments(),
-      dashboardService.getRecentRegistrations(5)
-    ])
-
-    return {
-      monthlyPayments,
-      monthlyRegistrations,
-      monthlySnackbar,
-      yearlyCampers,
-      campPayments,
-      recentRegistrations
-    }
+    const data = await dashboardService.getDashboardData()
+    return data
   }, [])
 
   // Usar uma única query para todos os dados
   const { data, isLoading, error, refetch } = useQuery<DashboardData, Error>({
     queryKey: ['dashboard', 'all-data', timestamp],
     queryFn: fetchAllData,
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
     retry: 1,
     retryDelay: 1000,
     refetchOnWindowFocus: false
