@@ -69,6 +69,17 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout 
   }
 };
 
+// Função para determinar o URL base correto para requisições
+const getApiBaseUrl = () => {
+  // Se estamos em desenvolvimento, usa a URL normal da API
+  if (import.meta.env.DEV) {
+    return API_BASE_URL;
+  }
+  
+  // Em produção, usar a URL correta para os endpoints do dashboard
+  return import.meta.env.VITE_API_URL || window.location.origin;
+};
+
 export const dashboardService = {
   async getTeamIdHeader() {
     const teamId = localStorage.getItem('team_id');
@@ -77,7 +88,13 @@ export const dashboardService = {
   },
   
   async getDashboardData(): Promise<DashboardData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/data`, {
+    const baseUrl = getApiBaseUrl();
+    // Em produção, a URL será /dashboard/data diretamente
+    const url = baseUrl.includes('/api') 
+      ? `${baseUrl}/dashboard/data` 
+      : `${baseUrl}/dashboard/data`;
+    
+    const response = await fetchWithTimeout(url, {
       headers: { ...await this.getTeamIdHeader() }
     }, 10000);
     
@@ -86,7 +103,12 @@ export const dashboardService = {
   },
 
   async getMonthlyPayments(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-payments`, {
+    const baseUrl = getApiBaseUrl();
+    const url = baseUrl.includes('/api') 
+      ? `${baseUrl}/dashboard/monthly-payments` 
+      : `${baseUrl}/dashboard/monthly-payments`;
+    
+    const response = await fetchWithTimeout(url, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -95,7 +117,12 @@ export const dashboardService = {
   },
 
   async getMonthlyRegistrations(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-registrations`, {
+    const baseUrl = getApiBaseUrl();
+    const url = baseUrl.includes('/api') 
+      ? `${baseUrl}/dashboard/monthly-registrations` 
+      : `${baseUrl}/dashboard/monthly-registrations`;
+    
+    const response = await fetchWithTimeout(url, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -104,7 +131,12 @@ export const dashboardService = {
   },
 
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/monthly-snackbar`, {
+    const baseUrl = getApiBaseUrl();
+    const url = baseUrl.includes('/api') 
+      ? `${baseUrl}/dashboard/monthly-snackbar` 
+      : `${baseUrl}/dashboard/monthly-snackbar`;
+    
+    const response = await fetchWithTimeout(url, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -113,7 +145,12 @@ export const dashboardService = {
   },
 
   async getYearlyCampers(): Promise<MetricData> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/yearly-campers`, {
+    const baseUrl = getApiBaseUrl();
+    const url = baseUrl.includes('/api') 
+      ? `${baseUrl}/dashboard/yearly-campers` 
+      : `${baseUrl}/dashboard/yearly-campers`;
+    
+    const response = await fetchWithTimeout(url, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -122,7 +159,12 @@ export const dashboardService = {
   },
 
   async getCampPayments(): Promise<CampPaymentsData[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/camp-payments`, {
+    const baseUrl = getApiBaseUrl();
+    const url = baseUrl.includes('/api') 
+      ? `${baseUrl}/dashboard/camp-payments` 
+      : `${baseUrl}/dashboard/camp-payments`;
+    
+    const response = await fetchWithTimeout(url, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
@@ -131,7 +173,12 @@ export const dashboardService = {
   },
 
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, {
+    const baseUrl = getApiBaseUrl();
+    const url = baseUrl.includes('/api') 
+      ? `${baseUrl}/dashboard/recent-registrations?limit=${limit}` 
+      : `${baseUrl}/dashboard/recent-registrations?limit=${limit}`;
+    
+    const response = await fetchWithTimeout(url, {
       headers: { ...await this.getTeamIdHeader() }
     }, 8000);
     
