@@ -24,8 +24,28 @@ export interface RecentRegistration {
 
 export const dashboardService = {
   async getTeamIdHeader() {
-    const teamId = localStorage.getItem('team_id');
-    if (!teamId) throw new Error('team_id não encontrado no localStorage');
+    // Verificar as duas possíveis chaves para compatibilidade
+    let teamId = localStorage.getItem('teamId') || localStorage.getItem('team_id');
+    
+    // Se não encontrou, tentar buscar dos dados do usuário no localStorage
+    if (!teamId) {
+      try {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+          const user = JSON.parse(userData);
+          if (user && user.team_id) {
+            teamId = user.team_id;
+            // Salvar para uso futuro nos dois formatos para garantir compatibilidade
+            localStorage.setItem('teamId', teamId);
+            localStorage.setItem('team_id', teamId);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao obter dados do usuário:', error);
+      }
+    }
+    
+    if (!teamId) throw new Error('ID da equipe não encontrado');
     return { 'x-team-id': teamId };
   },
 

@@ -47,6 +47,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(true)
         const currentUser = await getCurrentUser()
         setUser(currentUser)
+        
+        // Salvar team_id no localStorage quando inicializar
+        if (currentUser && currentUser.team_id) {
+          localStorage.setItem('team_id', currentUser.team_id)
+          localStorage.setItem('teamId', currentUser.team_id)
+        }
       } catch {
         // User is not authenticated, that's okay
         setUser(null)
@@ -75,9 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Definir o token no localStorage
       localStorage.setItem('token', session.token)
       
-      // Definir o team_id no localStorage
+      // Definir o team_id no localStorage (em ambos os formatos para compatibilidade)
       if (session.user.team_id) {
         localStorage.setItem('team_id', session.user.team_id)
+        localStorage.setItem('teamId', session.user.team_id)
+        console.log('Team ID salvo:', session.user.team_id)
       }
     } catch (error) {
       toast({
@@ -97,9 +105,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Definir o token no localStorage
       localStorage.setItem('token', response.session.token)
       
-      // Definir o team_id no localStorage
+      // Definir o team_id no localStorage (em ambos os formatos para compatibilidade)
       if (response.session.user.team_id) {
         localStorage.setItem('team_id', response.session.user.team_id)
+        localStorage.setItem('teamId', response.session.user.team_id)
+        console.log('Team ID salvo:', response.session.user.team_id)
       }
       
       return response

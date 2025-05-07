@@ -988,49 +988,34 @@ app.get('/debug/env', async (req, res) => {
 
 // Helper para obter o teamId do header
 function getTeamId(req) {
-  console.log('Tentando obter teamId dos headers...');
-  console.log('Headers disponíveis:', Object.keys(req.headers));
-  
   // Check for x-team-id header
   const teamId = req.headers['x-team-id'];
-  console.log('x-team-id do header:', teamId);
   
-  // Verificar se existe no cookie também
-  const cookies = req.headers.cookie;
-  console.log('Cookies:', cookies);
+  // Se encontrou um teamId válido no header, usar
+  if (teamId && typeof teamId === 'string') {
+    return teamId;
+  }
   
-  // Verificar no authorization header se for necessário
+  // Se não tiver o teamId no header, tentar buscá-lo do token
   const authHeader = req.headers.authorization;
-  console.log('Authorization header:', authHeader);
-  
-  // Se não tiver o teamId, tentar buscá-lo do token
-  if (!teamId && authHeader && authHeader.startsWith('Bearer ')) {
-    console.log('Tentando obter teamId do token...');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
-    if (token) {
-      try {
-        // Armazenar o token para tentar verificar o usuário posteriormente
-        req.userToken = token;
-        console.log('Token armazenado:', token);
-      } catch (error) {
-        console.error('Erro ao processar token:', error);
-      }
-    }
+    
+    // Armazenar o token para uso posterior
+    req.userToken = token;
+    
+    // Neste ponto, poderíamos fazer uma verificação síncrona ao banco 
+    // de dados para obter o team_id do usuário. Para evitar complexidade,
+    // essa implementação seria melhor feita num middleware separado.
   }
   
   // Se não encontrou o teamId, permitir o uso do query parameter
-  if (!teamId && req.query && req.query.teamId) {
-    console.log('Usando teamId do query parameter:', req.query.teamId);
+  if (req.query && req.query.teamId) {
     return req.query.teamId;
   }
   
-  if (!teamId || typeof teamId !== 'string') {
-    console.log('TeamId não encontrado ou inválido');
-    return null;
-  }
-  
-  console.log('TeamId encontrado:', teamId);
-  return teamId;
+  // Se chegou aqui, não conseguiu encontrar um teamId
+  return null;
 }
 
 // ===== REGISTRATIONS ENDPOINTS =====
