@@ -6,6 +6,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/auth/sign-in",
+      "destination": "/api/auth-simple"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api"
     },
@@ -15,7 +19,7 @@
     }
   ],
   "functions": {
-    "api/index.js": {
+    "api/auth-simple.js": {
       "memory": 1024,
       "maxDuration": 10
     }

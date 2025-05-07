@@ -1,8 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
+import * as dotenv from 'dotenv';
 
-// Load environment variables
-const dotenv = import('dotenv');
+// Load environment variables corretamente
 dotenv.config();
 
 // Logging para debug
@@ -18,8 +18,19 @@ import express from 'express';
 import cors from 'cors';
 import { Resend } from 'resend';
 import { v4 as uuidv4 } from 'uuid';
-import stripe from 'stripe';
-import twilio from 'twilio';
+// Importação dinâmica de pacotes opcionais
+let stripe, twilio;
+try {
+  // Apenas tenta importar se for necessário
+  if (process.env.STRIPE_ENABLED === 'true') {
+    stripe = await import('stripe').then(m => m.default);
+  }
+  if (process.env.TWILIO_ENABLED === 'true') {
+    twilio = await import('twilio').then(m => m.default);
+  }
+} catch (error) {
+  console.log('Optional packages not available:', error.message);
+}
 
 const app = express();
 
@@ -455,28 +466,66 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
 // Sign in route
 app.post('/api/auth/sign-in', async (req, res) => {
   try {
+    console.log('Recebendo requisição para /api/auth/sign-in');
+    console.log('Request body:', req.body);
+    
+    if (!req.body || typeof req.body !== 'object') {
+      console.error('Requisição inválida, body não é um objeto:', req.body);
+      return res.status(400).json({ error: 'Invalid request body' });
+    }
+    
     const { email, password } = req.body;
+    
+    if (!email || !password) {
+      console.error('Email ou senha não fornecidos');
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
 
-    // Find user by email
-    const userResult = await sqlVercel`
-      SELECT id, email, name, password_hash, team_id 
-      FROM public.users 
-      WHERE email = ${email}
-    `;
+    console.log('Buscando usuário pelo email:', email);
+    
+    // Find user by email (wrapped in try/catch)
+    let userResult;
+    try {
+      userResult = await sqlVercel`
+        SELECT id, email, name, password_hash, team_id 
+        FROM public.users 
+        WHERE email = ${email}
+      `;
+      console.log('Resultado da consulta do usuário:', userResult ? 'encontrado' : 'não encontrado');
+    } catch (dbError) {
+      console.error('Erro ao consultar banco de dados:', dbError);
+      return res.status(500).json({ 
+        error: 'Database error', 
+        details: dbError.message,
+        database_url_set: !!process.env.DATABASE_URL
+      });
+    }
 
     const user = userResult[0];
 
     if (!user) {
+      console.log('Usuário não encontrado');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    console.log('Verificando senha');
+    
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    let isPasswordValid;
+    try {
+      isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    } catch (bcryptError) {
+      console.error('Erro ao verificar senha:', bcryptError);
+      return res.status(500).json({ error: 'Password verification error' });
+    }
 
     if (!isPasswordValid) {
+      console.log('Senha inválida');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    console.log('Autenticação bem-sucedida');
+    
     // Remove password_hash from response
     const userWithoutPassword = { ...user };
     delete userWithoutPassword.password_hash;
@@ -489,8 +538,14 @@ app.post('/api/auth/sign-in', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in sign-in:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Error in sign-in - DETALHADO:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message,
+      database_url_set: !!process.env.DATABASE_URL 
+    });
   }
 });
 
