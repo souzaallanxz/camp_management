@@ -1,42 +1,32 @@
 import { neon } from '@neondatabase/serverless'
-import { config } from 'dotenv'
+import dotenv from 'dotenv'
 
 // Load environment variables
-config()
+dotenv.config()
 
-const sql = neon(process.env.VITE_NEON_DB_URL!)
+async function testConnection() {
+  if (!process.env.DATABASE_URL) {
+    process.exit(1)
+  }
 
-async function testDbConnection() {
   try {
-    // Check user_teams table structure
-    const userTeamsColumns = await sql`
-      SELECT column_name, data_type, is_nullable, column_default  
-      FROM information_schema.columns 
-      WHERE table_name = 'user_teams'
-    `
+    const sql = neon(process.env.DATABASE_URL)
 
-    // Check if users_sync table exists and its structure
-    const usersSyncColumns = await sql`
-      SELECT column_name, data_type, is_nullable, column_default  
-      FROM information_schema.columns 
-      WHERE table_name = 'users_sync'
-    `
+    // Test the connection
+    const result = await sql`SELECT NOW()`
+    console.log('Database connection successful:', result[0])
 
-    // Try to get constraint information
-    const constraints = await sql`
-      SELECT tc.constraint_name, tc.table_name, kcu.column_name, 
-             ccu.table_name AS foreign_table_name,
-             ccu.column_name AS foreign_column_name 
-      FROM information_schema.table_constraints AS tc 
-      JOIN information_schema.key_column_usage AS kcu
-        ON tc.constraint_name = kcu.constraint_name
-      JOIN information_schema.constraint_column_usage AS ccu 
-        ON ccu.constraint_name = tc.constraint_name
-      WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name = 'user_teams'
+    // Test users table
+    const users = await sql`
+      SELECT COUNT(*) as count 
+      FROM public.users
     `
+    console.log('Users table accessible. Count:', users[0].count)
+
   } catch (error) {
+    console.error('Database connection failed:', error)
     process.exit(1)
   }
 }
 
-testDbConnection() 
+testConnection() 
