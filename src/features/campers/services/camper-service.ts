@@ -1,65 +1,125 @@
-import type { Camper, InsertCamper } from '../data/schema'
-import { buildApiUrl } from '@/services/api'
+import { getTeamIdHeader } from '@/lib/auth';
 
-function getTeamIdHeader() {
-  const teamId = localStorage.getItem('teamId');
-  if (!teamId) throw new Error('No team ID found');
-  return { 'x-team-id': teamId };
-}
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-async function findAll() {
-  const response = await fetch(buildApiUrl('/campers'), {
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Erro ao buscar campistas');
-  return response.json();
-}
-
-async function findById(id: string) {
-  const response = await fetch(buildApiUrl(`/campers/${id}`), {
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Erro ao buscar campista');
-  return response.json();
-}
-
-async function create(camper: InsertCamper) {
-  const response = await fetch(buildApiUrl('/campers'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
-    credentials: 'include',
-    body: JSON.stringify(camper),
-  });
-  if (!response.ok) throw new Error('Erro ao criar campista');
-  return response.json();
-}
-
-async function update(id: string, camper: Partial<Camper>) {
-  const response = await fetch(buildApiUrl(`/campers/${id}`), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getTeamIdHeader() },
-    credentials: 'include',
-    body: JSON.stringify(camper),
-  });
-  if (!response.ok) throw new Error('Erro ao atualizar campista');
-  return response.json();
-}
-
-async function remove(id: string) {
-  const response = await fetch(buildApiUrl(`/campers/${id}`), {
-    method: 'DELETE',
-    headers: { ...getTeamIdHeader() },
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Erro ao deletar campista');
+export interface Camper {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  city: string;
+  birthday: string;
+  emergencyContact: string;
+  emergencyPhone: string;
+  identificationDocument: string;
+  guardianName: string;
+  guardianPhone: string;
+  allergies: string;
+  medications: string;
+  foodRestrictions: string;
+  observations: string;
+  pictureAuthorization: boolean;
+  shirtSize: string;
+  isMinor: boolean;
+  user_id: string | null;
+  team_id: string;
+  lastCamp?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const camperService = {
-  findAll,
-  findById,
-  create,
-  update,
-  remove,
-}
+  async findAll(): Promise<Camper[]> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(`${API_BASE_URL}/campers`, { headers });
+      
+      if (!response.ok) {
+        return [];
+      }
+      
+      return await response.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async findById(id: string): Promise<Camper | null> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(`${API_BASE_URL}/campers/${id}`, { headers });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      return await response.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async create(camper: Partial<Camper>): Promise<Camper | null> {
+    try {
+      const headers = { 
+        ...getTeamIdHeader(),
+        'Content-Type': 'application/json' 
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/campers`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(camper)
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      return await response.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async update(id: string, camper: Partial<Camper>): Promise<Camper | null> {
+    try {
+      const headers = { 
+        ...getTeamIdHeader(),
+        'Content-Type': 'application/json' 
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/campers/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(camper)
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      return await response.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(`${API_BASE_URL}/campers/${id}`, {
+        method: 'DELETE',
+        headers
+      });
+      
+      if (!response.ok) {
+        return false;
+      }
+      
+      return true;
+    } catch {
+      return false;
+    }
+  }
+};

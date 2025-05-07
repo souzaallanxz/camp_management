@@ -2,31 +2,32 @@ import { getTeamIdHeader } from '@/lib/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-export interface Registration {
+export interface Payment {
   id: string;
-  campId: string;
-  campName?: string;
-  camperId: string;
+  registrationId: string;
   camperName?: string;
-  status: string;
-  totalAmount: number;
-  paidAmount: number;
-  remainingAmount: number;
+  campName?: string;
+  amount: number;
+  paymentMethod: string;
+  paymentDate: string;
+  notes: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateRegistrationData {
-  campId: string;
-  camperId: string;
-  totalAmount: number;
+export interface CreatePaymentData {
+  registrationId: string;
+  amount: number;
+  paymentMethod: string;
+  paymentDate: string;
+  notes?: string;
 }
 
-export const registrationService = {
-  async findAll(): Promise<Registration[]> {
+export const paymentService = {
+  async findAll(): Promise<Payment[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/registrations`, { headers });
+      const response = await fetch(`${API_BASE_URL}/payments`, { headers });
       
       if (!response.ok) {
         return [];
@@ -38,10 +39,10 @@ export const registrationService = {
     }
   },
 
-  async findById(id: string): Promise<Registration | null> {
+  async findById(id: string): Promise<Payment | null> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/registrations/${id}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/payments/${id}`, { headers });
       
       if (!response.ok) {
         return null;
@@ -53,14 +54,14 @@ export const registrationService = {
     }
   },
 
-  async create(data: CreateRegistrationData): Promise<Registration | null> {
+  async create(data: CreatePaymentData): Promise<Payment | null> {
     try {
       const headers = { 
         ...getTeamIdHeader(),
         'Content-Type': 'application/json' 
       };
       
-      const response = await fetch(`${API_BASE_URL}/registrations`, {
+      const response = await fetch(`${API_BASE_URL}/payments`, {
         method: 'POST',
         headers,
         body: JSON.stringify(data)
@@ -76,14 +77,14 @@ export const registrationService = {
     }
   },
 
-  async update(id: string, data: Partial<Registration>): Promise<Registration | null> {
+  async update(id: string, data: Partial<Payment>): Promise<Payment | null> {
     try {
       const headers = { 
         ...getTeamIdHeader(),
         'Content-Type': 'application/json' 
       };
       
-      const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/payments/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(data)
@@ -102,7 +103,7 @@ export const registrationService = {
   async delete(id: string): Promise<boolean> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/payments/${id}`, {
         method: 'DELETE',
         headers
       });
@@ -113,25 +114,10 @@ export const registrationService = {
     }
   },
 
-  async getRegistrationsByCamp(campId: string): Promise<Registration[]> {
+  async getPaymentsByRegistration(registrationId: string): Promise<Payment[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/registrations/camp/${campId}`, { headers });
-      
-      if (!response.ok) {
-        return [];
-      }
-      
-      return await response.json();
-    } catch {
-      return [];
-    }
-  },
-
-  async getRegistrationsByCamper(camperId: string): Promise<Registration[]> {
-    try {
-      const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/registrations/camper/${camperId}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/payments/registration/${registrationId}`, { headers });
       
       if (!response.ok) {
         return [];
@@ -142,4 +128,4 @@ export const registrationService = {
       return [];
     }
   }
-};
+}; 
