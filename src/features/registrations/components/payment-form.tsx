@@ -9,15 +9,22 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
-import { PaymentMethod, Registration } from '../data/schema'
+import { PaymentMethod } from '../data/schema'
 import { createPayment } from '../services/payment-service'
 import { MBWayService } from '../services/mbway-service'
-import { getRegistrationById } from '../services/registration-service'
+import { registrationService, Registration } from '../services/registration-service'
 
 interface PaymentFormProps {
   registrationId: string
   onSuccess: () => void
   onCancel: () => void
+}
+
+// Tipo estendido para compatibilidade com o código legado
+interface ExtendedRegistration extends Registration {
+  form_id?: string;
+  email?: string;
+  name?: string;
 }
 
 export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentFormProps) {
@@ -26,13 +33,13 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
   const [amount, setAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('MB Way')
   const [phoneNumber, setPhoneNumber] = useState('')
-  const [registration, setRegistration] = useState<Registration | null>(null)
+  const [registration, setRegistration] = useState<ExtendedRegistration | null>(null)
 
   useEffect(() => {
     async function loadRegistration() {
       try {
-        const data = await getRegistrationById(registrationId)
-        setRegistration(data)
+        const data = await registrationService.findById(registrationId)
+        setRegistration(data as ExtendedRegistration)
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to load registration'
         toast({
@@ -78,9 +85,9 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
           await MBWayService.requestPayment({
             mobileNumber: phoneNumber,
             amount: numericAmount,
-            description: `Pagamento de inscrição - ${registration.name}`,
+            description: `Pagamento de inscrição - ${registration.camperName || 'Campista'}`,
             orderId: registration.form_id || `${registrationId}-${Date.now()}`,
-            email: registration.email,
+            email: registration.email || '',
           })
 
           // If we get here, the MB Way request was successful

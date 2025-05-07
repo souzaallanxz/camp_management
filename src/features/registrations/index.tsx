@@ -6,18 +6,27 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { Button } from '@/components/ui/button'
 import { IconPlus } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
-import { getRegistrations } from './services/registration-service'
+import { registrationService } from './services/registration-service'
 import { RegistrationsTable } from './components/registrations-table'
 import { RegistrationDialogs } from './components/registration-dialogs'
 import { useRegistrationDialogs } from './context/registration-dialogs-context'
 import { columns, type RegistrationWithActions } from './components/registrations-columns'
 import { RegistrationDialogsProvider } from './context/registration-dialogs-context'
 import { Actions } from './components/registrations-columns'
+import { Registration } from './data/schema'
 
 function RegistrationsContent() {
-  const { data: registrations = [], refetch, isLoading, error } = useQuery({
+  const { data: registrationsData = [], refetch, isLoading, error } = useQuery({
     queryKey: ['registrations'],
-    queryFn: getRegistrations,
+    queryFn: async () => {
+      const data = await registrationService.findAll();
+      // Adicionando propriedades necessárias para compatibilidade com o tipo Registration do schema
+      return data.map(reg => ({
+        ...reg,
+        camp: null,
+        camper: null
+      })) as Registration[];
+    }
   })
 
   // Função personalizada para refetch
@@ -27,7 +36,7 @@ function RegistrationsContent() {
 
   const { openCreateDialog } = useRegistrationDialogs()
 
-  const registrationsWithActions = registrations.map((registration) => ({
+  const registrationsWithActions = registrationsData.map((registration) => ({
     ...registration,
     actions: <Actions registration={registration} onRegistrationUpdated={handleRefetch} />,
     onRegistrationUpdated: handleRefetch

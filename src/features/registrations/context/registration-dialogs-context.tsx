@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react'
 import { Registration } from '../data/schema'
-import { getRegistrationById } from '../services/registration-service'
+import { registrationService } from '../services/registration-service'
 import { toast } from 'sonner'
 
 type DialogType = 'create' | 'view' | 'delete' | 'onboard' | null
@@ -55,9 +55,24 @@ export function RegistrationDialogsProvider({ children }: RegistrationDialogsPro
 
   const openViewDialog = async (registration: Registration) => {
     try {
-      const fullRegistration = await getRegistrationById(registration.id)
-      setSelectedRegistration(fullRegistration)
-      setOpenDialog('view')
+      const fullRegistration = await registrationService.findById(registration.id)
+      if (fullRegistration) {
+        // Converter o tipo do service para o tipo esperado pelo estado
+        const registrationData = {
+          ...fullRegistration,
+          // Adicionar campos que podem estar faltando
+          camp: null,
+          camper: null,
+          ...registration
+        } as Registration;
+        
+        setSelectedRegistration(registrationData)
+        setOpenDialog('view')
+      } else {
+        toast.error('Failed to load registration details', {
+          description: 'Registration not found'
+        })
+      }
     } catch (error) {
       toast.error('Failed to load registration details', {
         description: error instanceof Error ? error.message : 'Unknown error occurred'

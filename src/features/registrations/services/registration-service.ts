@@ -141,5 +141,28 @@ export const registrationService = {
     } catch {
       return [];
     }
+  },
+
+  async updateOnboardingStatus(registrationId: string, onboardingStatus: string): Promise<Registration | null> {
+    try {
+      const headers = { 
+        ...getTeamIdHeader(),
+        'Content-Type': 'application/json' 
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/registrations/${registrationId}/onboarding-status`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ onboarding_status: onboardingStatus })
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      return await response.json();
+    } catch {
+      return null;
+    }
   }
 };

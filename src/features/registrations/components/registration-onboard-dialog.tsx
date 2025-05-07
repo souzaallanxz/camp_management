@@ -9,7 +9,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Registration } from '../data/schema'
-import { updateOnboardingStatus } from '../services/registration-service'
+import { registrationService } from '../services/registration-service'
 import { toast } from 'sonner'
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
@@ -82,7 +82,7 @@ export function RegistrationOnboardDialog({
       await createCamper()
       
       // Atualizar o status de onboarding
-      await updateOnboardingStatus(registration.id, 'Onboarded')
+      await registrationService.updateOnboardingStatus(registration.id, 'Onboarded')
       
       // Invalidar a query de registrations para atualizar a tabela após todas as operações
       await queryClient.invalidateQueries({ queryKey: ['registrations'] })
@@ -141,7 +141,7 @@ export function RegistrationOnboardDialog({
       await createCamper()
 
       // Atualizar o status de onboarding
-      await updateOnboardingStatus(registration.id, 'Onboarded')
+      await registrationService.updateOnboardingStatus(registration.id, 'Onboarded')
       
       // Invalidar a query de registrations para atualizar a tabela após todas as operações
       await queryClient.invalidateQueries({ queryKey: ['registrations'] })
@@ -248,7 +248,7 @@ export function RegistrationOnboardDialog({
             disabled={loading}
             className="h-9"
           >
-            {loading ? 'A processar...' : isPaid ? 'Confirmar' : 'Pagar e Onboard'}
+            {loading ? 'Processando...' : isPaid ? 'Confirmar' : 'Efetuar Pagamento'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
