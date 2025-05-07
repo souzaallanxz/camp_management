@@ -70,28 +70,58 @@ export function CreateTeamRedirect() {
             return
           }
           
-          // Se não temos team_id nem no usuário nem no localStorage, verificar no backend
-          console.log('🔄 Verificando equipe no backend...')
-          const team = await teamService.getCurrentUserTeam()
-          console.log('🔄 Resposta do backend:', team)
-          
-          if (team && team.id) {
-            console.log('✅ Equipe encontrada no backend:', team.id)
-            // Se encontrou uma equipe, salvar no localStorage
-            localStorage.setItem('teamId', team.id)
-            localStorage.setItem('team_id', team.id)
+          // IMPORTANTE: O erro estava acontecendo aqui quando a API retornava HTML
+          // em vez de JSON. Em vez de tentar verificar no backend, vamos priorizar
+          // as verificações locais
+
+          // Verificar uma última vez se algum dos IDs de equipe existe
+          // Isso evita chamadas desnecessárias ao backend que podem falhar
+          const finalTeamId = user.team_id || 
+                            localStorage.getItem('teamId') || 
+                            localStorage.getItem('team_id');
+                            
+          if (finalTeamId) {
+            console.log('✅ Usando team_id encontrado na verificação final:', finalTeamId)
+            localStorage.setItem('teamId', finalTeamId)
+            localStorage.setItem('team_id', finalTeamId)
             
             // Forçar fechamento de qualquer modal aberto
             forceCloseTeamModal()
             
             setIsChecking(false)
-          } else {
-            console.log('❌ Nenhuma equipe encontrada, redirecionando para criar')
-            // Se não tem equipe, redirecionar para criar uma
-            navigate('/create-team')
+            return
+          }
+          
+          // Se chegamos aqui, não temos nenhuma informação local sobre o ID da equipe
+          // Só agora tentamos verificar no backend como último recurso
+          console.log('🔄 Verificando equipe no backend como último recurso...')
+          
+          try {
+            const team = await teamService.getCurrentUserTeam()
+            console.log('🔄 Resposta do backend:', team)
+            
+            if (team && team.id) {
+              console.log('✅ Equipe encontrada no backend:', team.id)
+              // Se encontrou uma equipe, salvar no localStorage
+              localStorage.setItem('teamId', team.id)
+              localStorage.setItem('team_id', team.id)
+              
+              // Forçar fechamento de qualquer modal aberto
+              forceCloseTeamModal()
+              
+              setIsChecking(false)
+            } else {
+              console.log('❌ Nenhuma equipe encontrada, redirecionando para criar')
+              // Se não tem equipe, redirecionar para criar uma
+              navigate('/create-team')
+            }
+          } catch (backendError) {
+            console.error('Erro ao verificar equipe no backend:', backendError)
+            setIsChecking(false)
+            // Não redirecionar aqui, pois pode ser apenas um problema temporário
           }
         } catch (error) {
-          console.error('Erro ao verificar equipe:', error)
+          console.error('Erro geral ao verificar equipe:', error)
           setIsChecking(false)
         }
       } else {

@@ -38,6 +38,22 @@ export function buildApiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
+/**
+ * Builds a URL specifically for team endpoints, which may have different issues
+ * with routing in some environments
+ */
+export function buildTeamApiUrl(): string {
+  // For production, use a safe, absolute path that won't redirect to HTML
+  if (import.meta.env.PROD) {
+    // Use an explicit API path
+    return '/api/teams/current';
+  }
+  
+  // For development, use the normal URL building
+  return buildApiUrl('/teams/current');
+}
+
 export default {
-  buildApiUrl
+  buildApiUrl,
+  buildTeamApiUrl
 }; 
