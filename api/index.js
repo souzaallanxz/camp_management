@@ -1,10 +1,17 @@
 import { neon } from '@neondatabase/serverless';
 import bcrypt from 'bcryptjs';
-import { sql as sqlVercel } from '@vercel/postgres';
 
 // Load environment variables
 const dotenv = import('dotenv');
 dotenv.config();
+
+// Logging para debug
+console.log('Environment:', process.env.NODE_ENV);
+console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+
+// Initialize Neon database connection
+const sql = neon(process.env.DATABASE_URL);
+const sqlVercel = sql;
 
 // Initialize Express app
 import express from 'express';
@@ -18,7 +25,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app', 'https://campmanagement.vercel.app', 'https://campmanagement-a0bu9c7hx-souzaallanxzs-projects.vercel.app', 'https://campmanagement-pzl6edpul-souzaallanxzs-projects.vercel.app', 'https://campmanagement-9eqwfmsi7-souzaallanxzs-projects.vercel.app', 'https://campmanagement-hi7hnzpy1-souzaallanxzs-projects.vercel.app'],
+  origin: ['http://localhost:5173', 'https://campmanagement.vercel.app', 'https://shadcn-admin.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id']
@@ -36,9 +43,6 @@ app.use((req, res, next) => {
   res.set('Surrogate-Control', 'no-store');
   next();
 });
-
-// Initialize Neon database connection
-const sql = neon(process.env.DATABASE_URL);
 
 // Initialize Resend
 const resend = new Resend(process.env.VITE_RESEND_API_KEY);
