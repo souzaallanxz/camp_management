@@ -18,19 +18,6 @@ import express from 'express';
 import cors from 'cors';
 import { Resend } from 'resend';
 import { v4 as uuidv4 } from 'uuid';
-// Importação dinâmica de pacotes opcionais
-let stripe, twilio;
-try {
-  // Apenas tenta importar se for necessário
-  if (process.env.STRIPE_ENABLED === 'true') {
-    stripe = await import('stripe').then(m => m.default);
-  }
-  if (process.env.TWILIO_ENABLED === 'true') {
-    twilio = await import('twilio').then(m => m.default);
-  }
-} catch (error) {
-  console.log('Optional packages not available:', error.message);
-}
 
 const app = express();
 

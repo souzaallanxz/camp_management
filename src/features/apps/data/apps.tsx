@@ -9,11 +9,11 @@ import {
   IconBrandNotion,
   IconBrandSkype,
   IconBrandSlack,
-  IconBrandStripe,
-  IconBrandTelegram,
-  IconBrandTrello,
   IconBrandWhatsapp,
   IconBrandZoom,
+  IconCreditCard,
+  IconBrandTelegram,
+  IconBrandTrello,
 } from '@tabler/icons-react'
 
 export const apps = [
@@ -54,10 +54,10 @@ export const apps = [
     desc: 'Host Zoom meetings directly from the dashboard.',
   },
   {
-    name: 'Stripe',
-    logo: <IconBrandStripe />,
-    connected: false,
-    desc: 'Easily manage Stripe transactions and payments.',
+    name: 'Payments',
+    logo: <IconCreditCard />,
+    category: 'Finance',
+    desc: 'Manage payment processing and transaction history.',
   },
   {
     name: 'Gmail',
