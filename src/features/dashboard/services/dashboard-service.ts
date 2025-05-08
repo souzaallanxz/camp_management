@@ -197,8 +197,18 @@ export const dashboardService = {
       
       const data = await response.json();
       console.log('Camp payments response:', data);
-      // Return empty array if data is null or undefined to prevent errors
-      return Array.isArray(data) ? data : [];
+      
+      // Mapear os dados para o formato esperado
+      if (Array.isArray(data)) {
+        return data.map(camp => ({
+          campId: camp.id || camp.campId || '',
+          campName: camp.name || camp.campName || 'Acampamento',
+          totalPayments: parseFloat(camp.total_payments || camp.totalPayments || '0'),
+          totalRegistrations: parseInt(camp.total_registrations || camp.totalRegistrations || '0')
+        }));
+      }
+      
+      return [];
     } catch (error) {
       console.error('Camp payments error:', error);
       return [];
@@ -224,17 +234,30 @@ export const dashboardService = {
       
       const data = await response.json();
       console.log('Recent registrations response:', data);
-      // Return empty array if data is null or undefined to prevent errors
-      return Array.isArray(data) ? data.map(item => {
-        // Ensure all required fields exist, especially ones that might use split()
-        return {
-          ...item,
-          name: item.name || '',
-          email: item.email || '',
-          createdAt: item.createdAt || '',
-          campName: item.campName || ''
-        };
-      }) : [];
+      
+      // Mapear os dados para o formato esperado
+      if (Array.isArray(data)) {
+        return data.map(registration => {
+          // Verificar todos os possíveis formatos de campo que a API pode retornar
+          const id = registration.id || registration.registration_id || '';
+          const name = registration.name || registration.participant_name || registration.user_name || '';
+          const email = registration.email || registration.participant_email || registration.user_email || '';
+          const totalPaid = parseFloat(registration.total_paid || registration.totalPaid || '0');
+          const createdAt = registration.created_at || registration.createdAt || '';
+          const campName = registration.camp_name || registration.campName || '';
+          
+          return {
+            id,
+            name,
+            email,
+            totalPaid,
+            createdAt,
+            campName
+          };
+        });
+      }
+      
+      return [];
     } catch (error) {
       console.error('Recent registrations error:', error);
       return [];
