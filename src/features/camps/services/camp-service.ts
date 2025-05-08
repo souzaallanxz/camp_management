@@ -1,7 +1,7 @@
 import { getTeamIdHeader } from '@/lib/auth';
 
-// For production, directly use the correct API URL
-const API_BASE_URL = 'https://campmanagement.vercel.app/api';
+// For production, directly use the correct API URL without /api prefix
+const API_BASE_URL = 'https://campmanagement.vercel.app';
 
 export interface Camp {
   id: string;
@@ -39,7 +39,10 @@ export const campService = {
   async findAll(): Promise<Camp[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/camps`, { headers });
+      const response = await fetch(`${API_BASE_URL}/camps`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
         return [];
@@ -54,7 +57,10 @@ export const campService = {
   async findById(id: string): Promise<Camp | null> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/camps/${id}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/camps/${id}`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
         return null;
@@ -76,7 +82,8 @@ export const campService = {
       const response = await fetch(`${API_BASE_URL}/camps`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(camp)
+        body: JSON.stringify(camp),
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -99,7 +106,8 @@ export const campService = {
       const response = await fetch(`${API_BASE_URL}/camps/${id}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(camp)
+        body: JSON.stringify(camp),
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -117,7 +125,8 @@ export const campService = {
       const headers = { ...getTeamIdHeader() };
       const response = await fetch(`${API_BASE_URL}/camps/${id}`, {
         method: 'DELETE',
-        headers
+        headers,
+        credentials: 'include'
       });
       
       return response.ok;
