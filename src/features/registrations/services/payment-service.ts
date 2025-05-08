@@ -1,6 +1,7 @@
 import { getTeamIdHeader } from '@/lib/auth';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const API_BASE_URL = `${API_URL}/api`;
+
+// For production, directly use the correct API URL
+const API_BASE_URL = 'https://campmanagement.vercel.app/api';
 
 // Definindo o tipo Payment
 export interface Payment {

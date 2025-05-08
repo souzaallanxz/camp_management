@@ -1,7 +1,7 @@
 import { User } from '../data/schema'
-import { emailService } from '@/services/email.service'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// For production, directly use the correct API URL
+const API_BASE_URL = 'https://campmanagement.vercel.app/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');
@@ -17,7 +17,7 @@ function getTeamIdHeader() {
 
 // Busca apenas usuários da equipe atual do usuário logado
 export async function getUsers(): Promise<User[]> {
-  const response = await fetch(`${API_BASE_URL}/api/users`, {
+  const response = await fetch(`${API_BASE_URL}/users`, {
     headers: { ...getTeamIdHeader() },
     credentials: 'include',
   });
@@ -27,7 +27,7 @@ export async function getUsers(): Promise<User[]> {
 
 // Função unificada para criar/convidar usuários
 export async function createUserWithInvitation(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt' | 'username' | 'phoneNumber'>): Promise<User> {
-  const response = await fetch(`${API_BASE_URL}/api/users`, {
+  const response = await fetch(`${API_BASE_URL}/users`, {
     method: 'POST',
     headers: { ...getTeamIdHeader() },
     credentials: 'include',
@@ -38,7 +38,7 @@ export async function createUserWithInvitation(userData: Omit<User, 'id' | 'crea
 }
 
 export async function updateUser(userId: string, userData: Partial<User>): Promise<User> {
-  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+  const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
     method: 'PUT',
     headers: { ...getTeamIdHeader() },
     credentials: 'include',
@@ -49,7 +49,7 @@ export async function updateUser(userId: string, userData: Partial<User>): Promi
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+  const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
     method: 'DELETE',
     headers: { ...getTeamIdHeader() },
     credentials: 'include',

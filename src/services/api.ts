@@ -2,13 +2,11 @@
  * API utilities
  */
 
-// Ensure API_BASE_URL always has /api at the end
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const API_BASE_URL = `${API_URL}/api`;
+// For production, directly use the correct API URL
+const API_BASE_URL = 'https://campmanagement.vercel.app/api';
 
 /**
  * Builds an API URL correctly handling the path
- * It prevents the '/api' duplication issue when the base URL already includes '/api'
  */
 export function buildApiUrl(path: string): string {
   // Ensure path starts with '/' if not empty
@@ -16,42 +14,43 @@ export function buildApiUrl(path: string): string {
     path = '/' + path;
   }
   
-  // For production, we want to use the same domain
-  if (import.meta.env.PROD) {
-    return path;
+  // For development, we'll use the environment variable
+  if (import.meta.env.DEV) {
+    const devApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    
+    // Check if devApiUrl already ends with '/api'
+    if (devApiUrl.endsWith('/api')) {
+      // If path starts with '/api/', remove the duplicate '/api'
+      if (path.startsWith('/api/')) {
+        return `${devApiUrl}${path.substring(4)}`;
+      }
+      // Otherwise, just append the path
+      return `${devApiUrl}${path}`;
+    } 
+    
+    // If devApiUrl doesn't end with '/api', ensure the path includes '/api' if needed
+    if (!path.startsWith('/api/') && path !== '/api') {
+      return `${devApiUrl}/api${path}`;
+    }
+    
+    return `${devApiUrl}${path}`;
   }
   
-  // Check if the API_BASE_URL already ends with '/api'
-  if (API_BASE_URL.endsWith('/api')) {
-    // If path starts with '/api/', remove the duplicate '/api'
-    if (path.startsWith('/api/')) {
-      return `${API_BASE_URL}${path.substring(4)}`;
-    }
-    // Otherwise, just append the path
-    return `${API_BASE_URL}${path}`;
-  } 
-  
-  // If API_BASE_URL doesn't end with '/api', ensure the path includes '/api' if needed
-  if (!path.startsWith('/api/') && path !== '/api') {
-    return `${API_BASE_URL}/api${path}`;
+  // For production, use our hardcoded URL
+  // If path already includes '/api', remove it to prevent duplication
+  if (path.startsWith('/api/')) {
+    return `${API_BASE_URL}${path.substring(4)}`;
   }
   
   return `${API_BASE_URL}${path}`;
 }
 
 /**
- * Builds a URL specifically for team endpoints, which may have different issues
- * with routing in some environments
+ * Builds a URL specifically for team endpoints
  */
 export function buildTeamApiUrl(): string {
-  // For production, use a safe, absolute path that won't redirect to HTML
-  if (import.meta.env.PROD) {
-    // Use an explicit API path
-    return '/api/teams/current';
-  }
-  
-  // For development, use the normal URL building
-  return buildApiUrl('/teams/current');
+  // Always return the direct path
+  return `${API_BASE_URL}/teams/current`;
 }
 
 export default {

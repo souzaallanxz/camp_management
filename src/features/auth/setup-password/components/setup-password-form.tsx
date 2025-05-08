@@ -30,7 +30,8 @@ const formSchema = z.object({
   path: ['confirmPassword'],
 })
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// For production, directly use the correct API URL
+const API_BASE_URL = 'https://campmanagement.vercel.app/api';
 
 export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProps) {
   const [isLoading, setIsLoading] = useState(false)

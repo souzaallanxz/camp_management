@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// For production, directly use the correct API URL
+const API_BASE_URL = 'https://campmanagement.vercel.app/api';
 
 export function SetupPassword() {
   const navigate = useNavigate()
