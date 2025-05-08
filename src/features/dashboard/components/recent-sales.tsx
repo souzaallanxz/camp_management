@@ -3,7 +3,13 @@ import { Avatar } from '@/components/ui/avatar'
 import { dashboardService } from '../services/dashboard-service'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from './empty-state'
-import { Badge } from '@/components/ui/badge'
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('pt-PT', {
+    style: 'currency',
+    currency: 'EUR'
+  }).format(value)
+}
 
 function getInitials(name: string | null | undefined) {
   // Return placeholder if name is null or undefined
@@ -17,16 +23,18 @@ function getInitials(name: string | null | undefined) {
     .slice(0, 2)
 }
 
-function PaymentStatus({ status }: { status: string }) {
-  if (status === 'paid') {
-    return <Badge variant="default" className="ml-auto bg-green-500">Pago</Badge>
-  } else if (status === 'unpaid') {
-    return <Badge variant="secondary" className="ml-auto">Não pago</Badge>
-  } else if (status === 'pending') {
-    return <Badge variant="outline" className="ml-auto">Pendente</Badge>
-  } else {
-    return <Badge variant="outline" className="ml-auto">{status}</Badge>
-  }
+// Função para obter o valor padrão de cada acampamento se não houver valor na API
+function getDefaultCampValue(campName: string): number {
+  if (!campName) return 0;
+  
+  const campNameLower = campName.toLowerCase();
+  
+  if (campNameLower.includes('surf camp 1')) return 440;
+  if (campNameLower.includes('surf camp 2')) return 440;
+  if (campNameLower.includes('kids week')) return 330;
+  if (campNameLower.includes('pre-teens')) return 380;
+  
+  return 350; // valor padrão para outros acampamentos
 }
 
 export function RecentSales() {
@@ -74,21 +82,33 @@ export function RecentSales() {
 
   return (
     <div className="space-y-3">
-      {registrations.map((registration) => (
-        <div key={registration.id || 'unknown'} className="flex items-center text-xs">
-          <Avatar className="h-7 w-7">
-            <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground text-xs">
-              {getInitials(registration.name)}
+      {registrations.map((registration) => {
+        const displayValue = registration.totalPaid > 0 
+          ? registration.totalPaid 
+          : registration.status === 'paid' 
+            ? getDefaultCampValue(registration.campName)
+            : registration.status === 'partial' 
+              ? getDefaultCampValue(registration.campName) / 2 
+              : 0;
+        
+        return (
+          <div key={registration.id || 'unknown'} className="flex items-center text-xs">
+            <Avatar className="h-7 w-7">
+              <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground text-xs">
+                {getInitials(registration.name)}
+              </div>
+            </Avatar>
+            <div className="ml-2 space-y-0.5">
+              <p className="font-medium leading-none">{registration.name || 'Nome indisponível'}</p>
+              <p className="text-muted-foreground text-xs">{registration.email || 'Email indisponível'}</p>
+              <p className="text-muted-foreground text-xs">{registration.campName || 'Acampamento indisponível'}</p>
             </div>
-          </Avatar>
-          <div className="ml-2 space-y-0.5">
-            <p className="font-medium leading-none">{registration.name || 'Nome indisponível'}</p>
-            <p className="text-muted-foreground text-xs">{registration.email || 'Email indisponível'}</p>
-            <p className="text-muted-foreground text-xs">{registration.campName || 'Acampamento indisponível'}</p>
+            <div className="ml-auto font-medium">
+              {formatCurrency(displayValue)}
+            </div>
           </div>
-          <PaymentStatus status={registration.status} />
-        </div>
-      ))}
+        );
+      })}
     </div>
   )
 }
