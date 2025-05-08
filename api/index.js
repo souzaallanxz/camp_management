@@ -1081,7 +1081,7 @@ app.get('/registrations', async (req, res) => {
         c.end_date as camp_end_date
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      WHERE r.camp_id = ANY($1::uuid[])
+      WHERE r.camp_id = ANY(${campIdList}::uuid[])
       ORDER BY r.created_at DESC
     `;
 
@@ -1146,7 +1146,7 @@ app.get('/api/registrations', async (req, res) => {
         c.end_date as camp_end_date
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      WHERE r.camp_id = ANY($1::uuid[])
+      WHERE r.camp_id = ANY(${campIdList}::uuid[])
       ORDER BY r.created_at DESC
     `;
 
