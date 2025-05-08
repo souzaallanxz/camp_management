@@ -61,10 +61,20 @@ export function getTeamId(): string | null {
 /**
  * Obtém o header com o ID da equipe para usar em requisições à API
  */
-export function getTeamIdHeader(): { 'x-team-id': string } | Record<string, never> {
-  const teamId = getTeamId();
-  if (!teamId) {
-    return {};
+export function getTeamIdHeader(): { 'x-team-id': string; Authorization?: string } | { Authorization?: string } {
+  const headers: { 'x-team-id'?: string; Authorization?: string } = {};
+  
+  // Adicionar o token de autenticação, se disponível
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
-  return { 'x-team-id': teamId };
+  
+  // Adicionar o team ID, se disponível
+  const teamId = getTeamId();
+  if (teamId) {
+    headers['x-team-id'] = teamId;
+  }
+  
+  return headers;
 } 

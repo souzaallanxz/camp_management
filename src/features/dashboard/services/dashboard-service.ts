@@ -28,14 +28,22 @@ export const dashboardService = {
   async getMonthlyPayments(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/dashboard/monthly-payments`, { headers });
+      console.log('API URL:', `${API_BASE_URL}/dashboard/monthly-payments`);
+      console.log('Headers:', JSON.stringify(headers));
+      
+      const response = await fetch(`${API_BASE_URL}/dashboard/monthly-payments`, { 
+        headers,
+        credentials: 'include' // Try to include any cookies
+      });
       
       if (!response.ok) {
+        console.error('Monthly payments API error:', response.status, await response.text());
         return { total: 0, previousTotal: 0, percentageChange: null };
       }
       
       return await response.json();
-    } catch {
+    } catch (error) {
+      console.error('Monthly payments error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
     }
   },
@@ -43,14 +51,22 @@ export const dashboardService = {
   async getMonthlyRegistrations(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/dashboard/monthly-registrations`, { headers });
+      console.log('API URL:', `${API_BASE_URL}/dashboard/monthly-registrations`);
+      console.log('Headers:', JSON.stringify(headers));
+      
+      const response = await fetch(`${API_BASE_URL}/dashboard/monthly-registrations`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
+        console.error('Monthly registrations API error:', response.status, await response.text());
         return { total: 0, previousTotal: 0, percentageChange: null };
       }
       
       return await response.json();
-    } catch {
+    } catch (error) {
+      console.error('Monthly registrations error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
     }
   },
@@ -58,14 +74,22 @@ export const dashboardService = {
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/dashboard/monthly-snackbar`, { headers });
+      console.log('API URL:', `${API_BASE_URL}/dashboard/monthly-snackbar`);
+      console.log('Headers:', JSON.stringify(headers));
+      
+      const response = await fetch(`${API_BASE_URL}/dashboard/monthly-snackbar`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
+        console.error('Monthly snackbar API error:', response.status, await response.text());
         return { total: 0, previousTotal: 0, percentageChange: null };
       }
       
       return await response.json();
-    } catch {
+    } catch (error) {
+      console.error('Monthly snackbar error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
     }
   },
@@ -73,14 +97,22 @@ export const dashboardService = {
   async getYearlyCampers(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/dashboard/yearly-campers`, { headers });
+      console.log('API URL:', `${API_BASE_URL}/dashboard/yearly-campers`);
+      console.log('Headers:', JSON.stringify(headers));
+      
+      const response = await fetch(`${API_BASE_URL}/dashboard/yearly-campers`, { 
+        headers,
+        credentials: 'include' 
+      });
       
       if (!response.ok) {
+        console.error('Yearly campers API error:', response.status, await response.text());
         return { total: 0, previousTotal: 0, percentageChange: null };
       }
       
       return await response.json();
-    } catch {
+    } catch (error) {
+      console.error('Yearly campers error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
     }
   },
@@ -88,14 +120,22 @@ export const dashboardService = {
   async getCampPayments(): Promise<CampPaymentsData[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/dashboard/camp-payments`, { headers });
+      console.log('API URL:', `${API_BASE_URL}/dashboard/camp-payments`);
+      console.log('Headers:', JSON.stringify(headers));
+      
+      const response = await fetch(`${API_BASE_URL}/dashboard/camp-payments`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
+        console.error('Camp payments API error:', response.status, await response.text());
         return [];
       }
       
       return await response.json();
-    } catch {
+    } catch (error) {
+      console.error('Camp payments error:', error);
       return [];
     }
   },
@@ -103,14 +143,22 @@ export const dashboardService = {
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, { headers });
+      console.log('API URL:', `${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`);
+      console.log('Headers:', JSON.stringify(headers));
+      
+      const response = await fetch(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
+        console.error('Recent registrations API error:', response.status, await response.text());
         return [];
       }
       
       return await response.json();
-    } catch {
+    } catch (error) {
+      console.error('Recent registrations error:', error);
       return [];
     }
   }
