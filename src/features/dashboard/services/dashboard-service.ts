@@ -45,7 +45,19 @@ export const dashboardService = {
       
       const data = await response.json();
       console.log('Monthly payments response:', data);
-      return data;
+      
+      // Converter o formato da API para o formato esperado pelo componente
+      const current = parseFloat(data.current || '0');
+      const previous = parseFloat(data.previous || '0');
+      const percentageChange = previous === 0 
+        ? null 
+        : ((current - previous) / previous) * 100;
+      
+      return {
+        total: current,
+        previousTotal: previous,
+        percentageChange
+      };
     } catch (error) {
       console.error('Monthly payments error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
@@ -71,7 +83,19 @@ export const dashboardService = {
       
       const data = await response.json();
       console.log('Monthly registrations response:', data);
-      return data;
+      
+      // Converter o formato da API para o formato esperado pelo componente
+      const current = parseFloat(data.current || '0');
+      const previous = parseFloat(data.previous || '0');
+      const percentageChange = previous === 0 
+        ? null 
+        : ((current - previous) / previous) * 100;
+      
+      return {
+        total: current,
+        previousTotal: previous,
+        percentageChange
+      };
     } catch (error) {
       console.error('Monthly registrations error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
@@ -97,7 +121,19 @@ export const dashboardService = {
       
       const data = await response.json();
       console.log('Monthly snackbar response:', data);
-      return data;
+      
+      // Converter o formato da API para o formato esperado pelo componente
+      const current = parseFloat(data.current || '0');
+      const previous = parseFloat(data.previous || '0');
+      const percentageChange = previous === 0 
+        ? null 
+        : ((current - previous) / previous) * 100;
+      
+      return {
+        total: current,
+        previousTotal: previous,
+        percentageChange
+      };
     } catch (error) {
       console.error('Monthly snackbar error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
@@ -123,7 +159,19 @@ export const dashboardService = {
       
       const data = await response.json();
       console.log('Yearly campers response:', data);
-      return data;
+      
+      // Converter o formato da API para o formato esperado pelo componente
+      const current = parseFloat(data.current || '0');
+      const previous = parseFloat(data.previous || '0');
+      const percentageChange = previous === 0 
+        ? null 
+        : ((current - previous) / previous) * 100;
+      
+      return {
+        total: current,
+        previousTotal: previous,
+        percentageChange
+      };
     } catch (error) {
       console.error('Yearly campers error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
