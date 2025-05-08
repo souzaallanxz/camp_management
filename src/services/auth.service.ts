@@ -3,7 +3,9 @@
  * Este serviço conecta-se ao banco de dados Neon para operações de usuário
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Ensure API_BASE_URL always has /api at the end
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = `${API_URL}/api`;
 
 // Interface para representar um usuário
 interface User {
