@@ -1028,82 +1028,6 @@ function getTeamId(req) {
 // ===== REGISTRATIONS ENDPOINTS =====
 
 // List all registrations
-app.get('/api/registrations', async (req, res) => {
-  // Define cache headers
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  res.set('Surrogate-Control', 'no-store');
-  
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-
-  try {
-    // Get all camps for this team
-    const campIds = await sqlVercel`
-      SELECT id FROM camps WHERE team_id = ${teamId}::uuid
-    `;
-
-    if (campIds.length === 0) {
-      return res.json([]);
-    }
-
-    // Create array of camp IDs
-    const campIdList = campIds.map((row) => row.id);
-
-    // Get all registrations for these camps
-    const registrations = await sqlVercel`
-      SELECT 
-        r.id,
-        r.name as camper_name,
-        r.email as camper_email,
-        r.status,
-        r.created_at,
-        r.camp_id,
-        r.phone,
-        r.document_type,
-        r.document_number,
-        r.birthday,
-        r.city,
-        r.address,
-        r.total_amount,
-        r.emergency_contact_name,
-        r.emergency_contact_phone,
-        r.emergency_contact_relationship,
-        r.notes,
-        r.onboarding_status,
-        r.payment_status,
-        r.has_allergies,
-        r.allergies_description,
-        r.has_health_issues,
-        r.health_issues_description,
-        r.dietary_restrictions,
-        c.name as camp_name,
-        c.start_date as camp_start_date,
-        c.end_date as camp_end_date
-      FROM registrations r
-      JOIN camps c ON r.camp_id = c.id
-      WHERE r.camp_id = ANY($1::uuid[])
-      ORDER BY r.created_at DESC
-    `;
-
-    const safeRegistrations = registrations.map(reg => {
-      if (reg.emergency_contact_phone && !reg.emergency_contact_phone.startsWith('+')) {
-        reg.emergency_contact_phone = '+' + reg.emergency_contact_phone;
-      }
-      return reg;
-    });
-
-    return res.json(safeRegistrations);
-  } catch (error) {
-    console.error('Error fetching registrations:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// List all registrations
 app.get('/registrations', async (req, res) => {
   // Define cache headers
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -1133,29 +1057,25 @@ app.get('/registrations', async (req, res) => {
     const registrations = await sqlVercel`
       SELECT 
         r.id,
+        r.form_id,
         r.name as camper_name,
         r.email as camper_email,
+        r.contact,
         r.status,
         r.created_at,
+        r.updated_at,
+        r.user_id,
         r.camp_id,
-        r.phone,
-        r.document_type,
-        r.document_number,
-        r.birthday,
-        r.city,
-        r.address,
-        r.total_amount,
-        r.emergency_contact_name,
-        r.emergency_contact_phone,
-        r.emergency_contact_relationship,
-        r.notes,
         r.onboarding_status,
-        r.payment_status,
-        r.has_allergies,
-        r.allergies_description,
-        r.has_health_issues,
-        r.health_issues_description,
+        r.snack_bar_balance,
+        r.total_amount_paid,
+        r.id_number,
+        r.sns_number,
+        r.date_of_birth,
         r.dietary_restrictions,
+        r.guardian_name,
+        r.guardian_email,
+        r.guardian_phone,
         c.name as camp_name,
         c.start_date as camp_start_date,
         c.end_date as camp_end_date
@@ -1165,14 +1085,72 @@ app.get('/registrations', async (req, res) => {
       ORDER BY r.created_at DESC
     `;
 
-    const safeRegistrations = registrations.map(reg => {
-      if (reg.emergency_contact_phone && !reg.emergency_contact_phone.startsWith('+')) {
-        reg.emergency_contact_phone = '+' + reg.emergency_contact_phone;
-      }
-      return reg;
-    });
+    return res.json(registrations);
+  } catch (error) {
+    console.error('Error fetching registrations:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-    return res.json(safeRegistrations);
+// List all registrations (with /api prefix)
+app.get('/api/registrations', async (req, res) => {
+  // Define cache headers
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
+  try {
+    // Get all camps for this team
+    const campIds = await sqlVercel`
+      SELECT id FROM camps WHERE team_id = ${teamId}::uuid
+    `;
+
+    if (campIds.length === 0) {
+      return res.json([]);
+    }
+
+    // Create array of camp IDs
+    const campIdList = campIds.map((row) => row.id);
+
+    // Get all registrations for these camps
+    const registrations = await sqlVercel`
+      SELECT 
+        r.id,
+        r.form_id,
+        r.name as camper_name,
+        r.email as camper_email,
+        r.contact,
+        r.status,
+        r.created_at,
+        r.updated_at,
+        r.user_id,
+        r.camp_id,
+        r.onboarding_status,
+        r.snack_bar_balance,
+        r.total_amount_paid,
+        r.id_number,
+        r.sns_number,
+        r.date_of_birth,
+        r.dietary_restrictions,
+        r.guardian_name,
+        r.guardian_email,
+        r.guardian_phone,
+        c.name as camp_name,
+        c.start_date as camp_start_date,
+        c.end_date as camp_end_date
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.camp_id = ANY($1::uuid[])
+      ORDER BY r.created_at DESC
+    `;
+
+    return res.json(registrations);
   } catch (error) {
     console.error('Error fetching registrations:', error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -1480,7 +1458,28 @@ app.get('/api/registrations/:id', async (req, res) => {
     const { id } = req.params;
     
     const result = await sqlVercel`
-      SELECT r.*, c.name as camp_name
+      SELECT 
+        r.id,
+        r.form_id,
+        r.name,
+        r.email,
+        r.contact,
+        r.status,
+        r.created_at,
+        r.updated_at,
+        r.user_id,
+        r.camp_id,
+        r.onboarding_status,
+        r.snack_bar_balance,
+        r.total_amount_paid,
+        r.id_number,
+        r.sns_number,
+        r.date_of_birth,
+        r.dietary_restrictions,
+        r.guardian_name,
+        r.guardian_email,
+        r.guardian_phone,
+        c.name as camp_name
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
       WHERE r.id = ${id}::uuid
