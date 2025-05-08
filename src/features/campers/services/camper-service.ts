@@ -33,7 +33,10 @@ export const camperService = {
   async findAll(): Promise<Camper[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/campers`, { headers });
+      const response = await fetch(`${API_BASE_URL}/campers`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
         return [];
@@ -48,7 +51,10 @@ export const camperService = {
   async findById(id: string): Promise<Camper | null> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/campers/${id}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/campers/${id}`, { 
+        headers,
+        credentials: 'include' 
+      });
       
       if (!response.ok) {
         return null;
@@ -70,7 +76,8 @@ export const camperService = {
       const response = await fetch(`${API_BASE_URL}/campers`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(camper)
+        body: JSON.stringify(camper),
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -93,7 +100,8 @@ export const camperService = {
       const response = await fetch(`${API_BASE_URL}/campers/${id}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(camper)
+        body: JSON.stringify(camper),
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -111,7 +119,8 @@ export const camperService = {
       const headers = { ...getTeamIdHeader() };
       const response = await fetch(`${API_BASE_URL}/campers/${id}`, {
         method: 'DELETE',
-        headers
+        headers,
+        credentials: 'include'
       });
       
       if (!response.ok) {

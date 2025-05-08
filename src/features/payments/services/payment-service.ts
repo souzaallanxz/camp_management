@@ -28,7 +28,10 @@ export const paymentService = {
   async findAll(): Promise<Payment[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/payments`, { headers });
+      const response = await fetch(`${API_BASE_URL}/payments`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
         return [];
@@ -43,7 +46,10 @@ export const paymentService = {
   async findById(id: string): Promise<Payment | null> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/payments/${id}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/payments/${id}`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
         return null;
@@ -65,7 +71,8 @@ export const paymentService = {
       const response = await fetch(`${API_BASE_URL}/payments`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -88,7 +95,8 @@ export const paymentService = {
       const response = await fetch(`${API_BASE_URL}/payments/${id}`, {
         method: 'PUT',
         headers,
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -106,7 +114,8 @@ export const paymentService = {
       const headers = { ...getTeamIdHeader() };
       const response = await fetch(`${API_BASE_URL}/payments/${id}`, {
         method: 'DELETE',
-        headers
+        headers,
+        credentials: 'include'
       });
       
       return response.ok;
@@ -118,7 +127,10 @@ export const paymentService = {
   async getPaymentsByRegistration(registrationId: string): Promise<Payment[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const response = await fetch(`${API_BASE_URL}/payments/registration/${registrationId}`, { headers });
+      const response = await fetch(`${API_BASE_URL}/payments/registration/${registrationId}`, { 
+        headers,
+        credentials: 'include'
+      });
       
       if (!response.ok) {
         return [];

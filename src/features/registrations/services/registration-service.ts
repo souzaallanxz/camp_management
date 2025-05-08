@@ -1,7 +1,7 @@
 import { getTeamIdHeader } from '@/lib/auth';
 
-// For production, directly use the correct API URL without /api prefix
-const API_BASE_URL = 'https://campmanagement.vercel.app';
+// For production, directly use the correct API URL with /api prefix
+const API_BASE_URL = 'https://campmanagement.vercel.app/api';
 
 export interface Registration {
   id: string;
