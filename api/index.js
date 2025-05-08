@@ -836,10 +836,13 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
           r.email as camper_email, 
           r.status, 
           r.created_at,
-          c.name as camp_name
+          c.name as camp_name,
+          COALESCE(SUM(p.amount), 0) as total_paid
         FROM registrations r
         JOIN camps c ON r.camp_id = c.id
+        LEFT JOIN payments p ON r.id = p.registration_id
         WHERE c.team_id = ${teamId}::uuid
+        GROUP BY r.id, r.name, r.email, r.status, r.created_at, c.name
         ORDER BY r.created_at DESC
         LIMIT ${limit}
       `;
@@ -853,9 +856,12 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
           r.email as camper_email, 
           r.status, 
           r.created_at,
-          c.name as camp_name
+          c.name as camp_name,
+          COALESCE(SUM(p.amount), 0) as total_paid
         FROM registrations r
         JOIN camps c ON r.camp_id = c.id
+        LEFT JOIN payments p ON r.id = p.registration_id
+        GROUP BY r.id, r.name, r.email, r.status, r.created_at, c.name
         ORDER BY r.created_at DESC
         LIMIT ${limit}
       `;
@@ -866,11 +872,12 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
 
     const formattedResults = results.map(item => ({
       id: item.id,
-      camper_name: item.camper_name,
-      camper_email: item.camper_email,
+      name: item.camper_name,
+      email: item.camper_email,
       status: item.status,
-      created_at: item.created_at,
-      camp_name: item.camp_name
+      createdAt: item.created_at,
+      campName: item.camp_name,
+      totalPaid: Number(item.total_paid) || 0
     }));
     
     console.log('Enviando resposta...');
