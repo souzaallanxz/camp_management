@@ -11,7 +11,10 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
-function getInitials(name: string) {
+function getInitials(name: string | null | undefined) {
+  // Return placeholder if name is null or undefined
+  if (!name) return '--';
+  
   return name
     .split(' ')
     .map(part => part[0])
@@ -66,19 +69,19 @@ export function RecentSales() {
   return (
     <div className="space-y-3">
       {registrations.map((registration) => (
-        <div key={registration.id} className="flex items-center text-xs">
+        <div key={registration.id || 'unknown'} className="flex items-center text-xs">
           <Avatar className="h-7 w-7">
             <div className="flex h-full w-full items-center justify-center bg-primary text-primary-foreground text-xs">
               {getInitials(registration.name)}
             </div>
           </Avatar>
           <div className="ml-2 space-y-0.5">
-            <p className="font-medium leading-none">{registration.name}</p>
-            <p className="text-muted-foreground text-xs">{registration.email}</p>
-            <p className="text-muted-foreground text-xs">{registration.campName}</p>
+            <p className="font-medium leading-none">{registration.name || 'Nome indisponível'}</p>
+            <p className="text-muted-foreground text-xs">{registration.email || 'Email indisponível'}</p>
+            <p className="text-muted-foreground text-xs">{registration.campName || 'Acampamento indisponível'}</p>
           </div>
           <div className="ml-auto font-medium">
-            {formatCurrency(registration.totalPaid)}
+            {formatCurrency(registration.totalPaid || 0)}
           </div>
         </div>
       ))}
