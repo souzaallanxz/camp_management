@@ -1636,5 +1636,199 @@ app.get('/api/settings/profile', async (req, res) => {
   }
 });
 
+// ===== PAYMENTS ENDPOINTS =====
+
+// Get payments by registration ID
+app.get('/api/payments', async (req, res) => {
+  try {
+    const { registrationId } = req.query;
+    
+    if (!registrationId) {
+      return res.status(400).json({ error: 'Registration ID is required' });
+    }
+    
+    const results = await sqlVercel`
+      SELECT 
+        id, 
+        registration_id, 
+        amount, 
+        payment_method, 
+        status, 
+        created_at, 
+        updated_at,
+        notes
+      FROM payments
+      WHERE registration_id = ${registrationId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    return res.json(results);
+  } catch (error) {
+    console.error('Error getting payments:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create new payment
+app.post('/api/payments', async (req, res) => {
+  try {
+    const { registrationId, amount, paymentMethod, status, notes } = req.body;
+    
+    if (!registrationId || !amount || !paymentMethod) {
+      return res.status(400).json({ error: 'Registration ID, amount, and payment method are required' });
+    }
+    
+    const result = await sqlVercel`
+      INSERT INTO payments (
+        id, 
+        registration_id, 
+        amount, 
+        payment_method, 
+        status, 
+        notes,
+        created_at, 
+        updated_at
+      )
+      VALUES (
+        ${uuidv4()}, 
+        ${registrationId}::uuid, 
+        ${amount}, 
+        ${paymentMethod}, 
+        ${status || 'completed'}, 
+        ${notes || ''},
+        NOW(), 
+        NOW()
+      )
+      RETURNING *
+    `;
+    
+    // Update the total_amount_paid in the registration
+    await sqlVercel`
+      UPDATE registrations
+      SET total_amount_paid = COALESCE(total_amount_paid, 0) + ${amount}
+      WHERE id = ${registrationId}::uuid
+    `;
+    
+    return res.status(201).json(result[0]);
+  } catch (error) {
+    console.error('Error creating payment:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get latest payment link
+app.get('/api/payments/latest-link', async (req, res) => {
+  try {
+    const { registrationId } = req.query;
+    
+    if (!registrationId) {
+      return res.status(400).json({ error: 'Registration ID is required' });
+    }
+    
+    const result = await sqlVercel`
+      SELECT payment_link
+      FROM payments
+      WHERE registration_id = ${registrationId}::uuid
+        AND payment_link IS NOT NULL
+        AND payment_link != ''
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    
+    if (result.length === 0) {
+      return res.json({ payment_link: null });
+    }
+    
+    return res.json({ payment_link: result[0].payment_link });
+  } catch (error) {
+    console.error('Error getting latest payment link:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update payment
+app.put('/api/payments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, paymentMethod, status, notes, payment_link, phone_number } = req.body;
+    
+    // Get the current payment to calculate difference in amount
+    const currentPayment = await sqlVercel`
+      SELECT * FROM payments WHERE id = ${id}::uuid
+    `;
+    
+    if (currentPayment.length === 0) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+    
+    // Calculate amount difference if amount is being updated
+    const amountDifference = amount ? (amount - currentPayment[0].amount) : 0;
+    
+    // Update the payment
+    const result = await sqlVercel`
+      UPDATE payments
+      SET 
+        amount = COALESCE(${amount}, amount),
+        payment_method = COALESCE(${paymentMethod}, payment_method),
+        status = COALESCE(${status}, status),
+        notes = COALESCE(${notes}, notes),
+        payment_link = COALESCE(${payment_link}, payment_link),
+        phone_number = COALESCE(${phone_number}, phone_number),
+        updated_at = NOW()
+      WHERE id = ${id}::uuid
+      RETURNING *
+    `;
+    
+    // If amount was changed, update the registration's total_amount_paid
+    if (amountDifference !== 0) {
+      await sqlVercel`
+        UPDATE registrations
+        SET total_amount_paid = COALESCE(total_amount_paid, 0) + ${amountDifference}
+        WHERE id = ${currentPayment[0].registration_id}::uuid
+      `;
+    }
+    
+    return res.json(result[0]);
+  } catch (error) {
+    console.error('Error updating payment:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete payment
+app.delete('/api/payments/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the payment first to know the amount and registration ID
+    const paymentResult = await sqlVercel`
+      SELECT * FROM payments WHERE id = ${id}::uuid
+    `;
+    
+    if (paymentResult.length === 0) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+    
+    const payment = paymentResult[0];
+    
+    // Delete the payment
+    await sqlVercel`
+      DELETE FROM payments WHERE id = ${id}::uuid
+    `;
+    
+    // Update the total_amount_paid in the registration
+    await sqlVercel`
+      UPDATE registrations
+      SET total_amount_paid = COALESCE(total_amount_paid, 0) - ${payment.amount}
+      WHERE id = ${payment.registration_id}::uuid
+    `;
+    
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting payment:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Export the Express app as a serverless function
 export default app; 
