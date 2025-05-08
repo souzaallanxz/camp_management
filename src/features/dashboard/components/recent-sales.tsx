@@ -3,13 +3,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { dashboardService } from '../services/dashboard-service'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from './empty-state'
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('pt-PT', {
-    style: 'currency',
-    currency: 'EUR'
-  }).format(value)
-}
+import { Badge } from '@/components/ui/badge'
 
 function getInitials(name: string | null | undefined) {
   // Return placeholder if name is null or undefined
@@ -21,6 +15,18 @@ function getInitials(name: string | null | undefined) {
     .join('')
     .toUpperCase()
     .slice(0, 2)
+}
+
+function PaymentStatus({ status }: { status: string }) {
+  if (status === 'paid') {
+    return <Badge variant="default" className="ml-auto bg-green-500">Pago</Badge>
+  } else if (status === 'unpaid') {
+    return <Badge variant="secondary" className="ml-auto">Não pago</Badge>
+  } else if (status === 'pending') {
+    return <Badge variant="outline" className="ml-auto">Pendente</Badge>
+  } else {
+    return <Badge variant="outline" className="ml-auto">{status}</Badge>
+  }
 }
 
 export function RecentSales() {
@@ -80,9 +86,7 @@ export function RecentSales() {
             <p className="text-muted-foreground text-xs">{registration.email || 'Email indisponível'}</p>
             <p className="text-muted-foreground text-xs">{registration.campName || 'Acampamento indisponível'}</p>
           </div>
-          <div className="ml-auto font-medium">
-            {formatCurrency(registration.totalPaid || 0)}
-          </div>
+          <PaymentStatus status={registration.status} />
         </div>
       ))}
     </div>

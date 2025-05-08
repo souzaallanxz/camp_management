@@ -23,6 +23,7 @@ export interface RecentRegistration {
   totalPaid: number
   createdAt: string
   campName: string
+  status: string
 }
 
 export const dashboardService = {
@@ -245,6 +246,7 @@ export const dashboardService = {
           const totalPaid = parseFloat(registration.total_paid || registration.totalPaid || '0');
           const createdAt = registration.created_at || registration.createdAt || '';
           const campName = registration.camp_name || registration.campName || '';
+          const status = registration.status || 'unknown';
           
           return {
             id,
@@ -252,7 +254,8 @@ export const dashboardService = {
             email,
             totalPaid,
             createdAt,
-            campName
+            campName,
+            status
           };
         });
       }
