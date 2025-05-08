@@ -248,6 +248,17 @@ export const dashboardService = {
           const campName = registration.camp_name || registration.campName || '';
           const status = registration.status || 'unknown';
           
+          // Garantir que o console.log mostre os dados mapeados para depuração
+          console.log('Mapeado:', { 
+            id, 
+            name, 
+            email, 
+            totalPaid, 
+            createdAt, 
+            campName, 
+            status 
+          });
+          
           return {
             id,
             name,

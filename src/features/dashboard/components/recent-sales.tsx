@@ -83,13 +83,8 @@ export function RecentSales() {
   return (
     <div className="space-y-3">
       {registrations.map((registration) => {
-        const displayValue = registration.totalPaid > 0 
-          ? registration.totalPaid 
-          : registration.status === 'paid' 
-            ? getDefaultCampValue(registration.campName)
-            : registration.status === 'partial' 
-              ? getDefaultCampValue(registration.campName) / 2 
-              : 0;
+        // Sempre mostrar o valor do acampamento, independente do status
+        const campValue = getDefaultCampValue(registration.campName);
         
         return (
           <div key={registration.id || 'unknown'} className="flex items-center text-xs">
@@ -104,7 +99,7 @@ export function RecentSales() {
               <p className="text-muted-foreground text-xs">{registration.campName || 'Acampamento indisponível'}</p>
             </div>
             <div className="ml-auto font-medium">
-              {formatCurrency(displayValue)}
+              {formatCurrency(campValue)}
             </div>
           </div>
         );
