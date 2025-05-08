@@ -2,6 +2,21 @@ import { getTeamIdHeader } from '@/lib/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Helper to ensure proper URL construction
+function getApiUrl(endpoint: string): string {
+  // Remove any trailing slash from base URL
+  const baseUrl = API_BASE_URL.endsWith('/') 
+    ? API_BASE_URL.slice(0, -1) 
+    : API_BASE_URL;
+  
+  // Ensure endpoint starts with a slash
+  const formattedEndpoint = endpoint.startsWith('/') 
+    ? endpoint 
+    : `/${endpoint}`;
+    
+  return `${baseUrl}${formattedEndpoint}`;
+}
+
 export interface MetricData {
   total: number
   previousTotal: number
@@ -28,12 +43,13 @@ export const dashboardService = {
   async getMonthlyPayments(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
-      console.log('API URL:', `${API_BASE_URL}/dashboard/monthly-payments`);
+      const url = getApiUrl('dashboard/monthly-payments');
+      console.log('API URL:', url);
       console.log('Headers:', JSON.stringify(headers));
       
-      const response = await fetch(`${API_BASE_URL}/dashboard/monthly-payments`, { 
+      const response = await fetch(url, { 
         headers,
-        credentials: 'include' // Try to include any cookies
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -51,10 +67,11 @@ export const dashboardService = {
   async getMonthlyRegistrations(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
-      console.log('API URL:', `${API_BASE_URL}/dashboard/monthly-registrations`);
+      const url = getApiUrl('dashboard/monthly-registrations');
+      console.log('API URL:', url);
       console.log('Headers:', JSON.stringify(headers));
       
-      const response = await fetch(`${API_BASE_URL}/dashboard/monthly-registrations`, { 
+      const response = await fetch(url, { 
         headers,
         credentials: 'include'
       });
@@ -74,10 +91,11 @@ export const dashboardService = {
   async getMonthlySnackbarTransactions(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
-      console.log('API URL:', `${API_BASE_URL}/dashboard/monthly-snackbar`);
+      const url = getApiUrl('dashboard/monthly-snackbar');
+      console.log('API URL:', url);
       console.log('Headers:', JSON.stringify(headers));
       
-      const response = await fetch(`${API_BASE_URL}/dashboard/monthly-snackbar`, { 
+      const response = await fetch(url, { 
         headers,
         credentials: 'include'
       });
@@ -97,10 +115,11 @@ export const dashboardService = {
   async getYearlyCampers(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
-      console.log('API URL:', `${API_BASE_URL}/dashboard/yearly-campers`);
+      const url = getApiUrl('dashboard/yearly-campers');
+      console.log('API URL:', url);
       console.log('Headers:', JSON.stringify(headers));
       
-      const response = await fetch(`${API_BASE_URL}/dashboard/yearly-campers`, { 
+      const response = await fetch(url, { 
         headers,
         credentials: 'include' 
       });
@@ -120,10 +139,11 @@ export const dashboardService = {
   async getCampPayments(): Promise<CampPaymentsData[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      console.log('API URL:', `${API_BASE_URL}/dashboard/camp-payments`);
+      const url = getApiUrl('dashboard/camp-payments');
+      console.log('API URL:', url);
       console.log('Headers:', JSON.stringify(headers));
       
-      const response = await fetch(`${API_BASE_URL}/dashboard/camp-payments`, { 
+      const response = await fetch(url, { 
         headers,
         credentials: 'include'
       });
@@ -143,10 +163,11 @@ export const dashboardService = {
   async getRecentRegistrations(limit: number = 5): Promise<RecentRegistration[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      console.log('API URL:', `${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`);
+      const url = getApiUrl(`dashboard/recent-registrations?limit=${limit}`);
+      console.log('API URL:', url);
       console.log('Headers:', JSON.stringify(headers));
       
-      const response = await fetch(`${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`, { 
+      const response = await fetch(url, { 
         headers,
         credentials: 'include'
       });
