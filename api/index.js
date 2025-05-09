@@ -1640,11 +1640,28 @@ app.get('/api/settings/profile', async (req, res) => {
 
 // Get payments by registration ID
 app.get('/api/payments', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
     const { registrationId } = req.query;
     
     if (!registrationId) {
       return res.status(400).json({ error: 'Registration ID is required' });
+    }
+    
+    // Primeiro verifica se o registration pertence ao time
+    const registration = await sqlVercel`
+      SELECT r.id 
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registrationId}::uuid
+      AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (registration.length === 0) {
+      return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
     }
     
     const results = await sqlVercel`

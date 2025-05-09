@@ -16,6 +16,9 @@ import { useToast } from '@/components/ui/use-toast'
 export interface RegistrationWithActions extends Registration {
   onRegistrationUpdated: () => void
   actions: React.ReactElement
+  camper_name?: string
+  camper_email?: string
+  camp_name?: string
 }
 
 export interface ActionsProps {
@@ -123,35 +126,31 @@ export function Actions({ registration, onRegistrationUpdated }: ActionsProps) {
 }
 
 export const columns: ColumnDef<RegistrationWithActions>[] = [
-    {
+  {
     accessorKey: 'form_id',
     header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Form ID" />
+      <DataTableColumnHeader column={column} title="Form ID" />
     ),
     cell: ({ row }) => {
-        return <div>{row.original.form_id || '-'}</div>
+      return <div>{row.original.form_id || '-'}</div>
     }
-    },
+  },
   {
-    accessorKey: 'name',
+    accessorKey: 'camper_name',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Nome" />
     ),
     cell: ({ row }) => {
-      const camperName = row.original.camper?.name
-      const registrationName = row.original.name
-      return <div>{camperName || registrationName}</div>
+      return <div>{row.original.camper_name || '-'}</div>
     }
   },
   {
-    accessorKey: 'email',
+    accessorKey: 'camper_email',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Email" />
     ),
     cell: ({ row }) => {
-      const camperEmail = row.original.camper?.email
-      const registrationEmail = row.original.email
-      return <div>{camperEmail || registrationEmail}</div>
+      return <div>{row.original.camper_email || '-'}</div>
     }
   },
   {
@@ -160,18 +159,16 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
       <DataTableColumnHeader column={column} title="Contacto" />
     ),
     cell: ({ row }) => {
-      const camperContact = row.original.camper?.contact
-      const registrationContact = row.original.contact
-      return <div>{camperContact || registrationContact}</div>
+      return <div>{row.original.contact || '-'}</div>
     }
   },
   {
-    accessorKey: 'camp',
+    accessorKey: 'camp_name',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Acampamento" />
     ),
     cell: ({ row }) => {
-      return <div>{row.original.camp?.name}</div>
+      return <div>{row.original.camp_name || '-'}</div>
     }
   },
   {
@@ -214,12 +211,12 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
     }
   },
   {
-    accessorKey: 'total_paid',
+    accessorKey: 'total_amount_paid',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Valor Pago" />
     ),
     cell: ({ row }) => {
-      return <div>{formatCurrency(row.original.total_paid || 0)}</div>
+      return <div>{formatCurrency(row.original.total_amount_paid || 0)}</div>
     }
   },
   {
