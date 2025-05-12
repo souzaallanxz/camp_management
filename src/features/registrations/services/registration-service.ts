@@ -18,7 +18,6 @@ interface ApiRegistration {
   camper_name?: string;
   camper_email?: string;
   total_paid?: number | string;
-  total_amount_paid?: number | string;
   onboarding_status?: string;
   // Para outros campos que possam existir
   [key: string]: unknown;
@@ -59,7 +58,7 @@ export const registrationService = {
       const data = await response.json();
       return data.map((registration: ApiRegistration) => ({
         ...registration,
-        total_paid: Number(registration.total_paid || registration.total_amount_paid) || 0
+        total_paid: Number(registration.total_paid) || 0
       }));
     } catch {
       return [];
@@ -81,7 +80,7 @@ export const registrationService = {
       const data = await response.json();
       return {
         ...data,
-        total_paid: Number(data.total_paid || data.total_amount_paid) || 0
+        total_paid: Number(data.total_paid) || 0
       };
     } catch {
       return null;
@@ -109,7 +108,7 @@ export const registrationService = {
       const result = await response.json();
       return {
         ...result,
-        total_paid: Number(result.total_paid || result.total_amount_paid) || 0
+        total_paid: Number(result.total_paid) || 0
       };
     } catch {
       return null;
@@ -137,7 +136,7 @@ export const registrationService = {
       const result = await response.json();
       return {
         ...result,
-        total_paid: Number(result.total_paid || result.total_amount_paid) || 0
+        total_paid: Number(result.total_paid) || 0
       };
     } catch {
       return null;
@@ -174,7 +173,7 @@ export const registrationService = {
       const data = await response.json();
       return data.map((registration: ApiRegistration) => ({
         ...registration,
-        total_paid: Number(registration.total_paid || registration.total_amount_paid) || 0
+        total_paid: Number(registration.total_paid) || 0
       }));
     } catch {
       return [];
@@ -196,7 +195,7 @@ export const registrationService = {
       const data = await response.json();
       return data.map((registration: ApiRegistration) => ({
         ...registration,
-        total_paid: Number(registration.total_paid || registration.total_amount_paid) || 0
+        total_paid: Number(registration.total_paid) || 0
       }));
     } catch {
       return [];
@@ -224,7 +223,7 @@ export const registrationService = {
       const result = await response.json();
       return {
         ...result,
-        total_paid: Number(result.total_paid || result.total_amount_paid) || 0
+        total_paid: Number(result.total_paid) || 0
       };
     } catch {
       return null;

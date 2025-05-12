@@ -624,7 +624,6 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
         r.camp_id,
         r.onboarding_status,
         r.snack_bar_balance,
-        r.total_amount_paid,
         r.id_number,
         r.sns_number,
         r.date_of_birth,
@@ -641,7 +640,7 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
       LEFT JOIN payments p ON r.id = p.registration_id
       WHERE c.team_id = ${teamId}
       GROUP BY 
-        r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.total_amount_paid, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date
+        r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date
       ORDER BY r.created_at DESC
     `;
     res.json(registrations);

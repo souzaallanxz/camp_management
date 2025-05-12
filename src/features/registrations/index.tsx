@@ -15,12 +15,23 @@ import { RegistrationDialogsProvider } from './context/registration-dialogs-cont
 import { Actions } from './components/registrations-columns'
 import { Registration } from './data/schema'
 
-// Interface para mapear a resposta da API que contém total_amount_paid
-interface ApiRegistration extends Omit<Registration, 'camp' | 'camper'> {
-  total_amount_paid?: string | number;
+// Interface para mapear a resposta da API
+interface ApiRegistration {
+  id: string;
+  camp_id?: string;
   camp_name?: string;
   camper_name?: string;
   camper_email?: string;
+  name?: string;
+  email?: string;
+  contact?: string;
+  status?: string;
+  onboarding_status?: string;
+  created_at?: string | Date;
+  updated_at?: string | Date;
+  form_id?: string;
+  total_paid?: number | string;
+  [key: string]: unknown;
 }
 
 function RegistrationsContent() {
@@ -28,13 +39,17 @@ function RegistrationsContent() {
     queryKey: ['registrations'],
     queryFn: async () => {
       const data = await registrationService.findAll() as unknown as ApiRegistration[];
+      console.log('API Response:', data); // Para debug: verificar o que está vindo da API
       // Adicionando propriedades necessárias para compatibilidade com o tipo Registration do schema
-      return data.map(reg => ({
-        ...reg,
-        camp: null,
-        camper: null,
-        total_paid: Number(reg.total_amount_paid) || 0  // Mapear total_amount_paid para total_paid
-      })) as Registration[];
+      return data.map(reg => {
+        console.log('Registration total_paid:', reg.total_paid); // Para debug: verificar o valor de total_paid
+        return {
+          ...reg,
+          camp: null,
+          camper: null,
+          total_paid: Number(reg.total_paid) || 0  // Usar apenas total_paid
+        };
+      }) as Registration[];
     }
   })
 
