@@ -100,6 +100,14 @@ function calculateRegistrationStatus(totalPaid: number, campPrice: number): stri
 // Helper function to get the camp price
 async function getCampPrice(campId: string): Promise<number> {
   try {
+    // Verificar se o campId é válido
+    if (!campId) return 0;
+    
+    // Usar um cache simples para evitar múltiplas chamadas para o mesmo acampamento
+    if (campPriceCache[campId] !== undefined) {
+      return campPriceCache[campId];
+    }
+    
     const headers = { ...getTeamIdHeader() };
     const response = await fetch(`${API_BASE_URL}/camps/${campId}`, { 
       headers,
@@ -107,15 +115,26 @@ async function getCampPrice(campId: string): Promise<number> {
     });
     
     if (!response.ok) {
+      // Se o acampamento não for encontrado, cache o resultado como 0
+      campPriceCache[campId] = 0;
       return 0;
     }
     
     const camp = await response.json();
-    return Number(camp.price) || 0;
+    const price = Number(camp.price) || 0;
+    
+    // Armazenar no cache
+    campPriceCache[campId] = price;
+    return price;
   } catch {
+    // Em caso de erro, cache o resultado como 0
+    campPriceCache[campId] = 0;
     return 0;
   }
 }
+
+// Cache simples para armazenar preços de acampamentos já consultados
+const campPriceCache: Record<string, number> = {};
 
 export const registrationService = {
   async findAll(): Promise<Registration[]> {
@@ -140,35 +159,46 @@ export const registrationService = {
         camp_price: Number(registration.camp_price) || 0
       }));
       
-      // Para cada registro, buscar os pagamentos e calcular o total
-      const registrationsWithTotalPaid = await Promise.all(
-        registrations.map(async (registration) => {
-          // Se total_paid já estiver definido e for diferente de 0, usar esse valor
-          let totalPaid = Number(registration.total_paid) || 0;
-          if (totalPaid === 0) {
-            totalPaid = await getTotalPaidForRegistration(registration.id);
+      // Pré-carregar preços de acampamentos únicos para evitar múltiplas chamadas à API
+      const uniqueCampIds: string[] = [];
+      registrations.forEach(reg => {
+        if (reg.camp_id && typeof reg.camp_id === 'string' && (!reg.camp_price || reg.camp_price === 0)) {
+          if (!uniqueCampIds.includes(reg.camp_id)) {
+            uniqueCampIds.push(reg.camp_id);
           }
-          
-          // Garantir que temos o preço do acampamento
-          let campPrice = Number(registration.camp_price) || 0;
-          if (campPrice === 0 && registration.camp_id) {
-            campPrice = await getCampPrice(registration.camp_id);
-          }
-          
-          // Recalcular o status com base no valor pago e preço do acampamento
-          const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-          
-          return {
-            ...registration,
-            total_paid: totalPaid,
-            camp_price: campPrice,
-            // Se o status do backend não corresponder ao calculado, usamos o calculado
-            status: calculatedStatus
-          };
+        }
+      });
+      
+      // Carregamento paralelo de preços de acampamentos
+      await Promise.all(
+        uniqueCampIds.map(async (campId) => {
+          await getCampPrice(campId);
         })
       );
       
-      return registrationsWithTotalPaid;
+      // Para cada registro, processar dados
+      const processedRegistrations = registrations.map(registration => {
+        // Usar valor total_paid do backend se disponível
+        const totalPaid = Number(registration.total_paid) || 0;
+        
+        // Obter preço do acampamento do cache se possível
+        let campPrice = Number(registration.camp_price) || 0;
+        if (campPrice === 0 && registration.camp_id) {
+          campPrice = campPriceCache[registration.camp_id] || 0;
+        }
+        
+        // Recalcular o status com base no valor pago e preço do acampamento
+        const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+        
+        return {
+          ...registration,
+          total_paid: totalPaid,
+          camp_price: campPrice,
+          status: calculatedStatus
+        };
+      });
+      
+      return processedRegistrations;
     } catch {
       // Tratamento silencioso do erro
       return [];
