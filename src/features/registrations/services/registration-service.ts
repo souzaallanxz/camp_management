@@ -87,9 +87,8 @@ function calculateRegistrationStatus(totalPaid: number, campPrice: number): stri
     return totalPaid > 0 ? 'paid' : 'unpaid';
   }
   
-  // Comparação com tolerância para evitar problemas de arredondamento
-  // Consideramos como pago se a diferença for menor que 1 euro
-  if (totalPaid >= campPrice || (campPrice - totalPaid) < 1) {
+  // Usar comparação exata para determinar o status
+  if (totalPaid >= campPrice) {
     return 'paid';
   } else if (totalPaid > 0) {
     return 'partial';
@@ -151,7 +150,10 @@ export const registrationService = {
           }
           
           // Garantir que temos o preço do acampamento
-          const campPrice = Number(registration.camp_price) || 0;
+          let campPrice = Number(registration.camp_price) || 0;
+          if (campPrice === 0 && registration.camp_id) {
+            campPrice = await getCampPrice(registration.camp_id);
+          }
           
           // Recalcular o status com base no valor pago e preço do acampamento
           const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
@@ -159,6 +161,7 @@ export const registrationService = {
           return {
             ...registration,
             total_paid: totalPaid,
+            camp_price: campPrice,
             // Se o status do backend não corresponder ao calculado, usamos o calculado
             status: calculatedStatus
           };

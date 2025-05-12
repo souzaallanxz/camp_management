@@ -20,6 +20,7 @@ export interface RegistrationWithActions extends Registration {
   camper_email?: string
   camp_name?: string
   total_paid?: number
+  camp_price?: number
 }
 
 export interface ActionsProps {
@@ -179,6 +180,9 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
     ),
     cell: ({ row }) => {
       const status = row.original.status
+      const totalPaid = row.original.total_paid || 0
+      const campPrice = row.original.camp_price || 0
+      
       const statusStyles = {
         paid: 'bg-green-100 text-green-900 dark:bg-green-900 dark:text-green-100',
         partial: 'bg-yellow-100 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-100',
@@ -186,7 +190,10 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
       }
 
       return (
-        <Badge className={statusStyles[status]}>
+        <Badge 
+          className={statusStyles[status]}
+          title={`Pago: ${totalPaid}€ / Preço: ${campPrice}€`}
+        >
           {status.charAt(0).toUpperCase() + status.slice(1)}
         </Badge>
       )

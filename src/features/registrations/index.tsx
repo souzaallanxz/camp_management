@@ -31,6 +31,7 @@ interface ApiRegistration {
   updated_at?: string | Date;
   form_id?: string;
   total_paid?: number | string;
+  camp_price?: number | string;
   [key: string]: unknown;
 }
 
@@ -45,18 +46,21 @@ function RegistrationsContent() {
         console.log('First registration:', {
           id: data[0].id,
           total_paid: data[0].total_paid,
-          total_amount_paid: data[0].total_amount_paid
+          camp_price: data[0].camp_price,
+          status: data[0].status
         });
       }
       // Adicionando propriedades necessárias para compatibilidade com o tipo Registration do schema
       return data.map(reg => {
         const totalPaid = Number(reg.total_paid || 0);
-        console.log(`Registration ${reg.id} total_paid:`, totalPaid);
+        const campPrice = Number(reg.camp_price || 0);
+        console.log(`Registration ${reg.id}: total_paid=${totalPaid}, camp_price=${campPrice}, status=${reg.status}`);
         return {
           ...reg,
           camp: null,
           camper: null,
-          total_paid: totalPaid
+          total_paid: totalPaid,
+          camp_price: campPrice
         };
       }) as Registration[];
     }
