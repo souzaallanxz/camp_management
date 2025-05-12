@@ -634,23 +634,37 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
         c.name as camp_name,
         c.start_date as camp_start_date,
         c.end_date as camp_end_date,
+        c.price as camp_price,
         COALESCE(SUM(p.amount), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
       LEFT JOIN payments p ON r.id = p.registration_id
       WHERE c.team_id = ${teamId}
       GROUP BY 
-        r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date
+        r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date, c.price
       ORDER BY r.created_at DESC
     `;
     
-    // Log first registration for debugging
-    if (registrations.length > 0) {
-      console.log('First registration total_paid:', registrations[0].total_paid);
-      console.log('First registration total_paid type:', typeof registrations[0].total_paid);
-    }
+    // Recalcular o status de pagamento para cada inscrição
+    const registrationsWithStatus = registrations.map(registration => {
+      const totalPaid = Number(registration.total_paid) || 0;
+      const campPrice = Number(registration.camp_price) || 0;
+      
+      // Determinar status baseado no total pago vs preço do acampamento
+      let status = 'unpaid';
+      if (totalPaid >= campPrice || (campPrice > 0 && (campPrice - totalPaid) < 1)) {
+        status = 'paid';
+      } else if (totalPaid > 0) {
+        status = 'partial';
+      }
+      
+      return {
+        ...registration,
+        status: status // Sobrescrever o status armazenado com o calculado
+      };
+    });
     
-    res.json(registrations);
+    res.json(registrationsWithStatus);
   } catch (error) {
     console.error('Error fetching registrations:', error);
     res.status(500).json({ error: 'Erro ao buscar inscrições.' });

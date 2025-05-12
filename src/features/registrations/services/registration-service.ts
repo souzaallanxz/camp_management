@@ -83,7 +83,7 @@ function calculateRegistrationStatus(totalPaid: number | string, campPrice: numb
   const totalPaidNum = Number(totalPaid) || 0;
   const campPriceNum = Number(campPrice) || 0;
   
-  // Se o preço do acampamento for 0 ou não definido, vamos considerar como pago
+  // Se o preço do acampamento for 0 ou não definido, não faz sentido calcular status
   if (campPriceNum <= 0) {
     return totalPaidNum > 0 ? 'paid' : 'unpaid';
   }
@@ -93,7 +93,6 @@ function calculateRegistrationStatus(totalPaid: number | string, campPrice: numb
   if (totalPaidNum >= campPriceNum || (campPriceNum - totalPaidNum) < 1) {
     return 'paid';
   } else if (totalPaidNum > 0) {
-    // Garantir que pagamentos parciais são identificados corretamente
     return 'partial';
   } else {
     return 'unpaid';
@@ -153,7 +152,10 @@ export const registrationService = {
           }
           
           // Garantir que temos o preço do acampamento
-          const campPrice = Number(registration.camp_price) || 0;
+          let campPrice = Number(registration.camp_price) || 0;
+          if (campPrice === 0 && registration.camp_id) {
+            campPrice = await getCampPrice(registration.camp_id);
+          }
           
           // Recalcular o status com base no valor pago e preço do acampamento
           const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
@@ -161,7 +163,8 @@ export const registrationService = {
           return {
             ...registration,
             total_paid: totalPaid,
-            // Se o status do backend não corresponder ao calculado, usamos o calculado
+            camp_price: campPrice,
+            // Usar sempre o status calculado para garantir consistência
             status: calculatedStatus
           };
         })
@@ -329,7 +332,7 @@ export const registrationService = {
             totalPaid = await getTotalPaidForRegistration(registration.id);
           }
           
-          // Calcular o status com base no pagamento e preço
+          // Calcular o status com base no valor pago e preço do acampamento
           const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
           
           return {
