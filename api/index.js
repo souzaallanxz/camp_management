@@ -1670,7 +1670,7 @@ app.get('/api/payments', async (req, res) => {
         registration_id, 
         amount, 
         payment_method, 
-        status, 
+        payment_status, 
         created_at, 
         updated_at,
         notes
@@ -1701,7 +1701,7 @@ app.post('/api/payments', async (req, res) => {
         registration_id, 
         amount, 
         payment_method, 
-        status, 
+        payment_status, 
         notes,
         created_at, 
         updated_at
@@ -1787,7 +1787,7 @@ app.put('/api/payments/:id', async (req, res) => {
       SET 
         amount = COALESCE(${amount}, amount),
         payment_method = COALESCE(${paymentMethod}, payment_method),
-        status = COALESCE(${status}, status),
+        payment_status = COALESCE(${status}, payment_status),
         notes = COALESCE(${notes}, notes),
         payment_link = COALESCE(${payment_link}, payment_link),
         phone_number = COALESCE(${phone_number}, phone_number),
