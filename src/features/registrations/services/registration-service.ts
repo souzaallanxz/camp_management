@@ -10,9 +10,6 @@ export interface Registration {
   camperId: string;
   camperName?: string;
   status: string;
-  totalAmount: number;
-  paidAmount: number;
-  remainingAmount: number;
   createdAt: string;
   updatedAt: string;
   total_paid?: number;
