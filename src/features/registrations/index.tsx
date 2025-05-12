@@ -31,7 +31,6 @@ interface ApiRegistration {
   updated_at?: string | Date;
   form_id?: string;
   total_paid?: number | string;
-  camp_price?: number | string;
   [key: string]: unknown;
 }
 
@@ -46,21 +45,18 @@ function RegistrationsContent() {
         console.log('First registration:', {
           id: data[0].id,
           total_paid: data[0].total_paid,
-          camp_price: data[0].camp_price,
-          status: data[0].status
+          total_amount_paid: data[0].total_amount_paid
         });
       }
       // Adicionando propriedades necessárias para compatibilidade com o tipo Registration do schema
       return data.map(reg => {
         const totalPaid = Number(reg.total_paid || 0);
-        const campPrice = Number(reg.camp_price || 0);
-        console.log(`Registration ${reg.id}: total_paid=${totalPaid}, camp_price=${campPrice}, status=${reg.status}`);
+        console.log(`Registration ${reg.id} total_paid:`, totalPaid);
         return {
           ...reg,
           camp: null,
           camper: null,
-          total_paid: totalPaid,
-          camp_price: campPrice
+          total_paid: totalPaid
         };
       }) as Registration[];
     }
@@ -73,23 +69,11 @@ function RegistrationsContent() {
 
   const { openCreateDialog } = useRegistrationDialogs()
 
-  const registrationsWithActions = registrationsData.map((registration) => {
-    // Debug de valor de pagamento e preço
-    console.log(`Registration ${registration.id} debug:`, {
-      id: registration.id,
-      camp_id: registration.camp_id,
-      camp_name: registration.camp_name,
-      total_paid: registration.total_paid,
-      camp_price: registration.camp_price,
-      status: registration.status
-    });
-
-    return {
-      ...registration,
-      actions: <Actions registration={registration} onRegistrationUpdated={handleRefetch} />,
-      onRegistrationUpdated: handleRefetch
-    };
-  }) as unknown as RegistrationWithActions[]
+  const registrationsWithActions = registrationsData.map((registration) => ({
+    ...registration,
+    actions: <Actions registration={registration} onRegistrationUpdated={handleRefetch} />,
+    onRegistrationUpdated: handleRefetch
+  })) as unknown as RegistrationWithActions[]
 
   return (
     <>

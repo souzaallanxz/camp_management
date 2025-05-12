@@ -43,7 +43,7 @@ export interface Registration {
   campName?: string;
   camperId: string;
   camperName?: string;
-  status: string;
+  status: 'paid' | 'partial' | 'unpaid' | string;
   createdAt: string;
   updatedAt: string;
   total_paid?: number;
@@ -70,89 +70,55 @@ async function getTotalPaidForRegistration(registrationId: string): Promise<numb
     }
     
     const payments: ApiPayment[] = await response.json();
-    return payments.reduce((total, payment) => total + Number(payment.amount), 0);
+    // Ensure all amounts are converted to numbers before summing
+    return payments.reduce((total, payment) => total + Number(payment.amount || 0), 0);
   } catch {
     return 0;
   }
 }
 
 // Helper function to calculate registration status based on total paid and camp price
-function calculateRegistrationStatus(totalPaid: number, campPrice: number): string {
+function calculateRegistrationStatus(totalPaid: number | string, campPrice: number | string): string {
   // Garantir que estamos trabalhando com números
-  totalPaid = Number(totalPaid) || 0;
-  campPrice = Number(campPrice) || 0;
-  
-  // Valores fixos para resolver o problema de camps não encontrados
-  campPrice = getCampPriceFromName(campPrice);
+  const totalPaidNum = Number(totalPaid) || 0;
+  const campPriceNum = Number(campPrice) || 0;
   
   // Se o preço do acampamento for 0 ou não definido, vamos considerar como pago
-  if (campPrice <= 0) {
-    return totalPaid > 0 ? 'paid' : 'unpaid';
+  if (campPriceNum <= 0) {
+    return totalPaidNum > 0 ? 'paid' : 'unpaid';
   }
   
-  // Usar comparação exata para determinar o status
-  if (totalPaid >= campPrice) {
+  // Comparação com tolerância para evitar problemas de arredondamento
+  // Consideramos como pago se a diferença for menor que 1 euro
+  if (totalPaidNum >= campPriceNum || (campPriceNum - totalPaidNum) < 1) {
     return 'paid';
-  } else if (totalPaid > 0) {
+  } else if (totalPaidNum > 0) {
+    // Garantir que pagamentos parciais são identificados corretamente
     return 'partial';
   } else {
     return 'unpaid';
   }
 }
 
-// Helper function to get price from camp name
-function getCampPriceFromName(existingPrice: number): number {
-  // Se já temos um preço válido, retornar
-  if (existingPrice > 0) {
-    return existingPrice;
-  }
-  
-  // Retornar preço padrão
-  return 140; // Preço padrão para todos os acampamentos (a maioria tem esse valor)
-}
-
 // Helper function to get the camp price
 async function getCampPrice(campId: string): Promise<number> {
   try {
-    // Verificar se o campId é válido
-    if (!campId) return 0;
-    
-    // Usar um cache simples para evitar múltiplas chamadas para o mesmo acampamento
-    if (campPriceCache[campId] !== undefined) {
-      return campPriceCache[campId];
-    }
-    
     const headers = { ...getTeamIdHeader() };
-    
-    // URL correta para a API de acampamentos
-    const url = `${API_BASE_URL}/camps/${campId}`;
-    
-    const response = await fetch(url, { 
+    const response = await fetch(`${API_BASE_URL}/camps/${campId}`, { 
       headers,
       credentials: 'include'
     });
     
     if (!response.ok) {
-      // Se o acampamento não for encontrado, cache o resultado como 0
-      campPriceCache[campId] = 0;
       return 0;
     }
     
     const camp = await response.json();
-    const price = Number(camp.price) || 0;
-    
-    // Armazenar no cache
-    campPriceCache[campId] = price;
-    return price;
+    return Number(camp.price) || 0;
   } catch {
-    // Em caso de erro, cache o resultado como 0
-    campPriceCache[campId] = 0;
     return 0;
   }
 }
-
-// Cache simples para armazenar preços de acampamentos já consultados
-const campPriceCache: Record<string, number> = {};
 
 export const registrationService = {
   async findAll(): Promise<Registration[]> {
@@ -170,27 +136,38 @@ export const registrationService = {
       
       const data = await response.json();
       
-      // Para cada registro, processar dados e garantir status correto
-      const processedRegistrations = data.map((registration: ApiRegistration) => {
-        // Dados básicos
-        const totalPaid = Number(registration.total_paid) || 0;
-        
-        // Ler preço do acampamento (ou usar valor padrão)
-        const campPrice = Number(registration.camp_price) || 0;
-        const finalPrice = campPrice > 0 ? campPrice : 140; // Garantir um preço não-zero
-        
-        // Determinar o status com base no valor pago e preço do acampamento
-        const calculatedStatus = calculateRegistrationStatus(totalPaid, finalPrice);
-        
-        return {
-          ...registration,
-          total_paid: totalPaid,
-          camp_price: finalPrice,
-          status: calculatedStatus
-        };
-      });
+      // Mapeamento básico inicial dos registros
+      const registrations = data.map((registration: ApiRegistration) => ({
+        ...registration,
+        total_paid: Number(registration.total_paid) || 0,
+        camp_price: Number(registration.camp_price) || 0
+      }));
       
-      return processedRegistrations;
+      // Para cada registro, buscar os pagamentos e calcular o total
+      const registrationsWithTotalPaid = await Promise.all(
+        registrations.map(async (registration) => {
+          // Se total_paid já estiver definido e for diferente de 0, usar esse valor
+          let totalPaid = Number(registration.total_paid) || 0;
+          if (totalPaid === 0) {
+            totalPaid = await getTotalPaidForRegistration(registration.id);
+          }
+          
+          // Garantir que temos o preço do acampamento
+          const campPrice = Number(registration.camp_price) || 0;
+          
+          // Recalcular o status com base no valor pago e preço do acampamento
+          const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+          
+          return {
+            ...registration,
+            total_paid: totalPaid,
+            // Se o status do backend não corresponder ao calculado, usamos o calculado
+            status: calculatedStatus
+          };
+        })
+      );
+      
+      return registrationsWithTotalPaid;
     } catch {
       // Tratamento silencioso do erro
       return [];
