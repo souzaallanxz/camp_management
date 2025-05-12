@@ -15,6 +15,7 @@ export interface Registration {
   remainingAmount: number;
   createdAt: string;
   updatedAt: string;
+  total_paid?: number;
 }
 
 export interface CreateRegistrationData {
@@ -27,8 +28,6 @@ export const registrationService = {
   async findAll(): Promise<Registration[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      console.log('Fetching registrations from:', `${API_BASE_URL}/registrations`);
-      console.log('Headers:', JSON.stringify(headers));
       
       const response = await fetch(`${API_BASE_URL}/registrations`, { 
         headers,
@@ -36,16 +35,15 @@ export const registrationService = {
       });
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error fetching registrations:', response.status, errorText);
         return [];
       }
       
       const data = await response.json();
-      console.log('Registrations data received:', data);
-      return data;
-    } catch (error) {
-      console.error('Exception in findAll registrations:', error);
+      return data.map((registration: Registration) => ({
+        ...registration,
+        total_paid: Number(registration.total_paid) || 0
+      }));
+    } catch {
       return [];
     }
   },
@@ -62,7 +60,11 @@ export const registrationService = {
         return null;
       }
       
-      return await response.json();
+      const data = await response.json();
+      return {
+        ...data,
+        total_paid: Number(data.total_paid) || 0
+      };
     } catch {
       return null;
     }
@@ -86,7 +88,11 @@ export const registrationService = {
         return null;
       }
       
-      return await response.json();
+      const result = await response.json();
+      return {
+        ...result,
+        total_paid: Number(result.total_paid) || 0
+      };
     } catch {
       return null;
     }
@@ -110,7 +116,11 @@ export const registrationService = {
         return null;
       }
       
-      return await response.json();
+      const result = await response.json();
+      return {
+        ...result,
+        total_paid: Number(result.total_paid) || 0
+      };
     } catch {
       return null;
     }
@@ -143,7 +153,11 @@ export const registrationService = {
         return [];
       }
       
-      return await response.json();
+      const data = await response.json();
+      return data.map((registration: Registration) => ({
+        ...registration,
+        total_paid: Number(registration.total_paid) || 0
+      }));
     } catch {
       return [];
     }
@@ -161,7 +175,11 @@ export const registrationService = {
         return [];
       }
       
-      return await response.json();
+      const data = await response.json();
+      return data.map((registration: Registration) => ({
+        ...registration,
+        total_paid: Number(registration.total_paid) || 0
+      }));
     } catch {
       return [];
     }
@@ -185,7 +203,11 @@ export const registrationService = {
         return null;
       }
       
-      return await response.json();
+      const result = await response.json();
+      return {
+        ...result,
+        total_paid: Number(result.total_paid) || 0
+      };
     } catch {
       return null;
     }
