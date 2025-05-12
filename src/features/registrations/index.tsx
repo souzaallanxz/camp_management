@@ -73,11 +73,23 @@ function RegistrationsContent() {
 
   const { openCreateDialog } = useRegistrationDialogs()
 
-  const registrationsWithActions = registrationsData.map((registration) => ({
-    ...registration,
-    actions: <Actions registration={registration} onRegistrationUpdated={handleRefetch} />,
-    onRegistrationUpdated: handleRefetch
-  })) as unknown as RegistrationWithActions[]
+  const registrationsWithActions = registrationsData.map((registration) => {
+    // Debug de valor de pagamento e preço
+    console.log(`Registration ${registration.id} debug:`, {
+      id: registration.id,
+      camp_id: registration.camp_id,
+      camp_name: registration.camp_name,
+      total_paid: registration.total_paid,
+      camp_price: registration.camp_price,
+      status: registration.status
+    });
+
+    return {
+      ...registration,
+      actions: <Actions registration={registration} onRegistrationUpdated={handleRefetch} />,
+      onRegistrationUpdated: handleRefetch
+    };
+  }) as unknown as RegistrationWithActions[]
 
   return (
     <>

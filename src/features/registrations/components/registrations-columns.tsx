@@ -189,10 +189,13 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
         unpaid: 'bg-red-100 text-red-900 dark:bg-red-900 dark:text-red-100'
       }
 
+      const campName = row.original.camp_name || '';
+      const debugInfo = `ID do acampamento: ${row.original.camp_id || 'N/A'}\nNome do acampamento: ${campName}\nPago: ${totalPaid}€\nPreço: ${campPrice}€\nStatus Calculado: ${status}`;
+
       return (
         <Badge 
           className={statusStyles[status]}
-          title={`Pago: ${totalPaid}€ / Preço: ${campPrice}€`}
+          title={debugInfo}
         >
           {status.charAt(0).toUpperCase() + status.slice(1)}
         </Badge>
