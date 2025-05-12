@@ -1121,9 +1121,9 @@ async function updateRegistrationStatus(registrationId: string) {
   } else if (totalPaid[0].total > 0) {
     newStatus = 'partial';
   }
-  // Update registration status
+  // Update registration status and total_amount_paid
   await sql`
-    UPDATE registrations SET status = ${newStatus} WHERE id = ${registrationId}
+    UPDATE registrations SET status = ${newStatus}, total_amount_paid = ${totalPaid[0].total} WHERE id = ${registrationId}
   `;
 }
 
