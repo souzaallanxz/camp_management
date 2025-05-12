@@ -642,7 +642,8 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
         r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.total_amount_paid, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name
       ORDER BY r.created_at DESC
     `;
-    res.json(registrations);
+    // Forçar o campo total_paid para teste
+    res.json(registrations.map(r => ({ ...r, total_paid: 123 })));
   } catch {
     res.status(500).json({ error: 'Erro ao buscar inscrições.' });
   }
