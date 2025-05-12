@@ -44,6 +44,26 @@ async function getPaymentsByRegistrationId(registrationId: string) {
   }
 }
 
+async function getBulkPayments(registrationIds: string[]) {
+  try {
+    const headers = { 
+      ...getTeamIdHeader(),
+      'Content-Type': 'application/json' 
+    };
+    
+    const queryParams = registrationIds.map(id => `registrationIds=${id}`).join('&');
+    const response = await fetch(`${API_BASE_URL}/payments/bulk?${queryParams}`, { headers });
+    
+    if (!response.ok) {
+      return [];
+    }
+    
+    return await response.json();
+  } catch {
+    return [];
+  }
+}
+
 async function createPayment(data: CreatePaymentData) {
   const headers = { 
     ...getTeamIdHeader(),
@@ -103,6 +123,7 @@ async function getLatestPaymentLink(registrationId: string) {
 export {
   createPayment,
   getPaymentsByRegistrationId,
+  getBulkPayments,
   updatePayment,
   deletePayment,
   getLatestPaymentLink
@@ -111,6 +132,7 @@ export {
 export const paymentService = {
   createPayment,
   getPaymentsByRegistrationId,
+  getBulkPayments,
   updatePayment,
   deletePayment,
   getLatestPaymentLink,

@@ -1131,23 +1131,50 @@ async function updateRegistrationStatus(registrationId: string) {
 app.get('/api/payments', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   const { registrationId } = req.query;
+  
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
+  
   if (!registrationId) {
     return res.status(400).json({ error: 'Missing registrationId' });
   }
+  
   try {
-    const payments = await sql`
-      SELECT p.* FROM payments p
-      JOIN registrations r ON p.registration_id = r.id
+    // First verify if the registration belongs to the team
+    const registration = await sql`
+      SELECT r.id 
+      FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      WHERE p.registration_id = ${registrationId} AND c.team_id = ${teamId}
+      WHERE r.id = ${registrationId}::uuid
+      AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (registration.length === 0) {
+      return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
+    }
+    
+    const payments = await sql`
+      SELECT 
+        p.id,
+        p.registration_id,
+        p.payment_method,
+        p.amount,
+        p.payment_date,
+        p.phone_number,
+        p.payment_link,
+        p.payment_status,
+        p.created_at,
+        p.updated_at
+      FROM payments p
+      WHERE p.registration_id = ${registrationId}::uuid
       ORDER BY p.created_at DESC
     `;
+    
     res.json(payments);
-  } catch {
-    res.status(500).json({ error: 'Erro ao buscar pagamentos.' });
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+    res.status(500).json({ error: 'Error fetching payments' });
   }
 }) as any);
 
@@ -1228,130 +1255,4 @@ app.delete('/api/payments/:id', (async (req: Request, res: Response) => {
     `;
     const result = await sql`
       DELETE FROM payments WHERE id = ${id} AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = ${teamId}) RETURNING *
-    `;
-    if (!result[0]) {
-      return res.status(404).json({ error: 'Payment not found or you do not have permission to delete it' });
-    }
-    if (payment[0]) {
-      await updateRegistrationStatus(payment[0].registration_id);
-    }
-    res.status(204).end();
-  } catch {
-    res.status(500).json({ error: 'Erro ao deletar pagamento.' });
-  }
-}) as any);
-
-// Get latest payment link for a registration
-app.get('/api/payments/latest-link', (async (req: Request, res: Response) => {
-  const teamId = getTeamId(req);
-  const { registrationId } = req.query;
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  if (!registrationId) {
-    return res.status(400).json({ error: 'Missing registrationId' });
-  }
-  try {
-    const data = await sql`
-      SELECT payment_link FROM payments WHERE registration_id = ${registrationId} AND payment_link IS NOT NULL ORDER BY created_at DESC LIMIT 1
-    `;
-    res.json({ payment_link: data[0]?.payment_link || null });
-  } catch {
-    res.status(500).json({ error: 'Erro ao buscar link de pagamento.' });
-  }
-}) as any);
-
-app.patch('/api/registrations/:id/onboarding-status', async (req: Request, res: Response) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  try {
-    const { id } = req.params;
-    const { onboarding_status, status } = req.body;
-    const newStatus = onboarding_status || status;
-    if (!newStatus) {
-      return res.status(400).json({ error: 'Missing onboarding_status' });
-    }
-    const now = new Date().toISOString();
-    const result = await sql`
-      UPDATE registrations
-      SET onboarding_status = ${newStatus}, updated_at = ${now}
-      WHERE id = ${id} AND camp_id IN (SELECT id FROM camps WHERE team_id = ${teamId})
-      RETURNING *
-    `;
-    if (!result[0]) {
-      return res.status(404).json({ error: 'Registration not found or you do not have permission to update it' });
-    }
-    res.json(result[0]);
-  } catch {
-    res.status(500).json({ error: 'Erro ao atualizar onboarding_status.' });
-  }
-});
-
-// API para carregar cartão snackbar
-app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  try {
-    const { registration_id, amount, payment_method, phone_number } = req.body;
-    
-    if (!registration_id || !amount || !payment_method) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-    
-    // Verificar se a inscrição pertence a um acampamento da equipe
-    const reg = await sql`
-      SELECT r.id, c.id as camp_id, r.camp_id
-      FROM registrations r
-      JOIN camps c ON r.camp_id = c.id
-      WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
-    `;
-    
-    if (!reg[0]) {
-      return res.status(400).json({ error: 'Registration does not belong to your team' });
-    }
-    
-    // Buscar o camper relacionado a esta inscrição
-    const camperResult = await sql`
-      SELECT id FROM campers WHERE registration_id = ${registration_id}
-    `;
-    
-    if (!camperResult[0]) {
-      return res.status(404).json({ error: 'Camper not found for this registration' });
-    }
-    
-    const camperId = camperResult[0].id;
-    const now = new Date().toISOString();
-    
-    // Criar o registro no snackbar_balance
-    const result = await sql`
-      INSERT INTO snackbar_balance (
-        registration_id, amount, payment_method, phone_number, created_at, updated_at
-      ) VALUES (
-        ${registration_id}, ${amount}, ${payment_method}, ${phone_number}, ${now}, ${now}
-      ) RETURNING *
-    `;
-    
-    // Atualizar o saldo do campista
-    await sql`
-      UPDATE campers 
-      SET snack_bar_balance = COALESCE(snack_bar_balance, 0) + ${amount}, 
-          updated_at = ${now}
-      WHERE id = ${camperId}
-    `;
-    
-    res.status(201).json(result[0]);
-  } catch (error) {
-    console.error('Erro ao processar carregamento:', error);
-    res.status(500).json({ error: 'Erro ao processar carregamento do cartão.' });
-  }
-}) as any);
-
-const PORT = 3001
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.info(`Server running on http://localhost:${PORT}`)
-}) 
+    `
