@@ -78,7 +78,18 @@ async function getTotalPaidForRegistration(registrationId: string): Promise<numb
 
 // Helper function to calculate registration status based on total paid and camp price
 function calculateRegistrationStatus(totalPaid: number, campPrice: number): string {
-  if (totalPaid >= campPrice) {
+  // Garantir que estamos trabalhando com números
+  totalPaid = Number(totalPaid) || 0;
+  campPrice = Number(campPrice) || 0;
+  
+  // Se o preço do acampamento for 0 ou não definido, vamos considerar como pago
+  if (campPrice <= 0) {
+    return totalPaid > 0 ? 'paid' : 'unpaid';
+  }
+  
+  // Comparação com tolerância para evitar problemas de arredondamento
+  // Consideramos como pago se a diferença for menor que 1 euro
+  if (totalPaid >= campPrice || (campPrice - totalPaid) < 1) {
     return 'paid';
   } else if (totalPaid > 0) {
     return 'partial';
@@ -256,9 +267,20 @@ export const registrationService = {
         totalPaid = await getTotalPaidForRegistration(id);
       }
       
+      // Buscar o preço do acampamento se necessário
+      let campPrice = Number(result.camp_price) || 0;
+      if (campPrice === 0 && result.camp_id) {
+        campPrice = await getCampPrice(result.camp_id);
+      }
+      
+      // Calcular o status com base no pagamento e preço
+      const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+      
       return {
         ...result,
-        total_paid: totalPaid
+        total_paid: totalPaid,
+        camp_price: campPrice,
+        status: calculatedStatus
       };
     } catch {
       return null;
@@ -395,9 +417,20 @@ export const registrationService = {
         totalPaid = await getTotalPaidForRegistration(registrationId);
       }
       
+      // Buscar o preço do acampamento se necessário
+      let campPrice = Number(result.camp_price) || 0;
+      if (campPrice === 0 && result.camp_id) {
+        campPrice = await getCampPrice(result.camp_id);
+      }
+      
+      // Calcular o status com base no pagamento e preço
+      const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+      
       return {
         ...result,
-        total_paid: totalPaid
+        total_paid: totalPaid,
+        camp_price: campPrice,
+        status: calculatedStatus
       };
     } catch {
       return null;
