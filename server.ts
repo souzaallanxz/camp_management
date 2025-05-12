@@ -611,12 +611,35 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
   }
   try {
     const registrations = await sql`
-      SELECT r.*, c.name as camp_name, COALESCE(SUM(p.amount), 0) as total_paid
+      SELECT 
+        r.id,
+        r.form_id,
+        r.name,
+        r.email,
+        r.contact,
+        r.status,
+        r.created_at,
+        r.updated_at,
+        r.user_id,
+        r.camp_id,
+        r.onboarding_status,
+        r.snack_bar_balance,
+        r.total_amount_paid,
+        r.id_number,
+        r.sns_number,
+        r.date_of_birth,
+        r.dietary_restrictions,
+        r.guardian_name,
+        r.guardian_email,
+        r.guardian_phone,
+        c.name as camp_name,
+        COALESCE(SUM(p.amount), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
       LEFT JOIN payments p ON r.id = p.registration_id
       WHERE c.team_id = ${teamId}
-      GROUP BY r.id, c.name
+      GROUP BY 
+        r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.total_amount_paid, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name
       ORDER BY r.created_at DESC
     `;
     res.json(registrations);
