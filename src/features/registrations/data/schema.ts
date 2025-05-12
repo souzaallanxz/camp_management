@@ -25,7 +25,7 @@ export const registrationSchema = z.object({
 export interface Registration extends z.infer<typeof registrationSchema> {
   camp: Camp | null
   camper: Camper | null
-  total_amount_paid?: number
+  total_paid?: number
 }
 
 export const insertRegistrationSchema = registrationSchema.omit({
