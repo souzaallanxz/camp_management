@@ -47,6 +47,7 @@ export interface Registration {
   createdAt: string;
   updatedAt: string;
   total_paid?: number;
+  camp_price?: number;
 }
 
 export interface CreateRegistrationData {
@@ -70,8 +71,38 @@ async function getTotalPaidForRegistration(registrationId: string): Promise<numb
     
     const payments: ApiPayment[] = await response.json();
     return payments.reduce((total, payment) => total + Number(payment.amount), 0);
-  } catch (error) {
-    console.error(`Error fetching payments for registration ${registrationId}:`, error);
+  } catch {
+    return 0;
+  }
+}
+
+// Helper function to calculate registration status based on total paid and camp price
+function calculateRegistrationStatus(totalPaid: number, campPrice: number): string {
+  if (totalPaid >= campPrice) {
+    return 'paid';
+  } else if (totalPaid > 0) {
+    return 'partial';
+  } else {
+    return 'unpaid';
+  }
+}
+
+// Helper function to get the camp price
+async function getCampPrice(campId: string): Promise<number> {
+  try {
+    const headers = { ...getTeamIdHeader() };
+    const response = await fetch(`${API_BASE_URL}/camps/${campId}`, { 
+      headers,
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      return 0;
+    }
+    
+    const camp = await response.json();
+    return Number(camp.price) || 0;
+  } catch {
     return 0;
   }
 }
@@ -95,29 +126,37 @@ export const registrationService = {
       // Mapeamento básico inicial dos registros
       const registrations = data.map((registration: ApiRegistration) => ({
         ...registration,
-        total_paid: Number(registration.total_paid) || 0
+        total_paid: Number(registration.total_paid) || 0,
+        camp_price: Number(registration.camp_price) || 0
       }));
       
       // Para cada registro, buscar os pagamentos e calcular o total
       const registrationsWithTotalPaid = await Promise.all(
         registrations.map(async (registration) => {
           // Se total_paid já estiver definido e for diferente de 0, usar esse valor
-          if (registration.total_paid) {
-            return registration;
+          let totalPaid = Number(registration.total_paid) || 0;
+          if (totalPaid === 0) {
+            totalPaid = await getTotalPaidForRegistration(registration.id);
           }
           
-          // Caso contrário, buscar os pagamentos
-          const totalPaid = await getTotalPaidForRegistration(registration.id);
+          // Garantir que temos o preço do acampamento
+          const campPrice = Number(registration.camp_price) || 0;
+          
+          // Recalcular o status com base no valor pago e preço do acampamento
+          const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+          
           return {
             ...registration,
-            total_paid: totalPaid
+            total_paid: totalPaid,
+            // Se o status do backend não corresponder ao calculado, usamos o calculado
+            status: calculatedStatus
           };
         })
       );
       
       return registrationsWithTotalPaid;
-    } catch (error) {
-      console.error('Error fetching registrations:', error);
+    } catch {
+      // Tratamento silencioso do erro
       return [];
     }
   },
@@ -142,9 +181,20 @@ export const registrationService = {
         totalPaid = await getTotalPaidForRegistration(id);
       }
       
+      // Buscar o preço do acampamento se necessário
+      let campPrice = Number(data.camp_price) || 0;
+      if (campPrice === 0 && data.camp_id) {
+        campPrice = await getCampPrice(data.camp_id);
+      }
+      
+      // Calcular o status com base no pagamento e preço
+      const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+      
       return {
         ...data,
-        total_paid: totalPaid
+        total_paid: totalPaid,
+        camp_price: campPrice,
+        status: calculatedStatus
       };
     } catch {
       return null;
@@ -244,6 +294,9 @@ export const registrationService = {
       
       const data = await response.json();
       
+      // Buscar o preço do acampamento uma vez para todas as inscrições
+      const campPrice = await getCampPrice(campId);
+      
       // Para cada registro, verificar o total pago
       const registrationsWithTotalPaid = await Promise.all(
         data.map(async (registration: ApiRegistration) => {
@@ -252,9 +305,14 @@ export const registrationService = {
             totalPaid = await getTotalPaidForRegistration(registration.id);
           }
           
+          // Calcular o status com base no pagamento e preço
+          const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+          
           return {
             ...registration,
-            total_paid: totalPaid
+            total_paid: totalPaid,
+            camp_price: campPrice,
+            status: calculatedStatus
           };
         })
       );
@@ -279,7 +337,7 @@ export const registrationService = {
       
       const data = await response.json();
       
-      // Para cada registro, verificar o total pago
+      // Para cada registro, processar os pagamentos e preços dos acampamentos
       const registrationsWithTotalPaid = await Promise.all(
         data.map(async (registration: ApiRegistration) => {
           let totalPaid = Number(registration.total_paid) || 0;
@@ -287,9 +345,20 @@ export const registrationService = {
             totalPaid = await getTotalPaidForRegistration(registration.id);
           }
           
+          // Buscar o preço do acampamento se necessário
+          let campPrice = Number(registration.camp_price) || 0;
+          if (campPrice === 0 && registration.camp_id) {
+            campPrice = await getCampPrice(registration.camp_id);
+          }
+          
+          // Calcular o status com base no pagamento e preço
+          const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+          
           return {
             ...registration,
-            total_paid: totalPaid
+            total_paid: totalPaid,
+            camp_price: campPrice,
+            status: calculatedStatus
           };
         })
       );
