@@ -1671,9 +1671,11 @@ app.get('/api/payments', async (req, res) => {
         amount, 
         payment_method, 
         payment_status, 
+        payment_date,
+        payment_link,
+        phone_number,
         created_at, 
-        updated_at,
-        notes
+        updated_at
       FROM payments
       WHERE registration_id = ${registrationId}::uuid
       ORDER BY created_at DESC
@@ -1689,10 +1691,10 @@ app.get('/api/payments', async (req, res) => {
 // Create new payment
 app.post('/api/payments', async (req, res) => {
   try {
-    const { registrationId, amount, paymentMethod, status, notes } = req.body;
+    const { registrationId, amount, paymentMethod, status, payment_date, payment_link, phone_number } = req.body;
     
-    if (!registrationId || !amount || !paymentMethod) {
-      return res.status(400).json({ error: 'Registration ID, amount, and payment method are required' });
+    if (!registrationId || !amount || !paymentMethod || !payment_date) {
+      return res.status(400).json({ error: 'Registration ID, amount, payment method, and payment_date are required' });
     }
     
     const result = await sqlVercel`
@@ -1702,7 +1704,9 @@ app.post('/api/payments', async (req, res) => {
         amount, 
         payment_method, 
         payment_status, 
-        notes,
+        payment_date,
+        payment_link,
+        phone_number,
         created_at, 
         updated_at
       )
@@ -1711,8 +1715,10 @@ app.post('/api/payments', async (req, res) => {
         ${registrationId}::uuid, 
         ${amount}, 
         ${paymentMethod}, 
-        ${status || 'completed'}, 
-        ${notes || ''},
+        ${status || 'confirmed'}, 
+        ${payment_date},
+        ${payment_link || null},
+        ${phone_number || null},
         NOW(), 
         NOW()
       )
@@ -1767,7 +1773,7 @@ app.get('/api/payments/latest-link', async (req, res) => {
 app.put('/api/payments/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, paymentMethod, status, notes, payment_link, phone_number } = req.body;
+    const { amount, paymentMethod, status, payment_date, payment_link, phone_number } = req.body;
     
     // Get the current payment to calculate difference in amount
     const currentPayment = await sqlVercel`
@@ -1788,7 +1794,7 @@ app.put('/api/payments/:id', async (req, res) => {
         amount = COALESCE(${amount}, amount),
         payment_method = COALESCE(${paymentMethod}, payment_method),
         payment_status = COALESCE(${status}, payment_status),
-        notes = COALESCE(${notes}, notes),
+        payment_date = COALESCE(${payment_date}, payment_date),
         payment_link = COALESCE(${payment_link}, payment_link),
         phone_number = COALESCE(${phone_number}, phone_number),
         updated_at = NOW()
