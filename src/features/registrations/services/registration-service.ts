@@ -103,10 +103,19 @@ function calculateRegistrationStatus(totalPaid: number | string, campPrice: numb
 async function getCampPrice(campId: string): Promise<number> {
   try {
     const headers = { ...getTeamIdHeader() };
+    
+    // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
+    
     const response = await fetch(`${API_BASE_URL}/camps/${campId}`, { 
       headers,
-      credentials: 'include'
+      credentials: 'include',
+      signal: controller.signal
     });
+    
+    // Limpar o timeout independentemente do resultado
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       return 0;
@@ -124,10 +133,18 @@ export const registrationService = {
     try {
       const headers = { ...getTeamIdHeader() };
       
+      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos de timeout
+      
       const response = await fetch(`${API_BASE_URL}/registrations`, { 
         headers,
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      // Limpar o timeout independentemente do resultado
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         return [];
@@ -142,35 +159,22 @@ export const registrationService = {
         camp_price: Number(registration.camp_price) || 0
       }));
       
-      // Para cada registro, buscar os pagamentos e calcular o total
-      const registrationsWithTotalPaid = await Promise.all(
-        registrations.map(async (registration) => {
-          // Se total_paid já estiver definido e for diferente de 0, usar esse valor
-          let totalPaid = Number(registration.total_paid) || 0;
-          if (totalPaid === 0) {
-            totalPaid = await getTotalPaidForRegistration(registration.id);
-          }
-          
-          // Garantir que temos o preço do acampamento
-          let campPrice = Number(registration.camp_price) || 0;
-          if (campPrice === 0 && registration.camp_id) {
-            campPrice = await getCampPrice(registration.camp_id);
-          }
-          
-          // Recalcular o status com base no valor pago e preço do acampamento
-          const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-          
-          return {
-            ...registration,
-            total_paid: totalPaid,
-            camp_price: campPrice,
-            // Usar sempre o status calculado para garantir consistência
-            status: calculatedStatus
-          };
-        })
-      );
-      
-      return registrationsWithTotalPaid;
+      // Para cada registro, usar o total_paid e camp_price já retornados pela API
+      // em vez de fazer múltiplas chamadas adicionais
+      return registrations.map(registration => {
+        const totalPaid = Number(registration.total_paid) || 0;
+        const campPrice = Number(registration.camp_price) || 0;
+        
+        // Recalcular o status com base no valor pago e preço do acampamento
+        const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+        
+        return {
+          ...registration,
+          total_paid: totalPaid,
+          camp_price: campPrice,
+          status: calculatedStatus
+        };
+      });
     } catch {
       // Tratamento silencioso do erro
       return [];
@@ -180,10 +184,19 @@ export const registrationService = {
   async findById(id: string): Promise<Registration | null> {
     try {
       const headers = { ...getTeamIdHeader() };
+      
+      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
+      
       const response = await fetch(`${API_BASE_URL}/registrations/${id}`, { 
         headers,
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      // Limpar o timeout independentemente do resultado
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         return null;
@@ -191,17 +204,9 @@ export const registrationService = {
       
       const data = await response.json();
       
-      // Se total_paid for 0 ou null, buscar os pagamentos
-      let totalPaid = Number(data.total_paid) || 0;
-      if (totalPaid === 0) {
-        totalPaid = await getTotalPaidForRegistration(id);
-      }
-      
-      // Buscar o preço do acampamento se necessário
-      let campPrice = Number(data.camp_price) || 0;
-      if (campPrice === 0 && data.camp_id) {
-        campPrice = await getCampPrice(data.camp_id);
-      }
+      // Usar os valores retornados diretamente pela API
+      const totalPaid = Number(data.total_paid) || 0;
+      const campPrice = Number(data.camp_price) || 0;
       
       // Calcular o status com base no pagamento e preço
       const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
@@ -213,6 +218,7 @@ export const registrationService = {
         status: calculatedStatus
       };
     } catch {
+      // Erro silencioso
       return null;
     }
   },
@@ -224,12 +230,20 @@ export const registrationService = {
         'Content-Type': 'application/json' 
       };
       
+      // Adicionar timeout para evitar requisição pendente
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       const response = await fetch(`${API_BASE_URL}/registrations`, {
         method: 'POST',
         headers,
         body: JSON.stringify(data),
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      // Limpar o timeout
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         return null;
@@ -253,12 +267,20 @@ export const registrationService = {
         'Content-Type': 'application/json' 
       };
       
+      // Adicionar timeout para evitar requisição pendente
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(data),
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      // Limpar o timeout
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         return null;
@@ -266,17 +288,9 @@ export const registrationService = {
       
       const result = await response.json();
       
-      // Se total_paid for 0 ou null, buscar os pagamentos
-      let totalPaid = Number(result.total_paid) || 0;
-      if (totalPaid === 0) {
-        totalPaid = await getTotalPaidForRegistration(id);
-      }
-      
-      // Buscar o preço do acampamento se necessário
-      let campPrice = Number(result.camp_price) || 0;
-      if (campPrice === 0 && result.camp_id) {
-        campPrice = await getCampPrice(result.camp_id);
-      }
+      // Usar os valores retornados diretamente pela API
+      const totalPaid = Number(result.total_paid) || 0;
+      const campPrice = Number(result.camp_price) || 0;
       
       // Calcular o status com base no pagamento e preço
       const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
@@ -295,11 +309,20 @@ export const registrationService = {
   async delete(id: string): Promise<boolean> {
     try {
       const headers = { ...getTeamIdHeader() };
+      
+      // Adicionar timeout para evitar requisição pendente
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
         method: 'DELETE',
         headers,
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      // Limpar o timeout
+      clearTimeout(timeoutId);
       
       return response.ok;
     } catch {
@@ -310,10 +333,19 @@ export const registrationService = {
   async getRegistrationsByCamp(campId: string): Promise<Registration[]> {
     try {
       const headers = { ...getTeamIdHeader() };
+      
+      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
+      
       const response = await fetch(`${API_BASE_URL}/registrations/camp/${campId}`, { 
         headers,
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      // Limpar o timeout independentemente do resultado
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         return [];
@@ -324,27 +356,20 @@ export const registrationService = {
       // Buscar o preço do acampamento uma vez para todas as inscrições
       const campPrice = await getCampPrice(campId);
       
-      // Para cada registro, verificar o total pago
-      const registrationsWithTotalPaid = await Promise.all(
-        data.map(async (registration: ApiRegistration) => {
-          let totalPaid = Number(registration.total_paid) || 0;
-          if (totalPaid === 0) {
-            totalPaid = await getTotalPaidForRegistration(registration.id);
-          }
-          
-          // Calcular o status com base no valor pago e preço do acampamento
-          const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-          
-          return {
-            ...registration,
-            total_paid: totalPaid,
-            camp_price: campPrice,
-            status: calculatedStatus
-          };
-        })
-      );
-      
-      return registrationsWithTotalPaid;
+      // Para cada registro, usar os valores retornados pela API quando disponíveis
+      return data.map((registration: ApiRegistration) => {
+        const totalPaid = Number(registration.total_paid) || 0;
+        
+        // Calcular o status com base no valor pago e preço do acampamento
+        const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+        
+        return {
+          ...registration,
+          total_paid: totalPaid,
+          camp_price: campPrice,
+          status: calculatedStatus
+        };
+      });
     } catch {
       return [];
     }
@@ -353,10 +378,19 @@ export const registrationService = {
   async getRegistrationsByCamper(camperId: string): Promise<Registration[]> {
     try {
       const headers = { ...getTeamIdHeader() };
+      
+      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
+      
       const response = await fetch(`${API_BASE_URL}/registrations/camper/${camperId}`, { 
         headers,
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      // Limpar o timeout independentemente do resultado
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         return [];
@@ -364,33 +398,21 @@ export const registrationService = {
       
       const data = await response.json();
       
-      // Para cada registro, processar os pagamentos e preços dos acampamentos
-      const registrationsWithTotalPaid = await Promise.all(
-        data.map(async (registration: ApiRegistration) => {
-          let totalPaid = Number(registration.total_paid) || 0;
-          if (totalPaid === 0) {
-            totalPaid = await getTotalPaidForRegistration(registration.id);
-          }
-          
-          // Buscar o preço do acampamento se necessário
-          let campPrice = Number(registration.camp_price) || 0;
-          if (campPrice === 0 && registration.camp_id) {
-            campPrice = await getCampPrice(registration.camp_id);
-          }
-          
-          // Calcular o status com base no pagamento e preço
-          const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-          
-          return {
-            ...registration,
-            total_paid: totalPaid,
-            camp_price: campPrice,
-            status: calculatedStatus
-          };
-        })
-      );
-      
-      return registrationsWithTotalPaid;
+      // Para cada registro, usar os valores retornados pela API quando disponíveis
+      return data.map((registration: ApiRegistration) => {
+        const totalPaid = Number(registration.total_paid) || 0;
+        const campPrice = Number(registration.camp_price) || 0;
+        
+        // Calcular o status com base no valor pago e preço do acampamento
+        const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
+        
+        return {
+          ...registration,
+          total_paid: totalPaid,
+          camp_price: campPrice,
+          status: calculatedStatus
+        };
+      });
     } catch {
       return [];
     }
@@ -403,12 +425,20 @@ export const registrationService = {
         'Content-Type': 'application/json' 
       };
       
+      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
+      
       const response = await fetch(`${API_BASE_URL}/registrations/${registrationId}/onboarding-status`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ onboarding_status: onboardingStatus }),
-        credentials: 'include'
+        credentials: 'include',
+        signal: controller.signal
       });
+      
+      // Limpar o timeout independentemente do resultado
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         return null;
@@ -416,17 +446,9 @@ export const registrationService = {
       
       const result = await response.json();
       
-      // Se total_paid for 0 ou null, buscar os pagamentos
-      let totalPaid = Number(result.total_paid) || 0;
-      if (totalPaid === 0) {
-        totalPaid = await getTotalPaidForRegistration(registrationId);
-      }
-      
-      // Buscar o preço do acampamento se necessário
-      let campPrice = Number(result.camp_price) || 0;
-      if (campPrice === 0 && result.camp_id) {
-        campPrice = await getCampPrice(result.camp_id);
-      }
+      // Usar os valores retornados diretamente pela API
+      const totalPaid = Number(result.total_paid) || 0;
+      const campPrice = Number(result.camp_price) || 0;
       
       // Calcular o status com base no pagamento e preço
       const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
