@@ -23,6 +23,20 @@ interface ApiRegistration {
   [key: string]: unknown;
 }
 
+// Interface para pagamentos
+interface ApiPayment {
+  id: string;
+  registration_id: string;
+  amount: string | number;
+  payment_method: string;
+  payment_status: string;
+  payment_date: string;
+  payment_link?: string | null;
+  phone_number?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Registration {
   id: string;
   campId: string;
@@ -41,6 +55,27 @@ export interface CreateRegistrationData {
   totalAmount: number;
 }
 
+// Helper function to get the total paid amount for a registration
+async function getTotalPaidForRegistration(registrationId: string): Promise<number> {
+  try {
+    const headers = { ...getTeamIdHeader() };
+    const response = await fetch(`${API_BASE_URL}/payments?registrationId=${registrationId}`, { 
+      headers,
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      return 0;
+    }
+    
+    const payments: ApiPayment[] = await response.json();
+    return payments.reduce((total, payment) => total + Number(payment.amount), 0);
+  } catch (error) {
+    console.error(`Error fetching payments for registration ${registrationId}:`, error);
+    return 0;
+  }
+}
+
 export const registrationService = {
   async findAll(): Promise<Registration[]> {
     try {
@@ -56,11 +91,33 @@ export const registrationService = {
       }
       
       const data = await response.json();
-      return data.map((registration: ApiRegistration) => ({
+      
+      // Mapeamento básico inicial dos registros
+      const registrations = data.map((registration: ApiRegistration) => ({
         ...registration,
         total_paid: Number(registration.total_paid) || 0
       }));
-    } catch {
+      
+      // Para cada registro, buscar os pagamentos e calcular o total
+      const registrationsWithTotalPaid = await Promise.all(
+        registrations.map(async (registration) => {
+          // Se total_paid já estiver definido e for diferente de 0, usar esse valor
+          if (registration.total_paid) {
+            return registration;
+          }
+          
+          // Caso contrário, buscar os pagamentos
+          const totalPaid = await getTotalPaidForRegistration(registration.id);
+          return {
+            ...registration,
+            total_paid: totalPaid
+          };
+        })
+      );
+      
+      return registrationsWithTotalPaid;
+    } catch (error) {
+      console.error('Error fetching registrations:', error);
       return [];
     }
   },
@@ -78,9 +135,16 @@ export const registrationService = {
       }
       
       const data = await response.json();
+      
+      // Se total_paid for 0 ou null, buscar os pagamentos
+      let totalPaid = Number(data.total_paid) || 0;
+      if (totalPaid === 0) {
+        totalPaid = await getTotalPaidForRegistration(id);
+      }
+      
       return {
         ...data,
-        total_paid: Number(data.total_paid) || 0
+        total_paid: totalPaid
       };
     } catch {
       return null;
@@ -106,9 +170,10 @@ export const registrationService = {
       }
       
       const result = await response.json();
+      
       return {
         ...result,
-        total_paid: Number(result.total_paid) || 0
+        total_paid: 0 // Nova inscrição, sem pagamentos
       };
     } catch {
       return null;
@@ -134,9 +199,16 @@ export const registrationService = {
       }
       
       const result = await response.json();
+      
+      // Se total_paid for 0 ou null, buscar os pagamentos
+      let totalPaid = Number(result.total_paid) || 0;
+      if (totalPaid === 0) {
+        totalPaid = await getTotalPaidForRegistration(id);
+      }
+      
       return {
         ...result,
-        total_paid: Number(result.total_paid) || 0
+        total_paid: totalPaid
       };
     } catch {
       return null;
@@ -171,10 +243,23 @@ export const registrationService = {
       }
       
       const data = await response.json();
-      return data.map((registration: ApiRegistration) => ({
-        ...registration,
-        total_paid: Number(registration.total_paid) || 0
-      }));
+      
+      // Para cada registro, verificar o total pago
+      const registrationsWithTotalPaid = await Promise.all(
+        data.map(async (registration: ApiRegistration) => {
+          let totalPaid = Number(registration.total_paid) || 0;
+          if (totalPaid === 0) {
+            totalPaid = await getTotalPaidForRegistration(registration.id);
+          }
+          
+          return {
+            ...registration,
+            total_paid: totalPaid
+          };
+        })
+      );
+      
+      return registrationsWithTotalPaid;
     } catch {
       return [];
     }
@@ -193,10 +278,23 @@ export const registrationService = {
       }
       
       const data = await response.json();
-      return data.map((registration: ApiRegistration) => ({
-        ...registration,
-        total_paid: Number(registration.total_paid) || 0
-      }));
+      
+      // Para cada registro, verificar o total pago
+      const registrationsWithTotalPaid = await Promise.all(
+        data.map(async (registration: ApiRegistration) => {
+          let totalPaid = Number(registration.total_paid) || 0;
+          if (totalPaid === 0) {
+            totalPaid = await getTotalPaidForRegistration(registration.id);
+          }
+          
+          return {
+            ...registration,
+            total_paid: totalPaid
+          };
+        })
+      );
+      
+      return registrationsWithTotalPaid;
     } catch {
       return [];
     }
@@ -221,9 +319,16 @@ export const registrationService = {
       }
       
       const result = await response.json();
+      
+      // Se total_paid for 0 ou null, buscar os pagamentos
+      let totalPaid = Number(result.total_paid) || 0;
+      if (totalPaid === 0) {
+        totalPaid = await getTotalPaidForRegistration(registrationId);
+      }
+      
       return {
         ...result,
-        total_paid: Number(result.total_paid) || 0
+        total_paid: totalPaid
       };
     } catch {
       return null;

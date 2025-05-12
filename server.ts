@@ -643,8 +643,16 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
         r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date
       ORDER BY r.created_at DESC
     `;
+    
+    // Log first registration for debugging
+    if (registrations.length > 0) {
+      console.log('First registration total_paid:', registrations[0].total_paid);
+      console.log('First registration total_paid type:', typeof registrations[0].total_paid);
+    }
+    
     res.json(registrations);
-  } catch {
+  } catch (error) {
+    console.error('Error fetching registrations:', error);
     res.status(500).json({ error: 'Erro ao buscar inscrições.' });
   }
 }) as any);
