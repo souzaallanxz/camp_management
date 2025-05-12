@@ -3,6 +3,27 @@ import { getTeamIdHeader } from '@/lib/auth';
 // For production, directly use the correct API URL with /api prefix
 const API_BASE_URL = 'https://campmanagement.vercel.app/api';
 
+// Interface para a resposta da API
+interface ApiRegistration {
+  id: string;
+  form_id?: string;
+  name?: string;
+  email?: string;
+  contact?: string;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+  camp_id?: string;
+  camp_name?: string;
+  camper_name?: string;
+  camper_email?: string;
+  total_paid?: number | string;
+  total_amount_paid?: number | string;
+  onboarding_status?: string;
+  // Para outros campos que possam existir
+  [key: string]: unknown;
+}
+
 export interface Registration {
   id: string;
   campId: string;
@@ -36,9 +57,9 @@ export const registrationService = {
       }
       
       const data = await response.json();
-      return data.map((registration: Registration) => ({
+      return data.map((registration: ApiRegistration) => ({
         ...registration,
-        total_paid: Number(registration.total_paid) || 0
+        total_paid: Number(registration.total_paid || registration.total_amount_paid) || 0
       }));
     } catch {
       return [];
@@ -60,7 +81,7 @@ export const registrationService = {
       const data = await response.json();
       return {
         ...data,
-        total_paid: Number(data.total_paid) || 0
+        total_paid: Number(data.total_paid || data.total_amount_paid) || 0
       };
     } catch {
       return null;
@@ -88,7 +109,7 @@ export const registrationService = {
       const result = await response.json();
       return {
         ...result,
-        total_paid: Number(result.total_paid) || 0
+        total_paid: Number(result.total_paid || result.total_amount_paid) || 0
       };
     } catch {
       return null;
@@ -116,7 +137,7 @@ export const registrationService = {
       const result = await response.json();
       return {
         ...result,
-        total_paid: Number(result.total_paid) || 0
+        total_paid: Number(result.total_paid || result.total_amount_paid) || 0
       };
     } catch {
       return null;
@@ -151,9 +172,9 @@ export const registrationService = {
       }
       
       const data = await response.json();
-      return data.map((registration: Registration) => ({
+      return data.map((registration: ApiRegistration) => ({
         ...registration,
-        total_paid: Number(registration.total_paid) || 0
+        total_paid: Number(registration.total_paid || registration.total_amount_paid) || 0
       }));
     } catch {
       return [];
@@ -173,9 +194,9 @@ export const registrationService = {
       }
       
       const data = await response.json();
-      return data.map((registration: Registration) => ({
+      return data.map((registration: ApiRegistration) => ({
         ...registration,
-        total_paid: Number(registration.total_paid) || 0
+        total_paid: Number(registration.total_paid || registration.total_amount_paid) || 0
       }));
     } catch {
       return [];
@@ -203,7 +224,7 @@ export const registrationService = {
       const result = await response.json();
       return {
         ...result,
-        total_paid: Number(result.total_paid) || 0
+        total_paid: Number(result.total_paid || result.total_amount_paid) || 0
       };
     } catch {
       return null;
