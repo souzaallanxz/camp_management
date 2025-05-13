@@ -1882,5 +1882,45 @@ app.delete('/api/camps/:id', async (req, res) => {
   }
 });
 
+// Update user
+app.put('/api/users/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
+  try {
+    const { id } = req.params;
+    const { name, email, role } = req.body;
+    const now = new Date().toISOString();
+    
+    // Build the update query dynamically
+    const updates = [];
+    if (name !== undefined) updates.push(`name = '${name}'`);
+    if (email !== undefined) updates.push(`email = '${email}'`);
+    if (role !== undefined) updates.push(`role = '${role}'`);
+    updates.push(`updated_at = '${now}'`);
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    const setClause = updates.join(', ');
+    const result = await sqlVercel.unsafe(
+      `UPDATE users SET ${setClause} WHERE id = $1 AND team_id = $2 RETURNING *`,
+      [id, teamId]
+    );
+
+    if (!result[0]) {
+      return res.status(404).json({ error: 'User not found or you do not have permission to update it' });
+    }
+
+    return res.json(result[0]);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    return res.status(500).json({ error: 'Erro ao atualizar usuário.' });
+  }
+});
+
 // Export the Express app as a serverless function
 export default app; 
