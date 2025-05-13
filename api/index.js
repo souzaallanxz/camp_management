@@ -2030,5 +2030,103 @@ app.put('/api/camps/:id', async (req, res) => {
   }
 });
 
+// Create new camper
+app.post('/api/campers', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { name, email, registration_id, camp, form_id, additional_notes } = req.body;
+    
+    if (!name || !email || !registration_id) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Verify if registration belongs to the team
+    const registration = await sqlVercel`
+      SELECT r.id 
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registration_id}::uuid
+      AND c.team_id = ${teamId}::uuid
+    `;
+
+    if (registration.length === 0) {
+      return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
+    }
+
+    const now = new Date().toISOString();
+    const result = await sqlVercel`
+      INSERT INTO campers (
+        name, 
+        email, 
+        registration_id, 
+        camp, 
+        form_id, 
+        additional_notes,
+        created_at, 
+        updated_at
+      ) VALUES (
+        ${name}, 
+        ${email}, 
+        ${registration_id}, 
+        ${camp}, 
+        ${form_id}, 
+        ${additional_notes},
+        ${now}, 
+        ${now}
+      ) RETURNING *
+    `;
+
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error('Error creating camper:', error);
+    res.status(500).json({ error: 'Error creating camper' });
+  }
+});
+
+// Update registration onboarding status
+app.patch('/api/registrations/:id/onboarding-status', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+
+    // Verify if registration belongs to the team
+    const registration = await sqlVercel`
+      SELECT r.id 
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${id}::uuid
+      AND c.team_id = ${teamId}::uuid
+    `;
+
+    if (registration.length === 0) {
+      return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
+    }
+
+    const now = new Date().toISOString();
+    const result = await sqlVercel`
+      UPDATE registrations 
+      SET onboarding_status = ${status}, updated_at = ${now}
+      WHERE id = ${id}::uuid
+      RETURNING *
+    `;
+
+    res.json(result[0]);
+  } catch (error) {
+    console.error('Error updating registration onboarding status:', error);
+    res.status(500).json({ error: 'Error updating registration onboarding status' });
+  }
+});
+
 // Export the Express app as a serverless function
 export default app; 
