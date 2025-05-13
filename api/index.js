@@ -2181,7 +2181,7 @@ app.put('/api/campers/:id', async (req, res) => {
     if (name !== undefined) fields.push(`name = '${name}'`);
     if (email !== undefined) fields.push(`email = '${email}'`);
     if (contact !== undefined) fields.push(`contact = '${contact}'`);
-    if (registration_id !== undefined) fields.push(`registration_id = '${registration_id}'`);
+    // NÃO atualizar registration_id!
     if (form_id !== undefined) fields.push(`form_id = '${form_id}'`);
     if (camp !== undefined) fields.push(`camp = '${camp}'`);
     if (additional_notes !== undefined) fields.push(`additional_notes = '${additional_notes}'`);
