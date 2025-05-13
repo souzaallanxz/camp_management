@@ -1918,26 +1918,19 @@ app.put('/api/users/:id', async (req, res) => {
       return res.status(403).json({ error: 'User belongs to a different team' });
     }
     
-    // Build the update query dynamically
-    const updates = [];
-    if (name !== undefined) updates.push(`name = '${name}'`);
-    if (email !== undefined) updates.push(`email = '${email}'`);
-    if (role !== undefined) updates.push(`role = '${role}'`);
-    updates.push(`updated_at = '${now}'`);
-
-    if (updates.length === 0) {
-      console.log('Nenhum campo para atualizar');
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-
-    const setClause = updates.join(', ');
-    console.log('Query de atualização:', `UPDATE users SET ${setClause} WHERE id = $1 AND team_id = $2 RETURNING *`);
-    console.log('Parâmetros:', [id, teamId]);
-
-    const result = await sqlVercel.unsafe(
-      `UPDATE users SET ${setClause} WHERE id = $1 AND team_id = $2 RETURNING *`,
-      [id, teamId]
-    );
+    // Atualizar o usuário usando template literal
+    console.log('Atualizando usuário...');
+    const result = await sqlVercel`
+      UPDATE users 
+      SET 
+        name = ${name},
+        email = ${email},
+        role = ${role},
+        updated_at = ${now}
+      WHERE id = ${id}::uuid 
+        AND team_id = ${teamId}::uuid
+      RETURNING *
+    `;
 
     console.log('Resultado da atualização:', result[0]);
 
