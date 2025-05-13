@@ -2037,10 +2037,13 @@ app.post('/api/campers', async (req, res) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { name, email, registration_id, camp, form_id, additional_notes } = req.body;
+    const { name, email, contact, registration_id, camp, form_id, additional_notes } = req.body;
     
-    if (!name || !email || !registration_id) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!name || !email || !registration_id || !camp) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        details: { name, email, registration_id, camp }
+      });
     }
 
     // Verify if registration belongs to the team
@@ -2061,6 +2064,7 @@ app.post('/api/campers', async (req, res) => {
       INSERT INTO campers (
         name, 
         email, 
+        contact,
         registration_id, 
         camp, 
         form_id, 
@@ -2070,6 +2074,7 @@ app.post('/api/campers', async (req, res) => {
       ) VALUES (
         ${name}, 
         ${email}, 
+        ${contact},
         ${registration_id}, 
         ${camp}, 
         ${form_id}, 
@@ -2096,8 +2101,13 @@ app.patch('/api/registrations/:id/onboarding-status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
+    console.log('Updating onboarding status:', { id, status, body: req.body });
+
     if (!status) {
-      return res.status(400).json({ error: 'Status is required' });
+      return res.status(400).json({ 
+        error: 'Status is required',
+        details: { receivedBody: req.body }
+      });
     }
 
     // Verify if registration belongs to the team
