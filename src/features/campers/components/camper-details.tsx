@@ -6,11 +6,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { Camper, updateCamperSchema } from '../data/schema'
 import { Separator } from '@/components/ui/separator'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { format } from 'date-fns'
-import { CalendarIcon } from '@radix-ui/react-icons'
-import { cn } from '@/lib/utils'
 import { camperService } from '../services/camper-service'
 
 interface CamperDetailsProps {
@@ -50,13 +45,6 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
     setFormData(prev => ({
       ...prev,
       [name]: value
-    }))
-  }
-
-  const handleDateChange = (date: Date | undefined) => {
-    setFormData(prev => ({
-      ...prev,
-      date_of_birth: date
     }))
   }
 
@@ -125,92 +113,11 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
                 />
               </div>
               <div className="grid gap-2">
-                <label htmlFor="date_of_birth">Date of Birth</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !formData.date_of_birth && 'text-muted-foreground'
-                      )}
-                      disabled={!isEditing}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.date_of_birth ? (
-                        format(new Date(formData.date_of_birth), 'PPP')
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.date_of_birth ? new Date(formData.date_of_birth) : undefined}
-                      onSelect={handleDateChange}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="id_number">ID Number</label>
+                <label htmlFor="camp">Camp</label>
                 <Input
-                  id="id_number"
-                  name="id_number"
-                  value={formData.id_number || ''}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="sns_number">SNS Number</label>
-                <Input
-                  id="sns_number"
-                  name="sns_number"
-                  value={formData.sns_number || ''}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="dietary_restrictions">Dietary Restrictions</label>
-                <Textarea
-                  id="dietary_restrictions"
-                  name="dietary_restrictions"
-                  value={formData.dietary_restrictions || ''}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="guardian_name">Guardian Name</label>
-                <Input
-                  id="guardian_name"
-                  name="guardian_name"
-                  value={formData.guardian_name || ''}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="guardian_email">Guardian Email</label>
-                <Input
-                  id="guardian_email"
-                  name="guardian_email"
-                  type="email"
-                  value={formData.guardian_email || ''}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="guardian_phone">Guardian Phone</label>
-                <Input
-                  id="guardian_phone"
-                  name="guardian_phone"
-                  value={formData.guardian_phone || ''}
+                  id="camp"
+                  name="camp"
+                  value={formData.camp || ''}
                   onChange={handleInputChange}
                   disabled={!isEditing}
                 />
