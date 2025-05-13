@@ -986,10 +986,28 @@ app.post('/api/users', (async (req: Request, res: Response) => {
   }
 }) as any);
 
-// Update a user
-app.put('/api/users/:id', (async (req: Request, res: Response) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
+// GET user by ID
+app.get('/api/users/:id', async (req: Request, res: Response) => {
+  const teamId = req.headers['x-team-id'];
+  if (!teamId || typeof teamId !== 'string') {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const result = await sql`SELECT * FROM users WHERE id = ${id} AND team_id = ${teamId}`;
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(result[0]);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar usuário.' });
+  }
+});
+
+// PUT user by ID
+app.put('/api/users/:id', async (req: Request, res: Response) => {
+  const teamId = req.headers['x-team-id'];
+  if (!teamId || typeof teamId !== 'string') {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
@@ -997,17 +1015,17 @@ app.put('/api/users/:id', (async (req: Request, res: Response) => {
     const { name, email, role } = req.body;
     const now = new Date().toISOString();
     const fields = [];
-    if (name !== undefined) fields.push(sql`name = ${name}`);
-    if (email !== undefined) fields.push(sql`email = ${email}`);
-    if (role !== undefined) fields.push(sql`role = ${role}`);
-    fields.push(sql`updated_at = ${now}`);
+    if (name !== undefined) fields.push(`name = '${name}'`);
+    if (email !== undefined) fields.push(`email = '${email}'`);
+    if (role !== undefined) fields.push(`role = '${role}'`);
+    fields.push(`updated_at = '${now}'`);
     if (fields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
-    const setClause = sql.join(fields, sql`, `);
+    const setClause = fields.join(', ');
     const result = await sql.unsafe(
-      `UPDATE users SET ${setClause.sql} WHERE id = $1 AND team_id = $2 RETURNING *`,
-      [id, teamId, ...setClause.values]
+      `UPDATE users SET ${setClause} WHERE id = $1 AND team_id = $2 RETURNING *`,
+      [id, teamId]
     );
     if (!result[0]) {
       return res.status(404).json({ error: 'User not found or you do not have permission to update it' });
@@ -1016,19 +1034,17 @@ app.put('/api/users/:id', (async (req: Request, res: Response) => {
   } catch {
     res.status(500).json({ error: 'Erro ao atualizar usuário.' });
   }
-}) as any);
+});
 
-// Delete a user
-app.delete('/api/users/:id', (async (req: Request, res: Response) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
+// DELETE user by ID
+app.delete('/api/users/:id', async (req: Request, res: Response) => {
+  const teamId = req.headers['x-team-id'];
+  if (!teamId || typeof teamId !== 'string') {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
     const { id } = req.params;
-    const result = await sql`
-      DELETE FROM users WHERE id = ${id} AND team_id = ${teamId} RETURNING *
-    `;
+    const result = await sql`DELETE FROM users WHERE id = ${id} AND team_id = ${teamId} RETURNING *`;
     if (!result[0]) {
       return res.status(404).json({ error: 'User not found or you do not have permission to delete it' });
     }
@@ -1036,7 +1052,7 @@ app.delete('/api/users/:id', (async (req: Request, res: Response) => {
   } catch {
     res.status(500).json({ error: 'Erro ao deletar usuário.' });
   }
-}) as any);
+});
 
 // Create a new registration for the current team
 app.post('/api/registrations', (async (req: Request, res: Response) => {
