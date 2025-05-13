@@ -2039,16 +2039,11 @@ app.post('/api/campers', async (req, res) => {
   try {
     const { name, email, contact, registration_id, camp, form_id, additional_notes } = req.body;
     
-    if (!name || !email || !registration_id || !camp) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        details: { name, email, registration_id, camp }
-      });
-    }
-
-    // Verify if registration belongs to the team
+    console.log('Creating camper with data:', req.body);
+    
+    // Get registration data to use name and email if not provided
     const registration = await sqlVercel`
-      SELECT r.id 
+      SELECT r.id, r.name, r.email, r.contact
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
       WHERE r.id = ${registration_id}::uuid
@@ -2057,6 +2052,23 @@ app.post('/api/campers', async (req, res) => {
 
     if (registration.length === 0) {
       return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
+    }
+
+    // Use registration data if not provided in request
+    const camperName = name || registration[0].name;
+    const camperEmail = email || registration[0].email;
+    const camperContact = contact || registration[0].contact;
+
+    if (!camperName || !camperEmail || !registration_id || !camp) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        details: { 
+          name: camperName, 
+          email: camperEmail, 
+          registration_id, 
+          camp 
+        }
+      });
     }
 
     const now = new Date().toISOString();
@@ -2072,9 +2084,9 @@ app.post('/api/campers', async (req, res) => {
         created_at, 
         updated_at
       ) VALUES (
-        ${name}, 
-        ${email}, 
-        ${contact},
+        ${camperName}, 
+        ${camperEmail}, 
+        ${camperContact},
         ${registration_id}, 
         ${camp}, 
         ${form_id}, 
@@ -2099,13 +2111,13 @@ app.patch('/api/registrations/:id/onboarding-status', async (req, res) => {
   }
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { onboarding_status } = req.body;
 
-    console.log('Updating onboarding status:', { id, status, body: req.body });
+    console.log('Updating onboarding status:', { id, onboarding_status, body: req.body });
 
-    if (!status) {
+    if (!onboarding_status) {
       return res.status(400).json({ 
-        error: 'Status is required',
+        error: 'Onboarding status is required',
         details: { receivedBody: req.body }
       });
     }
@@ -2126,7 +2138,7 @@ app.patch('/api/registrations/:id/onboarding-status', async (req, res) => {
     const now = new Date().toISOString();
     const result = await sqlVercel`
       UPDATE registrations 
-      SET onboarding_status = ${status}, updated_at = ${now}
+      SET onboarding_status = ${onboarding_status}, updated_at = ${now}
       WHERE id = ${id}::uuid
       RETURNING *
     `;
