@@ -1884,7 +1884,14 @@ app.delete('/api/camps/:id', async (req, res) => {
 
 // Update user
 app.put('/api/users/:id', async (req, res) => {
+  console.log('Recebendo requisição PUT para /api/users/:id');
+  console.log('Headers:', req.headers);
+  console.log('Params:', req.params);
+  console.log('Body:', req.body);
+
   const teamId = getTeamId(req);
+  console.log('Team ID obtido:', teamId);
+  
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
@@ -1894,6 +1901,23 @@ app.put('/api/users/:id', async (req, res) => {
     const { name, email, role } = req.body;
     const now = new Date().toISOString();
     
+    // Primeiro, vamos verificar se o usuário existe e pertence ao time
+    console.log('Verificando usuário existente...');
+    const existingUser = await sqlVercel`
+      SELECT id, team_id FROM users WHERE id = ${id}::uuid
+    `;
+    console.log('Usuário encontrado:', existingUser[0]);
+
+    if (!existingUser[0]) {
+      console.log('Usuário não encontrado');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (existingUser[0].team_id !== teamId) {
+      console.log('Usuário pertence a outro time:', existingUser[0].team_id);
+      return res.status(403).json({ error: 'User belongs to a different team' });
+    }
+    
     // Build the update query dynamically
     const updates = [];
     if (name !== undefined) updates.push(`name = '${name}'`);
@@ -1902,22 +1926,30 @@ app.put('/api/users/:id', async (req, res) => {
     updates.push(`updated_at = '${now}'`);
 
     if (updates.length === 0) {
+      console.log('Nenhum campo para atualizar');
       return res.status(400).json({ error: 'No fields to update' });
     }
 
     const setClause = updates.join(', ');
+    console.log('Query de atualização:', `UPDATE users SET ${setClause} WHERE id = $1 AND team_id = $2 RETURNING *`);
+    console.log('Parâmetros:', [id, teamId]);
+
     const result = await sqlVercel.unsafe(
       `UPDATE users SET ${setClause} WHERE id = $1 AND team_id = $2 RETURNING *`,
       [id, teamId]
     );
 
+    console.log('Resultado da atualização:', result[0]);
+
     if (!result[0]) {
+      console.log('Nenhum registro atualizado');
       return res.status(404).json({ error: 'User not found or you do not have permission to update it' });
     }
 
     return res.json(result[0]);
   } catch (error) {
-    console.error('Error updating user:', error);
+    console.error('Erro ao atualizar usuário:', error);
+    console.error('Stack trace:', error.stack);
     return res.status(500).json({ error: 'Erro ao atualizar usuário.' });
   }
 });
