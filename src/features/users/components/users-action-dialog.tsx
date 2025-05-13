@@ -72,7 +72,8 @@ export function UsersActionDialog({ open, onOpenChange, onUserUpdated, initialDa
     
     try {
       const userData = {
-        name: `${values.firstName} ${values.lastName}`,
+        first_name: values.firstName,
+        last_name: values.lastName,
         email: values.email,
         role: values.role
       };
