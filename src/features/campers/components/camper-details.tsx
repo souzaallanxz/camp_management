@@ -215,6 +215,27 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
                   disabled={!isEditing}
                 />
               </div>
+              <div className="grid gap-2">
+                <label htmlFor="snack_bar_balance">Snack Bar Balance</label>
+                <Input
+                  id="snack_bar_balance"
+                  name="snack_bar_balance"
+                  type="number"
+                  value={formData.snack_bar_balance || 0}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="additional_notes">Additional Notes</label>
+                <Textarea
+                  id="additional_notes"
+                  name="additional_notes"
+                  value={formData.additional_notes || ''}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                />
+              </div>
             </div>
             <div className="flex justify-end space-x-2 py-4">
               <Button
