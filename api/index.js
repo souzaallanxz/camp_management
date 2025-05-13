@@ -1106,20 +1106,8 @@ app.get('/api/registrations', async (req, res) => {
   }
 
   try {
-    // Get all camps for this team
-    const campIds = await sqlVercel`
-      SELECT id FROM camps WHERE team_id = ${teamId}::uuid
-    `;
-
-    if (campIds.length === 0) {
-      return res.json([]);
-    }
-
-    // Create array of camp IDs
-    const campIdList = campIds.map((row) => row.id);
-
-    // Get all registrations for these camps
-    const registrations = await sqlVercel`
+    // Buscar registros com JOIN em camps e LEFT JOIN em payments
+    const registrationsQuery = await sqlVercel`
       SELECT 
         r.id,
         r.form_id,
@@ -1133,7 +1121,6 @@ app.get('/api/registrations', async (req, res) => {
         r.camp_id,
         r.onboarding_status,
         r.snack_bar_balance,
-        r.total_amount_paid,
         r.id_number,
         r.sns_number,
         r.date_of_birth,
@@ -1143,12 +1130,39 @@ app.get('/api/registrations', async (req, res) => {
         r.guardian_phone,
         c.name as camp_name,
         c.start_date as camp_start_date,
-        c.end_date as camp_end_date
+        c.end_date as camp_end_date,
+        c.price as camp_price,
+        COALESCE(SUM(p.amount), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      WHERE r.camp_id = ANY(${campIdList}::uuid[])
+      LEFT JOIN payments p ON r.id = p.registration_id
+      WHERE c.team_id = ${teamId}::uuid
+      GROUP BY r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date, c.price
       ORDER BY r.created_at DESC
     `;
+
+    // Processar os resultados
+    const registrations = registrationsQuery.map(registration => {
+      // Converter valores para números
+      const totalPaid = parseFloat(registration.total_paid) || 0;
+      const campPrice = parseFloat(registration.camp_price) || 0;
+      
+      // Determinar status baseado no total pago vs preço do acampamento
+      let status = 'unpaid';
+      if (totalPaid >= campPrice || (campPrice > 0 && (campPrice - totalPaid) < 1)) {
+        status = 'paid';
+      } else if (totalPaid > 0) {
+        status = 'partial';
+      }
+      
+      // Retornar registro com valores processados
+      return {
+        ...registration,
+        total_paid: totalPaid,
+        camp_price: campPrice,
+        status: status
+      };
+    });
 
     return res.json(registrations);
   } catch (error) {
@@ -1200,26 +1214,27 @@ app.get('/campers', async (req, res) => {
 });
 
 // Get camper by ID
-app.get('/campers/:id', async (req, res) => {
+app.get('/api/campers/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
     const { id } = req.params;
-    
-    const result = await sqlVercel`
-      SELECT cm.*, r.name as registration_name, c.name as camp_name
-      FROM campers cm
-      JOIN registrations r ON cm.registration_id = r.id
+    const camper = await sqlVercel`
+      SELECT ca.*
+      FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
-      WHERE cm.id = ${id}::uuid
+      WHERE ca.id = ${id} AND c.team_id = ${teamId}
+      LIMIT 1
     `;
-    
-    if (result.length === 0) {
+    if (!camper[0]) {
       return res.status(404).json({ error: 'Camper not found' });
     }
-    
-    return res.json(result[0]);
-  } catch (error) {
-    console.error('Error getting camper by ID:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    res.json(camper[0]);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar campista.' });
   }
 });
 
@@ -1263,24 +1278,22 @@ app.get('/users', async (req, res) => {
 });
 
 // Get user by ID
-app.get('/users/:id', async (req, res) => {
+app.get('/api/users/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
     const { id } = req.params;
-    
     const result = await sqlVercel`
-      SELECT id, email, name, role, team_id, created_at, updated_at
-      FROM users
-      WHERE id = ${id}::uuid
+      SELECT * FROM users WHERE id = ${id} AND team_id = ${teamId}
     `;
-    
     if (result.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
-    return res.json(result[0]);
-  } catch (error) {
-    console.error('Error getting user by ID:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    res.json(result[0]);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar usuário.' });
   }
 });
 
@@ -1323,24 +1336,22 @@ app.get('/camps', async (req, res) => {
 });
 
 // Get camp by ID
-app.get('/camps/:id', async (req, res) => {
+app.get('/api/camps/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
     const { id } = req.params;
-    
     const result = await sqlVercel`
-      SELECT *
-      FROM camps
-      WHERE id = ${id}::uuid
+      SELECT * FROM camps WHERE id = ${id} AND team_id = ${teamId}
     `;
-    
     if (result.length === 0) {
       return res.status(404).json({ error: 'Camp not found' });
     }
-    
-    return res.json(result[0]);
-  } catch (error) {
-    console.error('Error getting camp by ID:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    res.json(result[0]);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar acampamento.' });
   }
 });
 
@@ -1456,13 +1467,12 @@ app.get('/api/registrations', async (req, res) => {
 app.get('/api/registrations/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
     const result = await sqlVercel`
       SELECT 
         r.id,
         r.form_id,
-        r.name,
-        r.email,
+        r.name as camper_name,
+        r.email as camper_email,
         r.contact,
         r.status,
         r.created_at,
@@ -1471,7 +1481,6 @@ app.get('/api/registrations/:id', async (req, res) => {
         r.camp_id,
         r.onboarding_status,
         r.snack_bar_balance,
-        r.total_amount_paid,
         r.id_number,
         r.sns_number,
         r.date_of_birth,
@@ -1479,17 +1488,36 @@ app.get('/api/registrations/:id', async (req, res) => {
         r.guardian_name,
         r.guardian_email,
         r.guardian_phone,
-        c.name as camp_name
+        c.name as camp_name,
+        c.start_date as camp_start_date,
+        c.end_date as camp_end_date,
+        c.price as camp_price,
+        COALESCE(SUM(p.amount), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
+      LEFT JOIN payments p ON r.id = p.registration_id
       WHERE r.id = ${id}::uuid
+      GROUP BY r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date, c.price
+      LIMIT 1
     `;
-    
     if (result.length === 0) {
       return res.status(404).json({ error: 'Registration not found' });
     }
-    
-    return res.json(result[0]);
+    const registration = result[0];
+    const totalPaid = parseFloat(registration.total_paid) || 0;
+    const campPrice = parseFloat(registration.camp_price) || 0;
+    let status = 'unpaid';
+    if (totalPaid >= campPrice || (campPrice > 0 && (campPrice - totalPaid) < 1)) {
+      status = 'paid';
+    } else if (totalPaid > 0) {
+      status = 'partial';
+    }
+    return res.json({
+      ...registration,
+      total_paid: totalPaid,
+      camp_price: campPrice,
+      status
+    });
   } catch (error) {
     console.error('Error getting registration by ID:', error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -1498,114 +1526,62 @@ app.get('/api/registrations/:id', async (req, res) => {
 
 // Get all campers
 app.get('/api/campers', async (req, res) => {
-  console.log('Recebendo requisição para /api/campers');
-  
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
-    const teamId = getTeamId(req);
-    console.log('Team ID obtido:', teamId);
-    
-    let results;
-    if (teamId) {
-      results = await sqlVercel`
-        SELECT cm.*, r.name as registration_name, c.name as camp_name
-        FROM campers cm
-        JOIN registrations r ON cm.registration_id = r.id
-        JOIN camps c ON r.camp_id = c.id
-        WHERE c.team_id = ${teamId}::uuid
-        ORDER BY cm.created_at DESC
-      `;
-    } else {
-      // Modo diagnóstico
-      results = await sqlVercel`
-        SELECT cm.*, r.name as registration_name, c.name as camp_name
-        FROM campers cm
-        JOIN registrations r ON cm.registration_id = r.id
-        JOIN camps c ON r.camp_id = c.id
-        ORDER BY cm.created_at DESC
-        LIMIT 20
-      `;
-    }
-    
-    return res.json(results);
-  } catch (error) {
-    console.error('Error getting campers:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      details: error.message
-    });
+    const campers = await sqlVercel`
+      SELECT ca.*, 
+             c.name as camp_name, 
+             COALESCE(ca.snack_bar_balance, 0) as snack_bar_balance
+      FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY ca.created_at DESC
+    `;
+    // Mapear os resultados para incluir camp como objeto e garantir que snack_bar_balance seja um número
+    const campersWithCampObject = campers.map(camper => ({
+      ...camper,
+      camp: { name: camper.camp_name },
+      snack_bar_balance: Number(camper.snack_bar_balance) || 0
+    }));
+    res.json(campersWithCampObject);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar campistas.' });
   }
 });
 
 // Get all users
 app.get('/api/users', async (req, res) => {
-  console.log('Recebendo requisição para /api/users');
-  
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
-    const teamId = getTeamId(req);
-    console.log('Team ID obtido:', teamId);
-    
-    // Usuários só são acessíveis para a mesma equipe ou superadmin
-    let results;
-    if (teamId) {
-      results = await sqlVercel`
-        SELECT id, email, name, role, team_id, created_at, updated_at
-        FROM users
-        WHERE team_id = ${teamId}::uuid
-        ORDER BY created_at DESC
-      `;
-    } else {
-      // Modo diagnóstico - omite informações sensíveis
-      results = await sqlVercel`
-        SELECT id, email, name, role, team_id, created_at, updated_at
-        FROM users
-        ORDER BY created_at DESC
-        LIMIT 20
-      `;
-    }
-    
-    return res.json(results);
-  } catch (error) {
-    console.error('Error getting users:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      details: error.message
-    });
+    const users = await sqlVercel`
+      SELECT * FROM users WHERE team_id = ${teamId} ORDER BY created_at DESC
+    `;
+    res.json(users);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar usuários.' });
   }
 });
 
 // Get all camps
 app.get('/api/camps', async (req, res) => {
-  console.log('Recebendo requisição para /api/camps');
-  
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
-    const teamId = getTeamId(req);
-    console.log('Team ID obtido:', teamId);
-    
-    let results;
-    if (teamId) {
-      results = await sqlVercel`
-        SELECT *
-        FROM camps
-        WHERE team_id = ${teamId}::uuid
-        ORDER BY created_at DESC
-      `;
-    } else {
-      // Modo diagnóstico
-      results = await sqlVercel`
-        SELECT *
-        FROM camps
-        ORDER BY created_at DESC
-        LIMIT 20
-      `;
-    }
-    
-    return res.json(results);
-  } catch (error) {
-    console.error('Error getting camps:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      details: error.message
-    });
+    const camps = await sqlVercel`
+      SELECT * FROM camps WHERE team_id = ${teamId} ORDER BY created_at DESC
+    `;
+    res.json(camps);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar acampamentos.' });
   }
 });
 
@@ -1641,17 +1617,18 @@ app.get('/api/settings/profile', async (req, res) => {
 // Get payments by registration ID
 app.get('/api/payments', async (req, res) => {
   const teamId = getTeamId(req);
+  const { registrationId } = req.query;
+  
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
+  
+  if (!registrationId) {
+    return res.status(400).json({ error: 'Missing registrationId' });
+  }
+  
   try {
-    const { registrationId } = req.query;
-    
-    if (!registrationId) {
-      return res.status(400).json({ error: 'Registration ID is required' });
-    }
-    
-    // Primeiro verifica se o registration pertence ao time
+    // First verify if the registration belongs to the team
     const registration = await sqlVercel`
       SELECT r.id 
       FROM registrations r
@@ -1664,78 +1641,93 @@ app.get('/api/payments', async (req, res) => {
       return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
     }
     
-    const results = await sqlVercel`
+    const payments = await sqlVercel`
       SELECT 
-        id, 
-        registration_id, 
-        amount, 
-        payment_method, 
-        payment_status, 
-        payment_date,
-        payment_link,
-        phone_number,
-        created_at, 
-        updated_at
-      FROM payments
-      WHERE registration_id = ${registrationId}::uuid
-      ORDER BY created_at DESC
+        p.id,
+        p.registration_id,
+        p.payment_method,
+        p.amount,
+        p.payment_date,
+        p.phone_number,
+        p.payment_link,
+        p.payment_status,
+        p.created_at,
+        p.updated_at
+      FROM payments p
+      WHERE p.registration_id = ${registrationId}::uuid
+      ORDER BY p.created_at DESC
     `;
     
-    return res.json(results);
+    // Converter os valores numéricos de string para número
+    const processedPayments = payments.map(payment => ({
+      ...payment,
+      amount: parseFloat(payment.amount) || 0
+    }));
+    
+    res.json(processedPayments);
   } catch (error) {
-    console.error('Error getting payments:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Error fetching payments:', error);
+    res.status(500).json({ error: 'Error fetching payments' });
   }
 });
 
 // Create new payment
 app.post('/api/payments', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
-    const { registrationId, amount, paymentMethod, status, payment_date, payment_link, phone_number } = req.body;
-    
-    if (!registrationId || !amount || !paymentMethod || !payment_date) {
-      return res.status(400).json({ error: 'Registration ID, amount, payment method, and payment_date are required' });
+    const { registration_id, payment_method, amount, payment_date, phone_number, payment_link } = req.body;
+    if (!registration_id || !payment_method || !amount || !payment_date) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
-    
+    // Check if registration belongs to the team
+    const reg = await sqlVercel`
+      SELECT r.id FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
+    `;
+    if (!reg[0]) {
+      return res.status(400).json({ error: 'Registration does not belong to your team' });
+    }
+    const now = new Date().toISOString();
+    const paymentStatus = payment_method === 'MB Way' ? 'pending' : 'confirmed';
     const result = await sqlVercel`
       INSERT INTO payments (
-        id, 
-        registration_id, 
-        amount, 
-        payment_method, 
-        payment_status, 
-        payment_date,
-        payment_link,
-        phone_number,
-        created_at, 
-        updated_at
-      )
-      VALUES (
-        ${uuidv4()}, 
-        ${registrationId}::uuid, 
-        ${amount}, 
-        ${paymentMethod}, 
-        ${status || 'confirmed'}, 
-        ${payment_date},
-        ${payment_link || null},
-        ${phone_number || null},
-        NOW(), 
-        NOW()
-      )
-      RETURNING *
+        registration_id, payment_method, amount, payment_date, phone_number, payment_link, payment_status, created_at, updated_at
+      ) VALUES (
+        ${registration_id}, ${payment_method}, ${amount}, ${payment_date}, ${phone_number}, ${payment_link}, ${paymentStatus}, ${now}, ${now}
+      ) RETURNING *
     `;
-    
-    // Update the total_amount_paid in the registration
-    await sqlVercel`
-      UPDATE registrations
-      SET total_amount_paid = COALESCE(total_amount_paid, 0) + ${amount}
-      WHERE id = ${registrationId}::uuid
+    // Atualizar status da inscrição após criar pagamento
+    // Função utilitária (pode ser implementada como helper ou inline)
+    const totalPaidResult = await sqlVercel`
+      SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE registration_id = ${registration_id}
     `;
-    
-    return res.status(201).json(result[0]);
+    const registrationResult = await sqlVercel`
+      SELECT r.id, c.price as camp_price
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registration_id}
+    `;
+    if (registrationResult[0]) {
+      const campPrice = Number(registrationResult[0].camp_price || 0);
+      const totalPaid = Number(totalPaidResult[0].total || 0);
+      let newStatus = 'unpaid';
+      if (totalPaid >= campPrice) {
+        newStatus = 'paid';
+      } else if (totalPaid > 0) {
+        newStatus = 'partial';
+      }
+      await sqlVercel`
+        UPDATE registrations SET status = ${newStatus}, total_amount_paid = ${totalPaid} WHERE id = ${registration_id}
+      `;
+    }
+    res.status(201).json(result[0]);
   } catch (error) {
     console.error('Error creating payment:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Erro ao criar pagamento.' });
   }
 });
 
@@ -1771,85 +1763,162 @@ app.get('/api/payments/latest-link', async (req, res) => {
 
 // Update payment
 app.put('/api/payments/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
     const { id } = req.params;
-    const { amount, paymentMethod, status, payment_date, payment_link, phone_number } = req.body;
-    
-    // Get the current payment to calculate difference in amount
-    const currentPayment = await sqlVercel`
-      SELECT * FROM payments WHERE id = ${id}::uuid
-    `;
-    
-    if (currentPayment.length === 0) {
-      return res.status(404).json({ error: 'Payment not found' });
+    const { registration_id, ...fields } = req.body;
+    const now = new Date().toISOString();
+    const setFields = Object.entries(fields).map(([key, value]) => `${key} = '${value}'`).join(', ');
+    const result = await sqlVercel.unsafe(
+      `UPDATE payments SET ${setFields}, updated_at = '${now}' WHERE id = $1 AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = $2) RETURNING *`,
+      [id, teamId]
+    );
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Payment not found or you do not have permission to update it' });
     }
-    
-    // Calculate amount difference if amount is being updated
-    const amountDifference = amount ? (amount - currentPayment[0].amount) : 0;
-    
-    // Update the payment
-    const result = await sqlVercel`
-      UPDATE payments
-      SET 
-        amount = COALESCE(${amount}, amount),
-        payment_method = COALESCE(${paymentMethod}, payment_method),
-        payment_status = COALESCE(${status}, payment_status),
-        payment_date = COALESCE(${payment_date}, payment_date),
-        payment_link = COALESCE(${payment_link}, payment_link),
-        phone_number = COALESCE(${phone_number}, phone_number),
-        updated_at = NOW()
-      WHERE id = ${id}::uuid
-      RETURNING *
-    `;
-    
-    // If amount was changed, update the registration's total_amount_paid
-    if (amountDifference !== 0) {
-      await sqlVercel`
-        UPDATE registrations
-        SET total_amount_paid = COALESCE(total_amount_paid, 0) + ${amountDifference}
-        WHERE id = ${currentPayment[0].registration_id}::uuid
-      `;
-    }
-    
-    return res.json(result[0]);
+    res.json(result[0]);
   } catch (error) {
     console.error('Error updating payment:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Erro ao atualizar pagamento.' });
   }
 });
 
 // Delete payment
 app.delete('/api/payments/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
     const { id } = req.params;
-    
-    // Get the payment first to know the amount and registration ID
-    const paymentResult = await sqlVercel`
-      SELECT * FROM payments WHERE id = ${id}::uuid
+    // Get registration_id before deleting
+    const payment = await sqlVercel`
+      SELECT registration_id FROM payments WHERE id = ${id}
     `;
-    
-    if (paymentResult.length === 0) {
-      return res.status(404).json({ error: 'Payment not found' });
+    const result = await sqlVercel`
+      DELETE FROM payments WHERE id = ${id} AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = ${teamId}) RETURNING *
+    `;
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Payment not found or you do not have permission to delete it' });
     }
-    
-    const payment = paymentResult[0];
-    
-    // Delete the payment
-    await sqlVercel`
-      DELETE FROM payments WHERE id = ${id}::uuid
-    `;
-    
-    // Update the total_amount_paid in the registration
-    await sqlVercel`
-      UPDATE registrations
-      SET total_amount_paid = COALESCE(total_amount_paid, 0) - ${payment.amount}
-      WHERE id = ${payment.registration_id}::uuid
-    `;
-    
-    return res.json({ success: true });
+    // Atualizar status da inscrição após deletar pagamento
+    if (payment[0] && payment[0].registration_id) {
+      const registration_id = payment[0].registration_id;
+      const totalPaidResult = await sqlVercel`
+        SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE registration_id = ${registration_id}
+      `;
+      const registrationResult = await sqlVercel`
+        SELECT r.id, c.price as camp_price
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE r.id = ${registration_id}
+      `;
+      if (registrationResult[0]) {
+        const campPrice = Number(registrationResult[0].camp_price || 0);
+        const totalPaid = Number(totalPaidResult[0].total || 0);
+        let newStatus = 'unpaid';
+        if (totalPaid >= campPrice) {
+          newStatus = 'paid';
+        } else if (totalPaid > 0) {
+          newStatus = 'partial';
+        }
+        await sqlVercel`
+          UPDATE registrations SET status = ${newStatus}, total_amount_paid = ${totalPaid} WHERE id = ${registration_id}
+        `;
+      }
+    }
+    res.status(204).end();
   } catch (error) {
     console.error('Error deleting payment:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Erro ao deletar pagamento.' });
+  }
+});
+
+// Delete registration
+app.delete('/api/registrations/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    // Only delete if registration belongs to a camp of the team
+    const result = await sqlVercel`
+      DELETE FROM registrations WHERE id = ${id} AND camp_id IN (SELECT id FROM camps WHERE team_id = ${teamId}) RETURNING *
+    `;
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Registration not found or you do not have permission to delete it' });
+    }
+    res.status(204).end();
+  } catch (error) {
+    console.error('Error deleting registration:', error);
+    res.status(500).json({ error: 'Erro ao deletar inscrição.' });
+  }
+});
+
+// Delete camper
+app.delete('/api/campers/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const result = await sqlVercel`
+      DELETE FROM campers WHERE id = ${id} AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = ${teamId}) RETURNING *
+    `;
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Camper not found or you do not have permission to delete it' });
+    }
+    res.status(204).end();
+  } catch {
+    res.status(500).json({ error: 'Erro ao deletar campista.' });
+  }
+});
+
+// Delete camp
+app.delete('/api/camps/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    // Check if there are any registrations for this camp
+    const regs = await sqlVercel`SELECT id FROM registrations WHERE camp_id = ${id} LIMIT 1`;
+    if (regs.length > 0) {
+      return res.status(400).json({ error: 'Não é possível excluir um acampamento que possui inscrições. Por favor, exclua todas as inscrições primeiro.' });
+    }
+    const result = await sqlVercel`DELETE FROM camps WHERE id = ${id} AND team_id = ${teamId} RETURNING *`;
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Camp not found or you do not have permission to delete it' });
+    }
+    res.status(204).end();
+  } catch {
+    res.status(500).json({ error: 'Erro ao deletar acampamento.' });
+  }
+});
+
+// Delete user
+app.delete('/api/users/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const result = await sqlVercel`
+      DELETE FROM users WHERE id = ${id} AND team_id = ${teamId} RETURNING *
+    `;
+    if (!result[0]) {
+      return res.status(404).json({ error: 'User not found or you do not have permission to delete it' });
+    }
+    res.status(204).end();
+  } catch {
+    res.status(500).json({ error: 'Erro ao deletar usuário.' });
   }
 });
 
