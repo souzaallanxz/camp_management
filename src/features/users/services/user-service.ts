@@ -15,6 +15,14 @@ function getTeamIdHeader() {
   };
 }
 
+function mapUserApiToClient(user: Record<string, any>): User {
+  return {
+    ...user,
+    firstName: user.first_name ?? '',
+    lastName: user.last_name ?? '',
+  };
+}
+
 // Busca apenas usuários da equipe atual do usuário logado
 export async function getUsers(): Promise<User[]> {
   const response = await fetch(`${API_BASE_URL}/users`, {
@@ -22,7 +30,8 @@ export async function getUsers(): Promise<User[]> {
     credentials: 'include',
   });
   if (!response.ok) return [];
-  return response.json();
+  const data = await response.json();
+  return data.map(mapUserApiToClient);
 }
 
 // Função unificada para criar/convidar usuários
@@ -34,7 +43,8 @@ export async function createUserWithInvitation(userData: Omit<User, 'id' | 'crea
     body: JSON.stringify(userData),
   });
   if (!response.ok) throw new Error('Erro ao criar usuário');
-  return response.json();
+  const data = await response.json();
+  return mapUserApiToClient(data);
 }
 
 export async function updateUser(userId: string, userData: Partial<User>): Promise<User> {
@@ -45,7 +55,8 @@ export async function updateUser(userId: string, userData: Partial<User>): Promi
     body: JSON.stringify(userData),
   });
   if (!response.ok) throw new Error('Erro ao atualizar usuário');
-  return response.json();
+  const data = await response.json();
+  return mapUserApiToClient(data);
 }
 
 export async function deleteUser(userId: string): Promise<void> {
