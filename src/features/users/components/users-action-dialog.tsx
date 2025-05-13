@@ -71,7 +71,13 @@ export function UsersActionDialog({ open, onOpenChange, onUserUpdated, initialDa
     }
     
     try {
-      await updateUser(initialData.id, values)
+      const userData = {
+        name: `${values.firstName} ${values.lastName}`,
+        email: values.email,
+        role: values.role
+      };
+      
+      await updateUser(initialData.id, userData)
       toast({
         title: 'User updated',
         description: 'The user has been updated successfully.',
