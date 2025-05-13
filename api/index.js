@@ -1882,5 +1882,4 @@ app.delete('/api/camps/:id', async (req, res) => {
   }
 });
 
-// Export the Express app as a serverless function
-export default app; 
+// export default app; // REMOVIDO para não interferir com endpoints serverless dinâmicos
