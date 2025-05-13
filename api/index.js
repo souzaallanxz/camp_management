@@ -1277,26 +1277,6 @@ app.get('/users', async (req, res) => {
   }
 });
 
-// Get user by ID
-app.get('/api/users/:id', async (req, res) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  try {
-    const { id } = req.params;
-    const result = await sqlVercel`
-      SELECT * FROM users WHERE id = ${id} AND team_id = ${teamId}
-    `;
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(result[0]);
-  } catch {
-    res.status(500).json({ error: 'Erro ao buscar usuário.' });
-  }
-});
-
 // ===== CAMPS ENDPOINTS =====
 
 // Get all camps
@@ -1899,26 +1879,6 @@ app.delete('/api/camps/:id', async (req, res) => {
     res.status(204).end();
   } catch {
     res.status(500).json({ error: 'Erro ao deletar acampamento.' });
-  }
-});
-
-// Delete user
-app.delete('/api/users/:id', async (req, res) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  try {
-    const { id } = req.params;
-    const result = await sqlVercel`
-      DELETE FROM users WHERE id = ${id} AND team_id = ${teamId} RETURNING *
-    `;
-    if (!result[0]) {
-      return res.status(404).json({ error: 'User not found or you do not have permission to delete it' });
-    }
-    res.status(204).end();
-  } catch {
-    res.status(500).json({ error: 'Erro ao deletar usuário.' });
   }
 });
 
