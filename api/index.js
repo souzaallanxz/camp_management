@@ -1981,14 +1981,14 @@ app.post('/api/camps', async (req, res) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { name, start_date, end_date, price, description, location } = req.body;
-    if (!name || !start_date || !end_date) {
-      return res.status(400).json({ error: 'Missing required fields: name, start_date, end_date' });
+    const { name, start_date, end_date, price } = req.body;
+    if (!name || !start_date || !end_date || price === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: name, start_date, end_date, price' });
     }
     const now = new Date().toISOString();
     const result = await sqlVercel`
-      INSERT INTO camps (name, start_date, end_date, price, description, location, team_id, created_at, updated_at)
-      VALUES (${name}, ${start_date}, ${end_date}, ${price || 0}, ${description || ''}, ${location || ''}, ${teamId}, ${now}, ${now})
+      INSERT INTO camps (name, start_date, end_date, price, team_id, created_at, updated_at)
+      VALUES (${name}, ${start_date}, ${end_date}, ${price}, ${teamId}, ${now}, ${now})
       RETURNING *
     `;
     res.status(201).json(result[0]);
@@ -2006,7 +2006,7 @@ app.put('/api/camps/:id', async (req, res) => {
   }
   try {
     const { id } = req.params;
-    const { name, start_date, end_date, price, description, location } = req.body;
+    const { name, start_date, end_date, price } = req.body;
     // Verifica se o camp existe e pertence ao time
     const existing = await sqlVercel`SELECT * FROM camps WHERE id = ${id} AND team_id = ${teamId}`;
     if (!existing[0]) {
@@ -2019,8 +2019,6 @@ app.put('/api/camps/:id', async (req, res) => {
         start_date = ${start_date || existing[0].start_date},
         end_date = ${end_date || existing[0].end_date},
         price = ${price !== undefined ? price : existing[0].price},
-        description = ${description !== undefined ? description : existing[0].description},
-        location = ${location !== undefined ? location : existing[0].location},
         updated_at = ${now}
       WHERE id = ${id} AND team_id = ${teamId}
       RETURNING *
