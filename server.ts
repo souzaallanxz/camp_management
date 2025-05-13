@@ -609,8 +609,10 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
+  
   try {
-    const registrations = await sql`
+    // Consulta para buscar registros com seus respectivos acampamentos
+    const registrationsQuery = await sql`
       SELECT 
         r.id,
         r.form_id,
@@ -640,15 +642,15 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
       JOIN camps c ON r.camp_id = c.id
       LEFT JOIN payments p ON r.id = p.registration_id
       WHERE c.team_id = ${teamId}
-      GROUP BY 
-        r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date, c.price
+      GROUP BY r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date, c.price
       ORDER BY r.created_at DESC
     `;
     
-    // Recalcular o status de pagamento para cada inscrição
-    const registrationsWithStatus = registrations.map(registration => {
-      const totalPaid = Number(registration.total_paid) || 0;
-      const campPrice = Number(registration.camp_price) || 0;
+    // Processar os resultados
+    const registrations = registrationsQuery.map(registration => {
+      // Converter valores para números
+      const totalPaid = parseFloat(registration.total_paid) || 0;
+      const campPrice = parseFloat(registration.camp_price) || 0;
       
       // Determinar status baseado no total pago vs preço do acampamento
       let status = 'unpaid';
@@ -658,13 +660,16 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
         status = 'partial';
       }
       
+      // Retornar registro com valores processados
       return {
         ...registration,
-        status: status // Sobrescrever o status armazenado com o calculado
+        total_paid: totalPaid,
+        camp_price: campPrice,
+        status: status
       };
     });
     
-    res.json(registrationsWithStatus);
+    res.json(registrations);
   } catch (error) {
     console.error('Error fetching registrations:', error);
     res.status(500).json({ error: 'Erro ao buscar inscrições.' });
@@ -1217,7 +1222,13 @@ app.get('/api/payments', (async (req: Request, res: Response) => {
       ORDER BY p.created_at DESC
     `;
     
-    res.json(payments);
+    // Converter os valores numéricos de string para número
+    const processedPayments = payments.map(payment => ({
+      ...payment,
+      amount: parseFloat(payment.amount) || 0
+    }));
+    
+    res.json(processedPayments);
   } catch (error) {
     console.error('Error fetching payments:', error);
     res.status(500).json({ error: 'Error fetching payments' });
@@ -1301,4 +1312,20 @@ app.delete('/api/payments/:id', (async (req: Request, res: Response) => {
     `;
     const result = await sql`
       DELETE FROM payments WHERE id = ${id} AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = ${teamId}) RETURNING *
-    `
+    `;
+    
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Payment not found or you do not have permission to delete it' });
+    }
+    
+    // Update registration status after deleting payment
+    if (payment[0] && payment[0].registration_id) {
+      await updateRegistrationStatus(payment[0].registration_id);
+    }
+    
+    res.status(204).end();
+  } catch (error) {
+    console.error('Error deleting payment:', error);
+    res.status(500).json({ error: 'Erro ao deletar pagamento.' });
+  }
+}) as any);
