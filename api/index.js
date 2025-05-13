@@ -1898,7 +1898,7 @@ app.put('/api/users/:id', async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { name, email, role } = req.body;
+    const { name, email, role, first_name, last_name } = req.body;
     const now = new Date().toISOString();
     
     // Primeiro, vamos verificar se o usuário existe e pertence ao time
@@ -1926,6 +1926,8 @@ app.put('/api/users/:id', async (req, res) => {
         name = ${name},
         email = ${email},
         role = ${role},
+        first_name = ${first_name},
+        last_name = ${last_name},
         updated_at = ${now}
       WHERE id = ${id}::uuid 
         AND team_id = ${teamId}::uuid
@@ -1944,6 +1946,31 @@ app.put('/api/users/:id', async (req, res) => {
     console.error('Erro ao atualizar usuário:', error);
     console.error('Stack trace:', error.stack);
     return res.status(500).json({ error: 'Erro ao atualizar usuário.' });
+  }
+});
+
+// Create a new user for the team
+app.post('/api/users', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { name, first_name, last_name, email, role } = req.body;
+    // Monta o nome completo se não vier o campo name
+    const fullName = name || ((first_name && last_name) ? `${first_name} ${last_name}` : null);
+    if (!fullName || !email || !role) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const now = new Date().toISOString();
+    const result = await sqlVercel`
+      INSERT INTO users (name, first_name, last_name, email, role, team_id, created_at, updated_at)
+      VALUES (${fullName}, ${first_name}, ${last_name}, ${email}, ${role}, ${teamId}, ${now}, ${now})
+      RETURNING *
+    `;
+    res.status(201).json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao criar usuário.' });
   }
 });
 
