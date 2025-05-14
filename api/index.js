@@ -2152,10 +2152,18 @@ app.patch('/api/registrations/:id/onboarding-status', async (req, res) => {
 
 // Update camper
 app.put('/api/campers/:id', async (req, res) => {
+  console.log('Recebendo requisição PUT para /api/campers/:id');
+  console.log('Headers:', req.headers);
+  console.log('Params:', req.params);
+  console.log('Body:', req.body);
+
   const teamId = getTeamId(req);
+  console.log('Team ID obtido:', teamId);
+  
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
+
   try {
     const { id } = req.params;
     const {
@@ -2175,6 +2183,27 @@ app.put('/api/campers/:id', async (req, res) => {
       guardian_phone,
       snack_bar_balance
     } = req.body;
+
+    // Primeiro, vamos verificar se o camper existe e pertence ao time
+    console.log('Verificando camper existente...');
+    const existingCamper = await sqlVercel`
+      SELECT ca.*, c.team_id 
+      FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${id}::uuid
+    `;
+    console.log('Camper encontrado:', existingCamper[0]);
+
+    if (!existingCamper[0]) {
+      console.log('Camper não encontrado');
+      return res.status(404).json({ error: 'Camper not found' });
+    }
+
+    if (existingCamper[0].team_id !== teamId) {
+      console.log('Camper pertence a outro time:', existingCamper[0].team_id);
+      return res.status(403).json({ error: 'Camper belongs to a different team' });
+    }
 
     // Build update fields dynamically
     const fields = [];
@@ -2200,6 +2229,7 @@ app.put('/api/campers/:id', async (req, res) => {
     }
 
     const setClause = fields.join(', ');
+    console.log('SQL Update clause:', setClause);
 
     // Only allow update if camper belongs to a registration of the team
     const result = await sqlVercel.unsafe(
@@ -2207,14 +2237,18 @@ app.put('/api/campers/:id', async (req, res) => {
       [id, teamId]
     );
 
+    console.log('Resultado da atualização:', result[0]);
+
     if (!result[0]) {
+      console.log('Nenhum registro atualizado');
       return res.status(404).json({ error: 'Camper not found or you do not have permission to update it' });
     }
 
-    res.json(result[0]);
+    return res.json(result[0]);
   } catch (error) {
-    console.error('Error updating camper:', error);
-    res.status(500).json({ error: 'Erro ao atualizar campista.' });
+    console.error('Erro ao atualizar camper:', error);
+    console.error('Stack trace:', error.stack);
+    return res.status(500).json({ error: 'Erro ao atualizar campista.' });
   }
 });
 
