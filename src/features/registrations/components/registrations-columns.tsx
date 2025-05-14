@@ -143,7 +143,8 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
     ),
     cell: ({ row }) => {
       return <div>{row.original.camper_name || '-'}</div>
-    }
+    },
+    enableGlobalFilter: true
   },
   {
     accessorKey: 'camper_email',
@@ -152,7 +153,8 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
     ),
     cell: ({ row }) => {
       return <div>{row.original.camper_email || '-'}</div>
-    }
+    },
+    enableGlobalFilter: true
   },
   {
     accessorKey: 'contact',

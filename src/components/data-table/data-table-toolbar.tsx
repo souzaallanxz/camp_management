@@ -7,11 +7,15 @@ import { DataTableViewOptions } from './data-table-view-options'
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
   searchField?: string
+  globalFilter?: string
+  onGlobalFilterChange?: (value: string) => void
 }
 
 export function DataTableToolbar<TData>({
   table,
   searchField = 'name',
+  globalFilter,
+  onGlobalFilterChange,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
 
@@ -19,13 +23,9 @@ export function DataTableToolbar<TData>({
     <div className='flex items-center justify-between'>
       <div className='flex flex-1 flex-col-reverse items-start gap-y-2 sm:flex-row sm:items-center sm:space-x-2'>
         <Input
-          placeholder='Filter...'
-          value={
-            (table.getColumn(searchField)?.getFilterValue() as string) ?? ''
-          }
-          onChange={(event) =>
-            table.getColumn(searchField)?.setFilterValue(event.target.value)
-          }
+          placeholder='Filtrar por nome ou email...'
+          value={globalFilter ?? ''}
+          onChange={(event) => onGlobalFilterChange?.(event.target.value)}
           className='h-8 w-[150px] lg:w-[250px]'
         />
         {isFiltered && (

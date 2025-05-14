@@ -35,6 +35,7 @@ export function RegistrationsTable({ columns, data }: DataTableProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [sorting, setSorting] = useState<SortingState>([])
+  const [globalFilter, setGlobalFilter] = useState('')
 
   const table = useReactTable({
     data,
@@ -44,23 +45,39 @@ export function RegistrationsTable({ columns, data }: DataTableProps) {
       columnVisibility,
       rowSelection,
       columnFilters,
+      globalFilter,
     },
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
+    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
+    globalFilterFn: (row, columnId, filterValue) => {
+      const value = row.getValue(columnId)
+      if (value == null) return false
+      
+      const searchValue = filterValue.toLowerCase()
+      const stringValue = String(value).toLowerCase()
+      
+      return stringValue.includes(searchValue)
+    },
   })
 
   return (
     <div className='space-y-4'>
-      <DataTableToolbar table={table} searchField="name" />
+      <DataTableToolbar 
+        table={table} 
+        searchField="camper_name"
+        globalFilter={globalFilter}
+        onGlobalFilterChange={setGlobalFilter}
+      />
       <div className='rounded-md border'>
         <Table>
           <TableHeader>
