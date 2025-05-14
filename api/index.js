@@ -2253,5 +2253,56 @@ app.post('/api/snackbar-balance', async (req, res) => {
   }
 });
 
+// Create new registration
+app.post('/api/registrations', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const {
+      name,
+      email,
+      contact,
+      camp_id,
+      form_id,
+      id_number,
+      sns_number,
+      date_of_birth,
+      dietary_restrictions,
+      guardian_name,
+      guardian_email,
+      guardian_phone
+    } = req.body;
+
+    if (!name || !email || !camp_id) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Verifica se o camp pertence ao time
+    const camp = await sqlVercel`
+      SELECT id FROM camps WHERE id = ${camp_id} AND team_id = ${teamId}
+    `;
+    if (!camp[0]) {
+      return res.status(400).json({ error: 'Camp does not belong to your team' });
+    }
+
+    const now = new Date().toISOString();
+    const result = await sqlVercel`
+      INSERT INTO registrations (
+        name, email, contact, camp_id, form_id, id_number, sns_number, date_of_birth,
+        dietary_restrictions, guardian_name, guardian_email, guardian_phone, created_at, updated_at
+      ) VALUES (
+        ${name}, ${email}, ${contact}, ${camp_id}, ${form_id}, ${id_number}, ${sns_number}, ${date_of_birth},
+        ${dietary_restrictions}, ${guardian_name}, ${guardian_email}, ${guardian_phone}, ${now}, ${now}
+      ) RETURNING *
+    `;
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error('Error creating registration:', error);
+    res.status(500).json({ error: 'Error creating registration' });
+  }
+});
+
 // Export the Express app as a serverless function
 export default app; 
