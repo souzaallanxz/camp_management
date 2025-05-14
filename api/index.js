@@ -527,7 +527,7 @@ app.get('/api/auth/me', async (req, res) => {
 
     // Find user by token (which is the user ID)
     const userResult = await sqlVercel`
-      SELECT id, email, name, team_id, role, created_at, updated_at
+      SELECT id, email, first_name, last_name, team_id, role, created_at, updated_at
       FROM public.users
       WHERE id = ${token}::uuid
     `;
@@ -541,7 +541,8 @@ app.get('/api/auth/me', async (req, res) => {
     return res.status(200).json({
       id: user.id,
       email: user.email,
-      name: user.name,
+      first_name: user.first_name,
+      last_name: user.last_name,
       team_id: user.team_id,
       role: user.role
     });
@@ -1812,17 +1813,14 @@ app.delete('/api/camps/:id', async (req, res) => {
 
 // Update user
 app.put('/api/users/:id', async (req, res) => {
-
-
   const teamId = getTeamId(req);
-  
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
 
   try {
     const { id } = req.params;
-    const { name, email, role, first_name, last_name } = req.body;
+    const { email, role, firstName, lastName } = req.body;
     const now = new Date().toISOString();
     
     // Primeiro, vamos verificar se o usuário existe e pertence ao time
@@ -1838,21 +1836,19 @@ app.put('/api/users/:id', async (req, res) => {
       return res.status(403).json({ error: 'User belongs to a different team' });
     }
     
-    // Atualizar o usuário usando template literal
+    // Atualizar o usuário sem o campo name
     const result = await sqlVercel`
       UPDATE users 
       SET 
-        name = ${name},
         email = ${email},
         role = ${role},
-        first_name = ${first_name},
-        last_name = ${last_name},
+        first_name = ${firstName},
+        last_name = ${lastName},
         updated_at = ${now}
       WHERE id = ${id}::uuid 
         AND team_id = ${teamId}::uuid
       RETURNING *
     `;
-
 
     if (!result[0]) {
       return res.status(404).json({ error: 'User not found or you do not have permission to update it' });
@@ -1915,17 +1911,13 @@ app.post('/api/users', async (req, res) => {
   try {
     const { firstName, lastName, email, role } = req.body;
     
-    // Monta o nome completo usando firstName e lastName
-    const fullName = firstName && lastName ? `${firstName} ${lastName}` : null;
-    
-    if (!fullName || !email || !role) {
+    if (!firstName || !lastName || !email || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
     const now = new Date().toISOString();
     const result = await sqlVercel`
       INSERT INTO users (
-        name, 
         first_name, 
         last_name, 
         email, 
@@ -1934,7 +1926,6 @@ app.post('/api/users', async (req, res) => {
         created_at, 
         updated_at
       ) VALUES (
-        ${fullName}, 
         ${firstName}, 
         ${lastName}, 
         ${email}, 
