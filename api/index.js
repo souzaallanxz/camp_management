@@ -1913,21 +1913,41 @@ app.post('/api/users', async (req, res) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { name, first_name, last_name, email, role } = req.body;
-    // Monta o nome completo se não vier o campo name
-    const fullName = name || ((first_name && last_name) ? `${first_name} ${last_name}` : null);
+    const { firstName, lastName, email, role } = req.body;
+    
+    // Monta o nome completo usando firstName e lastName
+    const fullName = firstName && lastName ? `${firstName} ${lastName}` : null;
+    
     if (!fullName || !email || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+    
     const now = new Date().toISOString();
     const result = await sqlVercel`
-      INSERT INTO users (name, first_name, last_name, email, role, team_id, created_at, updated_at)
-      VALUES (${fullName}, ${first_name}, ${last_name}, ${email}, ${role}, ${teamId}, ${now}, ${now})
-      RETURNING *
+      INSERT INTO users (
+        name, 
+        first_name, 
+        last_name, 
+        email, 
+        role, 
+        team_id, 
+        created_at, 
+        updated_at
+      ) VALUES (
+        ${fullName}, 
+        ${firstName}, 
+        ${lastName}, 
+        ${email}, 
+        ${role}, 
+        ${teamId}, 
+        ${now}, 
+        ${now}
+      ) RETURNING *
     `;
     res.status(201).json(result[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao criar usuário.' });
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: 'Error creating user' });
   }
 });
 
