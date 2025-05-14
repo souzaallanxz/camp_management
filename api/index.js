@@ -2205,37 +2205,28 @@ app.put('/api/campers/:id', async (req, res) => {
       return res.status(403).json({ error: 'Camper belongs to a different team' });
     }
 
-    // Build update fields dynamically
-    const fields = [];
-    if (name !== undefined) fields.push(`name = '${name}'`);
-    if (email !== undefined) fields.push(`email = '${email}'`);
-    if (contact !== undefined) fields.push(`contact = '${contact}'`);
-    // NÃO atualizar registration_id!
-    if (form_id !== undefined) fields.push(`form_id = '${form_id}'`);
-    if (camp !== undefined) fields.push(`camp = '${camp}'`);
-    if (additional_notes !== undefined) fields.push(`additional_notes = '${additional_notes}'`);
-    if (id_number !== undefined) fields.push(`id_number = '${id_number}'`);
-    if (sns_number !== undefined) fields.push(`sns_number = '${sns_number}'`);
-    if (date_of_birth !== undefined) fields.push(`date_of_birth = '${date_of_birth}'`);
-    if (dietary_restrictions !== undefined) fields.push(`dietary_restrictions = '${dietary_restrictions}'`);
-    if (guardian_name !== undefined) fields.push(`guardian_name = '${guardian_name}'`);
-    if (guardian_email !== undefined) fields.push(`guardian_email = '${guardian_email}'`);
-    if (guardian_phone !== undefined) fields.push(`guardian_phone = '${guardian_phone}'`);
-    if (snack_bar_balance !== undefined) fields.push(`snack_bar_balance = ${Number(snack_bar_balance)}`);
-    fields.push(`updated_at = NOW()`);
-
-    if (fields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-
-    const setClause = fields.join(', ');
-    console.log('SQL Update clause:', setClause);
-
-    // Only allow update if camper belongs to a registration of the team
-    const result = await sqlVercel.unsafe(
-      `UPDATE campers SET ${setClause} WHERE id = $1 AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = $2) RETURNING *`,
-      [id, teamId]
-    );
+    // Atualizar o camper usando template literal
+    console.log('Atualizando camper...');
+    const result = await sqlVercel`
+      UPDATE campers 
+      SET 
+        name = ${name},
+        email = ${email},
+        contact = ${contact},
+        form_id = ${form_id},
+        camp = ${camp},
+        additional_notes = ${additional_notes},
+        snack_bar_balance = ${Number(snack_bar_balance) || 0},
+        updated_at = NOW()
+      WHERE id = ${id}::uuid 
+        AND registration_id IN (
+          SELECT r.id 
+          FROM registrations r 
+          JOIN camps c ON r.camp_id = c.id 
+          WHERE c.team_id = ${teamId}::uuid
+        )
+      RETURNING *
+    `;
 
     console.log('Resultado da atualização:', result[0]);
 
