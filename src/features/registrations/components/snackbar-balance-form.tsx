@@ -28,7 +28,7 @@ async function saveSnackbarBalance(data: {
   const teamId = localStorage.getItem('teamId');
   if (!teamId) throw new Error('No team ID found');
   
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/snackbar-balance`, {
+  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/snackbar-balance`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
