@@ -1512,9 +1512,10 @@ app.get('/api/campers', async (req, res) => {
   }
   try {
     const campers = await sqlVercel`
-      SELECT ca.*, 
-             c.name as camp_name, 
-             COALESCE(ca.snack_bar_balance, 0) as snack_bar_balance
+      SELECT 
+        ca.*, 
+        c.name as camp_name,
+        r.snack_bar_balance
       FROM campers ca
       JOIN registrations r ON ca.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
@@ -1528,7 +1529,8 @@ app.get('/api/campers', async (req, res) => {
       snack_bar_balance: Number(camper.snack_bar_balance) || 0
     }));
     res.json(campersWithCampObject);
-  } catch {
+  } catch (error) {
+    console.error('Error getting campers:', error);
     res.status(500).json({ error: 'Erro ao buscar campistas.' });
   }
 });
