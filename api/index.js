@@ -2243,5 +2243,127 @@ app.put('/api/campers/:id', async (req, res) => {
   }
 });
 
+// ===== SNACKBAR BALANCE ENDPOINTS =====
+
+// Add balance to snackbar card
+app.post('/snackbar-balance', async (req, res) => {
+  console.log('Recebendo requisição POST para /snackbar-balance');
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+
+  const teamId = getTeamId(req);
+  console.log('Team ID obtido:', teamId);
+  
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
+  try {
+    const { registration_id, amount } = req.body;
+
+    if (!registration_id || amount === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: registration_id and amount' });
+    }
+
+    // Verify if registration belongs to the team
+    const registration = await sqlVercel`
+      SELECT r.id, r.snack_bar_balance
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registration_id}::uuid
+      AND c.team_id = ${teamId}::uuid
+    `;
+
+    if (registration.length === 0) {
+      return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
+    }
+
+    const currentBalance = parseFloat(registration[0].snack_bar_balance) || 0;
+    const newBalance = currentBalance + parseFloat(amount);
+
+    // Update the registration's snack bar balance
+    const result = await sqlVercel`
+      UPDATE registrations 
+      SET 
+        snack_bar_balance = ${newBalance},
+        updated_at = NOW()
+      WHERE id = ${registration_id}::uuid
+      RETURNING *
+    `;
+
+    console.log('Resultado da atualização:', result[0]);
+
+    if (!result[0]) {
+      return res.status(500).json({ error: 'Failed to update snack bar balance' });
+    }
+
+    return res.json(result[0]);
+  } catch (error) {
+    console.error('Erro ao adicionar saldo ao cartão:', error);
+    console.error('Stack trace:', error.stack);
+    return res.status(500).json({ error: 'Erro ao adicionar saldo ao cartão.' });
+  }
+});
+
+// Add balance to snackbar card (with /api prefix)
+app.post('/api/snackbar-balance', async (req, res) => {
+  console.log('Recebendo requisição POST para /api/snackbar-balance');
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+
+  const teamId = getTeamId(req);
+  console.log('Team ID obtido:', teamId);
+  
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
+  try {
+    const { registration_id, amount } = req.body;
+
+    if (!registration_id || amount === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: registration_id and amount' });
+    }
+
+    // Verify if registration belongs to the team
+    const registration = await sqlVercel`
+      SELECT r.id, r.snack_bar_balance
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registration_id}::uuid
+      AND c.team_id = ${teamId}::uuid
+    `;
+
+    if (registration.length === 0) {
+      return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
+    }
+
+    const currentBalance = parseFloat(registration[0].snack_bar_balance) || 0;
+    const newBalance = currentBalance + parseFloat(amount);
+
+    // Update the registration's snack bar balance
+    const result = await sqlVercel`
+      UPDATE registrations 
+      SET 
+        snack_bar_balance = ${newBalance},
+        updated_at = NOW()
+      WHERE id = ${registration_id}::uuid
+      RETURNING *
+    `;
+
+    console.log('Resultado da atualização:', result[0]);
+
+    if (!result[0]) {
+      return res.status(500).json({ error: 'Failed to update snack bar balance' });
+    }
+
+    return res.json(result[0]);
+  } catch (error) {
+    console.error('Erro ao adicionar saldo ao cartão:', error);
+    console.error('Stack trace:', error.stack);
+    return res.status(500).json({ error: 'Erro ao adicionar saldo ao cartão.' });
+  }
+});
+
 // Export the Express app as a serverless function
 export default app; 
