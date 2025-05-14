@@ -39,19 +39,11 @@ function RegistrationsContent() {
     queryKey: ['registrations'],
     queryFn: async () => {
       const data = await registrationService.findAll() as unknown as ApiRegistration[];
-      console.log('API Response:', data); // Log da resposta completa
-      // Analisando o primeiro item para debug
-      if (data.length > 0) {
-        console.log('First registration:', {
-          id: data[0].id,
-          total_paid: data[0].total_paid,
-          total_amount_paid: data[0].total_amount_paid
-        });
-      }
+      
       // Adicionando propriedades necessárias para compatibilidade com o tipo Registration do schema
       return data.map(reg => {
         const totalPaid = Number(reg.total_paid || 0);
-        console.log(`Registration ${reg.id} total_paid:`, totalPaid);
+        
         return {
           ...reg,
           camp: null,

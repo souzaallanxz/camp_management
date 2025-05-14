@@ -54,7 +54,6 @@ export function CreateTeamDialog({ open, onOpenChange, onSuccess, isOnboarding =
       if (team && team.id) {
         localStorage.setItem('teamId', team.id)
         localStorage.setItem('team_id', team.id)
-        console.log('Team ID salvo após criação:', team.id)
       }
       
       toast({

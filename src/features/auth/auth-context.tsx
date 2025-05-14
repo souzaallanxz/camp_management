@@ -85,7 +85,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session.user.team_id) {
         localStorage.setItem('team_id', session.user.team_id)
         localStorage.setItem('teamId', session.user.team_id)
-        console.log('Team ID salvo:', session.user.team_id)
       }
     } catch (error) {
       toast({
@@ -109,7 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.session.user.team_id) {
         localStorage.setItem('team_id', response.session.user.team_id)
         localStorage.setItem('teamId', response.session.user.team_id)
-        console.log('Team ID salvo:', response.session.user.team_id)
       }
       
       return response

@@ -39,7 +39,6 @@ export const campService = {
   async findAll(): Promise<Camp[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      console.log('Fetching camps from:', `${API_BASE_URL}/camps`);
       
       const response = await fetch(`${API_BASE_URL}/camps`, { 
         headers,
@@ -53,10 +52,8 @@ export const campService = {
       }
       
       const data = await response.json();
-      console.log('Camps data received successfully');
       return data;
     } catch (error) {
-      console.error('Exception in findAll camps:', error);
       return [];
     }
   },

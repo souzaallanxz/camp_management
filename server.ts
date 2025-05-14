@@ -906,10 +906,6 @@ app.put('/api/campers/:id', (async (req: Request, res: Response) => {
     
     const setClause = sql.join(fields, sql`, `);
     
-    // Para depuração
-    console.log('Update query:', `UPDATE campers SET ${setClause.sql} WHERE id = $1 AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = $2) RETURNING *`);
-    console.log('Update params:', [id, teamId, ...setClause.values]);
-    
     const result = await sql.unsafe(
       `UPDATE campers SET ${setClause.sql} WHERE id = $1 AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = $2) RETURNING *`,
       [id, teamId, ...setClause.values]

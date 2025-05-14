@@ -31,8 +31,6 @@ export const dashboardService = {
     try {
       const headers = { ...getTeamIdHeader() };
       const url = `${API_BASE_URL}/dashboard/monthly-payments`;
-      console.log('API URL:', url);
-      console.log('Headers:', JSON.stringify(headers));
       
       const response = await fetch(url, { 
         headers,
@@ -40,12 +38,10 @@ export const dashboardService = {
       });
       
       if (!response.ok) {
-        console.error('Monthly payments API error:', response.status, await response.text());
         return { total: 0, previousTotal: 0, percentageChange: null };
       }
       
       const data = await response.json();
-      console.log('Monthly payments response:', data);
       
       // Converter o formato da API para o formato esperado pelo componente
       const current = parseFloat(data.current || '0');
@@ -60,7 +56,6 @@ export const dashboardService = {
         percentageChange
       };
     } catch (error) {
-      console.error('Monthly payments error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
     }
   },
@@ -69,8 +64,6 @@ export const dashboardService = {
     try {
       const headers = { ...getTeamIdHeader() };
       const url = `${API_BASE_URL}/dashboard/monthly-registrations`;
-      console.log('API URL:', url);
-      console.log('Headers:', JSON.stringify(headers));
       
       const response = await fetch(url, { 
         headers,
@@ -78,12 +71,10 @@ export const dashboardService = {
       });
       
       if (!response.ok) {
-        console.error('Monthly registrations API error:', response.status, await response.text());
         return { total: 0, previousTotal: 0, percentageChange: null };
       }
       
       const data = await response.json();
-      console.log('Monthly registrations response:', data);
       
       // Converter o formato da API para o formato esperado pelo componente
       const current = parseFloat(data.current || '0');
@@ -98,7 +89,6 @@ export const dashboardService = {
         percentageChange
       };
     } catch (error) {
-      console.error('Monthly registrations error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
     }
   },
@@ -107,8 +97,6 @@ export const dashboardService = {
     try {
       const headers = { ...getTeamIdHeader() };
       const url = `${API_BASE_URL}/dashboard/monthly-snackbar`;
-      console.log('API URL:', url);
-      console.log('Headers:', JSON.stringify(headers));
       
       const response = await fetch(url, { 
         headers,
@@ -116,12 +104,10 @@ export const dashboardService = {
       });
       
       if (!response.ok) {
-        console.error('Monthly snackbar API error:', response.status, await response.text());
         return { total: 0, previousTotal: 0, percentageChange: null };
       }
       
       const data = await response.json();
-      console.log('Monthly snackbar response:', data);
       
       // Converter o formato da API para o formato esperado pelo componente
       const current = parseFloat(data.current || '0');
@@ -136,7 +122,6 @@ export const dashboardService = {
         percentageChange
       };
     } catch (error) {
-      console.error('Monthly snackbar error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
     }
   },
@@ -145,8 +130,6 @@ export const dashboardService = {
     try {
       const headers = { ...getTeamIdHeader() };
       const url = `${API_BASE_URL}/dashboard/yearly-campers`;
-      console.log('API URL:', url);
-      console.log('Headers:', JSON.stringify(headers));
       
       const response = await fetch(url, { 
         headers,
@@ -154,12 +137,10 @@ export const dashboardService = {
       });
       
       if (!response.ok) {
-        console.error('Yearly campers API error:', response.status, await response.text());
         return { total: 0, previousTotal: 0, percentageChange: null };
       }
       
       const data = await response.json();
-      console.log('Yearly campers response:', data);
       
       // Converter o formato da API para o formato esperado pelo componente
       const current = parseFloat(data.current || '0');
@@ -174,7 +155,6 @@ export const dashboardService = {
         percentageChange
       };
     } catch (error) {
-      console.error('Yearly campers error:', error);
       return { total: 0, previousTotal: 0, percentageChange: null };
     }
   },
@@ -182,22 +162,17 @@ export const dashboardService = {
   async getCampPayments(): Promise<CampPaymentsData[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const url = `${API_BASE_URL}/dashboard/camp-payments`;
-      console.log('API URL:', url);
-      console.log('Headers:', JSON.stringify(headers));
-      
+      const url = `${API_BASE_URL}/dashboard/camp-payments`;      
       const response = await fetch(url, { 
         headers,
         credentials: 'include'
       });
       
       if (!response.ok) {
-        console.error('Camp payments API error:', response.status, await response.text());
         return [];
       }
       
       const data = await response.json();
-      console.log('Camp payments response:', data);
       
       // Mapear os dados para o formato esperado
       if (Array.isArray(data)) {
@@ -211,7 +186,6 @@ export const dashboardService = {
       
       return [];
     } catch (error) {
-      console.error('Camp payments error:', error);
       return [];
     }
   },
@@ -220,8 +194,6 @@ export const dashboardService = {
     try {
       const headers = { ...getTeamIdHeader() };
       const url = `${API_BASE_URL}/dashboard/recent-registrations?limit=${limit}`;
-      console.log('API URL:', url);
-      console.log('Headers:', JSON.stringify(headers));
       
       const response = await fetch(url, { 
         headers,
@@ -229,12 +201,10 @@ export const dashboardService = {
       });
       
       if (!response.ok) {
-        console.error('Recent registrations API error:', response.status, await response.text());
         return [];
       }
       
       const data = await response.json();
-      console.log('Recent registrations response:', data);
       
       // Mapear os dados para o formato esperado
       if (Array.isArray(data)) {
@@ -247,17 +217,6 @@ export const dashboardService = {
           const createdAt = registration.created_at || registration.createdAt || '';
           const campName = registration.camp_name || registration.campName || '';
           const status = registration.status || 'unknown';
-          
-          // Garantir que o console.log mostre os dados mapeados para depuração
-          console.log('Mapeado:', { 
-            id, 
-            name, 
-            email, 
-            totalPaid, 
-            createdAt, 
-            campName, 
-            status 
-          });
           
           return {
             id,
@@ -273,7 +232,6 @@ export const dashboardService = {
       
       return [];
     } catch (error) {
-      console.error('Recent registrations error:', error);
       return [];
     }
   }

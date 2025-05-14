@@ -28,16 +28,13 @@ export const teamService = {
   async getCurrentUserTeam() {
     const token = localStorage.getItem('token');
     if (!token) {
-      console.log('getCurrentUserTeam: Token não encontrado no localStorage');
       throw new Error('No authenticated user found');
     }
     
-    console.log('getCurrentUserTeam: Buscando equipe com token', token.substring(0, 8) + '...');
     
     try {
       // Usa a função especial para construir URLs de equipe, evitando problemas de redirecionamento
       const teamUrl = buildTeamApiUrl();
-      console.log('getCurrentUserTeam: Usando URL', teamUrl);
       
       const response = await fetch(teamUrl, {
         headers: {
@@ -47,28 +44,22 @@ export const teamService = {
         credentials: 'include',
       });
       
-      console.log('getCurrentUserTeam: Status da resposta:', response.status);
       
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('getCurrentUserTeam: Equipe não encontrada');
           return null;
         }
-        console.error('getCurrentUserTeam: Erro na resposta', response.status, response.statusText);
         const errorText = await response.text();
-        console.error('getCurrentUserTeam: Detalhes do erro', errorText);
         return null;
       }
       
       // Verificar o Content-Type para garantir que é JSON antes de fazer o parse
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        console.log('getCurrentUserTeam: Resposta não é JSON (content-type:', contentType, ')');
         
         // Se já temos o ID da equipe no localStorage, podemos criar um objeto "simulado"
         const teamId = localStorage.getItem('teamId') || localStorage.getItem('team_id');
         if (teamId) {
-          console.log('getCurrentUserTeam: Usando teamId do localStorage:', teamId);
           return { id: teamId };
         }
         
@@ -77,27 +68,22 @@ export const teamService = {
       
       try {
         const data = await response.json();
-        console.log('getCurrentUserTeam: Dados da equipe recebidos:', data ? 'com dados' : 'sem dados');
         return data;
       } catch (parseError) {
-        console.error('getCurrentUserTeam: Erro ao fazer parse da resposta:', parseError);
         
         // Se já temos o ID da equipe no localStorage, podemos criar um objeto "simulado"
         const teamId = localStorage.getItem('teamId') || localStorage.getItem('team_id');
         if (teamId) {
-          console.log('getCurrentUserTeam: Usando teamId do localStorage após erro de parse:', teamId);
           return { id: teamId };
         }
         
         return null;
       }
     } catch (error) {
-      console.error('getCurrentUserTeam: Erro ao buscar equipe', error);
       
       // Se já temos o ID da equipe no localStorage, podemos criar um objeto "simulado"
       const teamId = localStorage.getItem('teamId') || localStorage.getItem('team_id');
       if (teamId) {
-        console.log('getCurrentUserTeam: Usando teamId do localStorage após erro de rede:', teamId);
         return { id: teamId };
       }
       

@@ -9,9 +9,6 @@ dotenv.config();
 
 const app = express();
 
-// Logging para debug
-console.log('Environment:', process.env.NODE_ENV);
-console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
 
 // Middleware
 app.use(cors({
@@ -30,8 +27,6 @@ const sql = neon(process.env.DATABASE_URL);
 // Sign in route
 app.post('/', async (req, res) => {
   try {
-    console.log('Recebendo requisição para autenticação');
-    console.log('Request body:', req.body);
     
     if (!req.body || typeof req.body !== 'object') {
       console.error('Requisição inválida, body não é um objeto:', req.body);
@@ -44,8 +39,6 @@ app.post('/', async (req, res) => {
       console.error('Email ou senha não fornecidos');
       return res.status(400).json({ error: 'Email and password are required' });
     }
-
-    console.log('Buscando usuário pelo email:', email);
     
     // Find user by email
     let userResult;
@@ -55,7 +48,6 @@ app.post('/', async (req, res) => {
         FROM public.users 
         WHERE email = ${email}
       `;
-      console.log('Resultado da consulta do usuário:', userResult ? 'encontrado' : 'não encontrado');
     } catch (dbError) {
       console.error('Erro ao consultar banco de dados:', dbError);
       return res.status(500).json({ 
@@ -68,11 +60,9 @@ app.post('/', async (req, res) => {
     const user = userResult[0];
 
     if (!user) {
-      console.log('Usuário não encontrado');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log('Verificando senha');
     
     // Verify password
     let isPasswordValid;
@@ -84,11 +74,9 @@ app.post('/', async (req, res) => {
     }
 
     if (!isPasswordValid) {
-      console.log('Senha inválida');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log('Autenticação bem-sucedida');
     
     // Remove password_hash from response
     const userWithoutPassword = { ...user };

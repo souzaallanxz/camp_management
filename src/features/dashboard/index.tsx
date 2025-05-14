@@ -21,7 +21,6 @@ import { useState } from 'react'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from './components/empty-state'
-import { DebugPanel } from './components/debug-panel'
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-PT', {
@@ -251,9 +250,6 @@ export default function Dashboard() {
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
       />
-      
-      {/* Debug Panel */}
-      <DebugPanel />
     </>
   )
 }

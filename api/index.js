@@ -5,10 +5,6 @@ import * as dotenv from 'dotenv';
 // Load environment variables corretamente
 dotenv.config();
 
-// Logging para debug
-console.log('Environment:', process.env.NODE_ENV);
-console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
-
 // Initialize Neon database connection
 const sql = neon(process.env.DATABASE_URL);
 const sqlVercel = sql;
@@ -338,9 +334,13 @@ app.get('/dashboard/camp-payments', async (req, res) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    // Pagamentos por acampamento
+    // Pagamentos e inscrições por acampamento
     const results = await sqlVercel`
-      SELECT c.name as camp_name, COALESCE(SUM(p.amount), 0) as total_amount
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(p.amount), 0) as total_amount,
+        COUNT(DISTINCT r.id) as total_registrations
       FROM camps c
       LEFT JOIN registrations r ON c.id = r.camp_id
       LEFT JOIN payments p ON r.id = p.registration_id
@@ -351,8 +351,10 @@ app.get('/dashboard/camp-payments', async (req, res) => {
     `;
 
     return res.json(results.map(item => ({
-      name: item.camp_name,
-      total: item.total_amount
+      campId: item.camp_id,
+      campName: item.camp_name,
+      totalPayments: Number(item.total_amount) || 0,
+      totalRegistrations: Number(item.total_registrations) || 0
     })));
   } catch (error) {
     console.error('Error getting camp payments:', error);
@@ -362,34 +364,23 @@ app.get('/dashboard/camp-payments', async (req, res) => {
 
 // Recent Registrations
 app.get('/dashboard/recent-registrations', async (req, res) => {
-  console.log('Recebendo requisição para /dashboard/recent-registrations');
-  console.log('Headers:', req.headers);
-  console.log('Query params:', req.query);
   
   const teamId = getTeamId(req);
-  console.log('Team ID obtido:', teamId);
-  
+
   try {
     // Tentar descobrir a estrutura da tabela registrations
-    console.log('Verificando estrutura da tabela registrations...');
     const tableInfo = await sqlVercel`
       SELECT column_name, data_type 
       FROM information_schema.columns 
       WHERE table_name = 'registrations'
     `;
     
-    console.log('Colunas da tabela registrations:', tableInfo.map(col => col.column_name));
-    
     const limit = req.query.limit ? parseInt(req.query.limit) : 5;
-    console.log('Limit para consulta:', limit);
     
     // Inscrições recentes - usando nome das colunas corretas
-    console.log('Executando consulta SQL...');
-    
     let results;
     if (teamId) {
       // Se tiver teamId, filtra por ele
-      console.log('Executando consulta com filtro de teamId');
       results = await sqlVercel`
         SELECT 
           r.id, 
@@ -406,7 +397,6 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
       `;
     } else {
       // Se não tiver teamId, retorna as mais recentes sem filtro
-      console.log('Executando consulta SEM filtro de teamId (modo diagnóstico)');
       results = await sqlVercel`
         SELECT 
           r.id, 
@@ -422,8 +412,6 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
       `;
     }
     
-    console.log('Consulta SQL executada com sucesso');
-    console.log('Resultados obtidos:', results.length);
 
     const formattedResults = results.map(item => ({
       id: item.id,
@@ -433,8 +421,7 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
       created_at: item.created_at,
       camp_name: item.camp_name
     }));
-    
-    console.log('Enviando resposta...');
+
     return res.json(formattedResults);
   } catch (error) {
     console.error('Error getting recent registrations - DETALHADO:', error);
@@ -453,11 +440,7 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
 // Sign in route
 app.post('/api/auth/sign-in', async (req, res) => {
   try {
-    console.log('Recebendo requisição para /api/auth/sign-in');
-    console.log('Request body:', req.body);
-    
     if (!req.body || typeof req.body !== 'object') {
-      console.error('Requisição inválida, body não é um objeto:', req.body);
       return res.status(400).json({ error: 'Invalid request body' });
     }
     
@@ -468,7 +451,6 @@ app.post('/api/auth/sign-in', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    console.log('Buscando usuário pelo email:', email);
     
     // Find user by email (wrapped in try/catch)
     let userResult;
@@ -478,7 +460,6 @@ app.post('/api/auth/sign-in', async (req, res) => {
         FROM public.users 
         WHERE email = ${email}
       `;
-      console.log('Resultado da consulta do usuário:', userResult ? 'encontrado' : 'não encontrado');
     } catch (dbError) {
       console.error('Erro ao consultar banco de dados:', dbError);
       return res.status(500).json({ 
@@ -491,28 +472,23 @@ app.post('/api/auth/sign-in', async (req, res) => {
     const user = userResult[0];
 
     if (!user) {
-      console.log('Usuário não encontrado');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log('Verificando senha');
     
     // Verify password
     let isPasswordValid;
     try {
       isPasswordValid = await bcrypt.compare(password, user.password_hash);
-    } catch (bcryptError) {
-      console.error('Erro ao verificar senha:', bcryptError);
+    } catch (bcryptError) { 
       return res.status(500).json({ error: 'Password verification error' });
     }
 
-    if (!isPasswordValid) {
-      console.log('Senha inválida');
+    if (!isPasswordValid) { 
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log('Autenticação bem-sucedida');
-    
+
     // Remove password_hash from response
     const userWithoutPassword = { ...user };
     delete userWithoutPassword.password_hash;
@@ -525,9 +501,6 @@ app.post('/api/auth/sign-in', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error in sign-in - DETALHADO:', error);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       error: 'Internal server error', 
       details: error.message,
@@ -573,7 +546,6 @@ app.get('/api/auth/me', async (req, res) => {
       role: user.role
     });
   } catch (error) {
-    console.error('Error in get current user:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -607,7 +579,6 @@ app.get('/api/teams/current', async (req, res) => {
     }
     return res.json(team);
   } catch (error) {
-    console.error('Error getting team:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -651,7 +622,6 @@ app.get('/api/dashboard/monthly-payments', async (req, res) => {
       previous: prev[0]?.total_amount || 0
     });
   } catch (error) {
-    console.error('Error getting monthly payments:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -692,7 +662,6 @@ app.get('/api/dashboard/monthly-registrations', async (req, res) => {
       previous: prev[0]?.total_count || 0
     });
   } catch (error) {
-    console.error('Error getting monthly registrations:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -735,7 +704,6 @@ app.get('/api/dashboard/monthly-snackbar', async (req, res) => {
       previous: prev[0]?.total_amount || 0
     });
   } catch (error) {
-    console.error('Error getting monthly snackbar:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -775,7 +743,6 @@ app.get('/api/dashboard/yearly-campers', async (req, res) => {
       previous: prev[0]?.total_count || 0
     });
   } catch (error) {
-    console.error('Error getting yearly campers:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -787,9 +754,13 @@ app.get('/api/dashboard/camp-payments', async (req, res) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    // Pagamentos por acampamento
+    // Pagamentos e inscrições por acampamento
     const results = await sqlVercel`
-      SELECT c.name as camp_name, COALESCE(SUM(p.amount), 0) as total_amount
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(p.amount), 0) as total_amount,
+        COUNT(DISTINCT r.id) as total_registrations
       FROM camps c
       LEFT JOIN registrations r ON c.id = r.camp_id
       LEFT JOIN payments p ON r.id = p.registration_id
@@ -800,35 +771,29 @@ app.get('/api/dashboard/camp-payments', async (req, res) => {
     `;
 
     return res.json(results.map(item => ({
-      name: item.camp_name,
-      total: item.total_amount
+      campId: item.camp_id,
+      campName: item.camp_name,
+      totalPayments: Number(item.total_amount) || 0,
+      totalRegistrations: Number(item.total_registrations) || 0
     })));
   } catch (error) {
-    console.error('Error getting camp payments:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Recent Registrations
-app.get('/api/dashboard/recent-registrations', async (req, res) => {
-  console.log('Recebendo requisição para /api/dashboard/recent-registrations');
-  console.log('Headers:', req.headers);
-  console.log('Query params:', req.query);
+app.get('/api/dashboard/recent-registrations', async (req, res) => {  
   
   const teamId = getTeamId(req);
-  console.log('Team ID obtido:', teamId);
   
   try {
     const limit = req.query.limit ? parseInt(req.query.limit) : 5;
-    console.log('Limit para consulta:', limit);
     
     // Inscrições recentes - usando nome das colunas corretas
-    console.log('Executando consulta SQL...');
     
     let results;
     if (teamId) {
       // Se tiver teamId, filtra por ele
-      console.log('Executando consulta com filtro de teamId');
       results = await sqlVercel`
         SELECT 
           r.id, 
@@ -848,7 +813,6 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
       `;
     } else {
       // Se não tiver teamId, retorna as mais recentes sem filtro
-      console.log('Executando consulta SEM filtro de teamId (modo diagnóstico)');
       results = await sqlVercel`
         SELECT 
           r.id, 
@@ -867,8 +831,6 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
       `;
     }
     
-    console.log('Consulta SQL executada com sucesso');
-    console.log('Resultados obtidos:', results.length);
 
     const formattedResults = results.map(item => ({
       id: item.id,
@@ -880,12 +842,8 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
       totalPaid: Number(item.total_paid) || 0
     }));
     
-    console.log('Enviando resposta...');
     return res.json(formattedResults);
   } catch (error) {
-    console.error('Error getting recent registrations - DETALHADO:', error);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       error: 'Internal server error', 
       details: error.message,
@@ -896,32 +854,24 @@ app.get('/api/dashboard/recent-registrations', async (req, res) => {
 
 // Rota de diagnóstico (sem verificação de teamId)
 app.get('/debug/registrations', async (req, res) => {
-  console.log('Executando rota de diagnóstico /debug/registrations');
   
   try {
     // Verificar conexão com o banco
-    console.log('Verificando conexão com o banco de dados...');
     const testConnection = await sqlVercel`SELECT 1 as test`;
-    console.log('Conexão com banco de dados OK:', testConnection);
     
     // Dados básicos das tabelas
-    console.log('Buscando informações sobre tabelas...');
     
     // Contagem de registrations
     const registrationCount = await sqlVercel`SELECT COUNT(*) as count FROM registrations`;
-    console.log('Total de registrations:', registrationCount[0]?.count);
     
     // Contagem de camps
     const campsCount = await sqlVercel`SELECT COUNT(*) as count FROM camps`;
-    console.log('Total de camps:', campsCount[0]?.count);
     
     // Contagem de teams
     const teamsCount = await sqlVercel`SELECT COUNT(*) as count FROM teams`;
-    console.log('Total de teams:', teamsCount[0]?.count);
     
     // Listar alguns teams para diagnóstico
     const teams = await sqlVercel`SELECT id, name FROM teams LIMIT 5`;
-    console.log('Teams encontrados:', teams);
     
     // Tentar buscar as 5 registrations mais recentes
     const results = await sqlVercel`
@@ -938,8 +888,7 @@ app.get('/debug/registrations', async (req, res) => {
       ORDER BY r.created_at DESC
       LIMIT 5
     `;
-    console.log('Registrations mais recentes encontrados:', results.length);
-    
+
     return res.json({
       success: true,
       database_connection: "OK",
@@ -956,10 +905,7 @@ app.get('/debug/registrations', async (req, res) => {
         team_id: item.team_id
       }))
     });
-  } catch (error) {
-    console.error('Erro na rota de diagnóstico:', error);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
+  } catch (error) { 
     return res.status(500).json({ 
       success: false, 
       error: 'Database connection error',
@@ -971,7 +917,6 @@ app.get('/debug/registrations', async (req, res) => {
 
 // Rota para verificar variáveis de ambiente (sem dados sensíveis)
 app.get('/debug/env', async (req, res) => {
-  console.log('Verificando variáveis de ambiente');
   
   try {
     return res.json({
@@ -988,7 +933,6 @@ app.get('/debug/env', async (req, res) => {
       debug_mode: true
     });
   } catch (error) {
-    console.error('Erro ao verificar variáveis de ambiente:', error);
     return res.status(500).json({ error: 'Error checking environment variables' });
   }
 });
@@ -1175,11 +1119,9 @@ app.get('/api/registrations', async (req, res) => {
 
 // Get all campers
 app.get('/campers', async (req, res) => {
-  console.log('Recebendo requisição para /campers');
   
   try {
     const teamId = getTeamId(req);
-    console.log('Team ID obtido:', teamId);
     
     let results;
     if (teamId) {
@@ -1242,11 +1184,9 @@ app.get('/api/campers/:id', async (req, res) => {
 
 // Get all users
 app.get('/users', async (req, res) => {
-  console.log('Recebendo requisição para /users');
   
   try {
     const teamId = getTeamId(req);
-    console.log('Team ID obtido:', teamId);
     
     // Usuários só são acessíveis para a mesma equipe ou superadmin
     let results;
@@ -1281,11 +1221,9 @@ app.get('/users', async (req, res) => {
 
 // Get all camps
 app.get('/camps', async (req, res) => {
-  console.log('Recebendo requisição para /camps');
   
   try {
     const teamId = getTeamId(req);
-    console.log('Team ID obtido:', teamId);
     
     let results;
     if (teamId) {
@@ -1407,12 +1345,10 @@ app.get('/settings/organization', async (req, res) => {
 
 // Get all registrations
 app.get('/api/registrations', async (req, res) => {
-  console.log('Recebendo requisição para /api/registrations');
   
   try {
     const teamId = getTeamId(req);
-    console.log('Team ID obtido:', teamId);
-    
+      
     let results;
     if (teamId) {
       results = await sqlVercel`
@@ -1435,7 +1371,6 @@ app.get('/api/registrations', async (req, res) => {
     
     return res.json(results);
   } catch (error) {
-    console.error('Error getting registrations:', error);
     return res.status(500).json({ 
       error: 'Internal server error', 
       details: error.message
@@ -1499,7 +1434,6 @@ app.get('/api/registrations/:id', async (req, res) => {
       status
     });
   } catch (error) {
-    console.error('Error getting registration by ID:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1530,7 +1464,6 @@ app.get('/api/campers', async (req, res) => {
     }));
     res.json(campersWithCampObject);
   } catch (error) {
-    console.error('Error getting campers:', error);
     res.status(500).json({ error: 'Erro ao buscar campistas.' });
   }
 });
@@ -1589,7 +1522,6 @@ app.get('/api/settings/profile', async (req, res) => {
     
     return res.json(result[0]);
   } catch (error) {
-    console.error('Error getting profile settings:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1648,7 +1580,6 @@ app.get('/api/payments', async (req, res) => {
     
     res.json(processedPayments);
   } catch (error) {
-    console.error('Error fetching payments:', error);
     res.status(500).json({ error: 'Error fetching payments' });
   }
 });
@@ -1708,7 +1639,6 @@ app.post('/api/payments', async (req, res) => {
     }
     res.status(201).json(result[0]);
   } catch (error) {
-    console.error('Error creating payment:', error);
     res.status(500).json({ error: 'Erro ao criar pagamento.' });
   }
 });
@@ -1738,7 +1668,6 @@ app.get('/api/payments/latest-link', async (req, res) => {
     
     return res.json({ payment_link: result[0].payment_link });
   } catch (error) {
-    console.error('Error getting latest payment link:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1763,7 +1692,6 @@ app.put('/api/payments/:id', async (req, res) => {
     }
     res.json(result[0]);
   } catch (error) {
-    console.error('Error updating payment:', error);
     res.status(500).json({ error: 'Erro ao atualizar pagamento.' });
   }
 });
@@ -1814,7 +1742,6 @@ app.delete('/api/payments/:id', async (req, res) => {
     }
     res.status(204).end();
   } catch (error) {
-    console.error('Error deleting payment:', error);
     res.status(500).json({ error: 'Erro ao deletar pagamento.' });
   }
 });
@@ -1836,7 +1763,6 @@ app.delete('/api/registrations/:id', async (req, res) => {
     }
     res.status(204).end();
   } catch (error) {
-    console.error('Error deleting registration:', error);
     res.status(500).json({ error: 'Erro ao deletar inscrição.' });
   }
 });
@@ -1886,13 +1812,9 @@ app.delete('/api/camps/:id', async (req, res) => {
 
 // Update user
 app.put('/api/users/:id', async (req, res) => {
-  console.log('Recebendo requisição PUT para /api/users/:id');
-  console.log('Headers:', req.headers);
-  console.log('Params:', req.params);
-  console.log('Body:', req.body);
+
 
   const teamId = getTeamId(req);
-  console.log('Team ID obtido:', teamId);
   
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
@@ -1904,24 +1826,19 @@ app.put('/api/users/:id', async (req, res) => {
     const now = new Date().toISOString();
     
     // Primeiro, vamos verificar se o usuário existe e pertence ao time
-    console.log('Verificando usuário existente...');
     const existingUser = await sqlVercel`
       SELECT id, team_id FROM users WHERE id = ${id}::uuid
     `;
-    console.log('Usuário encontrado:', existingUser[0]);
 
     if (!existingUser[0]) {
-      console.log('Usuário não encontrado');
       return res.status(404).json({ error: 'User not found' });
     }
 
     if (existingUser[0].team_id !== teamId) {
-      console.log('Usuário pertence a outro time:', existingUser[0].team_id);
       return res.status(403).json({ error: 'User belongs to a different team' });
     }
     
     // Atualizar o usuário usando template literal
-    console.log('Atualizando usuário...');
     const result = await sqlVercel`
       UPDATE users 
       SET 
@@ -1936,17 +1853,13 @@ app.put('/api/users/:id', async (req, res) => {
       RETURNING *
     `;
 
-    console.log('Resultado da atualização:', result[0]);
 
     if (!result[0]) {
-      console.log('Nenhum registro atualizado');
       return res.status(404).json({ error: 'User not found or you do not have permission to update it' });
     }
 
     return res.json(result[0]);
   } catch (error) {
-    console.error('Erro ao atualizar usuário:', error);
-    console.error('Stack trace:', error.stack);
     return res.status(500).json({ error: 'Erro ao atualizar usuário.' });
   }
 });
@@ -2041,7 +1954,6 @@ app.post('/api/campers', async (req, res) => {
   try {
     const { name, email, contact, registration_id, camp, form_id, additional_notes } = req.body;
     
-    console.log('Creating camper with data:', req.body);
     
     // Get registration data to use name and email if not provided
     const registration = await sqlVercel`
@@ -2100,7 +2012,6 @@ app.post('/api/campers', async (req, res) => {
 
     res.status(201).json(result[0]);
   } catch (error) {
-    console.error('Error creating camper:', error);
     res.status(500).json({ error: 'Error creating camper' });
   }
 });
@@ -2115,7 +2026,6 @@ app.patch('/api/registrations/:id/onboarding-status', async (req, res) => {
     const { id } = req.params;
     const { onboarding_status } = req.body;
 
-    console.log('Updating onboarding status:', { id, onboarding_status, body: req.body });
 
     if (!onboarding_status) {
       return res.status(400).json({ 
@@ -2147,20 +2057,15 @@ app.patch('/api/registrations/:id/onboarding-status', async (req, res) => {
 
     res.json(result[0]);
   } catch (error) {
-    console.error('Error updating registration onboarding status:', error);
     res.status(500).json({ error: 'Error updating registration onboarding status' });
   }
 });
 
 // Update camper
 app.put('/api/campers/:id', async (req, res) => {
-  console.log('Recebendo requisição PUT para /api/campers/:id');
-  console.log('Headers:', req.headers);
-  console.log('Params:', req.params);
-  console.log('Body:', req.body);
+
 
   const teamId = getTeamId(req);
-  console.log('Team ID obtido:', teamId);
   
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
@@ -2187,7 +2092,6 @@ app.put('/api/campers/:id', async (req, res) => {
     } = req.body;
 
     // Primeiro, vamos verificar se o camper existe e pertence ao time
-    console.log('Verificando camper existente...');
     const existingCamper = await sqlVercel`
       SELECT ca.*, c.team_id 
       FROM campers ca
@@ -2195,20 +2099,16 @@ app.put('/api/campers/:id', async (req, res) => {
       JOIN camps c ON r.camp_id = c.id
       WHERE ca.id = ${id}::uuid
     `;
-    console.log('Camper encontrado:', existingCamper[0]);
 
     if (!existingCamper[0]) {
-      console.log('Camper não encontrado');
       return res.status(404).json({ error: 'Camper not found' });
     }
 
     if (existingCamper[0].team_id !== teamId) {
-      console.log('Camper pertence a outro time:', existingCamper[0].team_id);
       return res.status(403).json({ error: 'Camper belongs to a different team' });
     }
 
     // Atualizar o camper usando template literal
-    console.log('Atualizando camper...');
     const result = await sqlVercel`
       UPDATE campers 
       SET 
@@ -2230,10 +2130,8 @@ app.put('/api/campers/:id', async (req, res) => {
       RETURNING *
     `;
 
-    console.log('Resultado da atualização:', result[0]);
 
     if (!result[0]) {
-      console.log('Nenhum registro atualizado');
       return res.status(404).json({ error: 'Camper not found or you do not have permission to update it' });
     }
 
@@ -2249,12 +2147,8 @@ app.put('/api/campers/:id', async (req, res) => {
 
 // Add balance to snackbar card (with /api prefix)
 app.post('/api/snackbar-balance', async (req, res) => {
-  console.log('Recebendo requisição POST para /api/snackbar-balance');
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
 
   const teamId = getTeamId(req);
-  console.log('Team ID obtido:', teamId);
   
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
@@ -2293,7 +2187,6 @@ app.post('/api/snackbar-balance', async (req, res) => {
       RETURNING *
     `;
 
-    console.log('Resultado da atualização:', result[0]);
 
     if (!result[0]) {
       return res.status(500).json({ error: 'Failed to update snack bar balance' });
