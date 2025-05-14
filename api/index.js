@@ -1864,6 +1864,48 @@ app.put('/api/users/:id', async (req, res) => {
   }
 });
 
+// Delete user
+app.delete('/api/users/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
+  try {
+    const { id } = req.params;
+
+    // Primeiro, vamos verificar se o usuário existe e pertence ao time
+    const existingUser = await sqlVercel`
+      SELECT id, team_id FROM users WHERE id = ${id}::uuid
+    `;
+
+    if (!existingUser[0]) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (existingUser[0].team_id !== teamId) {
+      return res.status(403).json({ error: 'User belongs to a different team' });
+    }
+
+    // Deletar o usuário
+    const result = await sqlVercel`
+      DELETE FROM users 
+      WHERE id = ${id}::uuid 
+        AND team_id = ${teamId}::uuid
+      RETURNING *
+    `;
+
+    if (!result[0]) {
+      return res.status(404).json({ error: 'User not found or you do not have permission to delete it' });
+    }
+
+    return res.status(204).end();
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    return res.status(500).json({ error: 'Error deleting user' });
+  }
+});
+
 // Create a new user for the team
 app.post('/api/users', async (req, res) => {
   const teamId = getTeamId(req);
