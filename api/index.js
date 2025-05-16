@@ -2054,13 +2054,18 @@ app.post('/api/users', async (req, res) => {
     }
     
     const now = new Date().toISOString();
+    const inviteToken = uuidv4();
+    const inviteExpiresAt = new Date();
+    inviteExpiresAt.setDate(inviteExpiresAt.getDate() + 7); // 7 dias
     const insertData = {
       firstName,
       lastName,
       email,
       role,
       teamId,
-      now
+      now,
+      inviteToken,
+      inviteExpiresAt: inviteExpiresAt.toISOString()
     };
     debug.insertData = insertData;
 
@@ -2081,7 +2086,9 @@ app.post('/api/users', async (req, res) => {
           role, 
           team_id, 
           created_at, 
-          updated_at
+          updated_at,
+          invite_token,
+          invite_expires_at
         ) VALUES (
           ${firstName}, 
           ${lastName}, 
@@ -2089,7 +2096,9 @@ app.post('/api/users', async (req, res) => {
           ${role}, 
           ${teamId}, 
           ${now}, 
-          ${now}
+          ${now},
+          ${inviteToken},
+          ${inviteExpiresAt.toISOString()}
         ) RETURNING *
       `;
       debug.insertResult = result;
@@ -2104,7 +2113,7 @@ app.post('/api/users', async (req, res) => {
       `;
       const teamName = teamResult[0]?.name || 'Sua equipe';
 
-      // Enviar email de boas-vindas simples
+      // Enviar email de convite com link para setup-password
       try {
         await resend.emails.send({
           from: 'Camp Management <noreply@infolio.pt>',
@@ -2114,7 +2123,13 @@ app.post('/api/users', async (req, res) => {
             <h1>Bem-vindo ao Camp Management!</h1>
             <p>Olá ${firstName},</p>
             <p>Você foi adicionado à equipe <b>${teamName}</b> no Camp Management.</p>
-            <p>Entre em contato com o administrador para receber sua senha ou redefinir sua senha na tela de login.</p>
+            <p>Para definir sua senha e ativar sua conta, clique no link abaixo:</p>
+            <p>
+              <a href="https://campmanagement.vercel.app/setup-password?token=${inviteToken}">
+                Definir minha senha
+              </a>
+            </p>
+            <p>Este link expira em 7 dias.</p>
             <p>Se você não esperava este convite, pode ignorar este email.</p>
           `
         });
@@ -2125,7 +2140,7 @@ app.post('/api/users', async (req, res) => {
           code: emailError.code
         };
         // Não vamos falhar a criação do usuário se o email falhar
-        console.error('Error sending welcome email:', emailError);
+        console.error('Error sending invite email:', emailError);
       }
 
       res.status(201).json(result[0]);
