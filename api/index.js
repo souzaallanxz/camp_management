@@ -1909,47 +1909,64 @@ app.post('/api/users', async (req, res) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
+    console.log('Received request body:', req.body);
     const { firstName, lastName, email, role } = req.body;
     
     if (!firstName || !lastName || !email || !role) {
+      console.log('Missing fields:', { firstName, lastName, email, role });
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    console.log('Generating temporary password...');
     // Generate a temporary password
     const tempPassword = Math.random().toString(36).slice(-8);
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(tempPassword, salt);
     
+    console.log('Preparing database insert...');
     const now = new Date().toISOString();
-    const result = await sqlVercel`
-      INSERT INTO users (
-        id,
-        first_name, 
-        last_name, 
-        email, 
-        role, 
-        team_id,
-        password_hash,
-        created_at, 
-        updated_at
-      ) VALUES (
-        gen_random_uuid(),
-        ${firstName}, 
-        ${lastName}, 
-        ${email}, 
-        ${role}, 
-        ${teamId},
-        ${hashedPassword},
-        ${now}, 
-        ${now}
-      ) RETURNING *
-    `;
-    res.status(201).json(result[0]);
+    
+    try {
+      const result = await sqlVercel`
+        INSERT INTO users (
+          id,
+          first_name, 
+          last_name, 
+          email, 
+          role, 
+          team_id,
+          password_hash,
+          created_at, 
+          updated_at
+        ) VALUES (
+          gen_random_uuid(),
+          ${firstName}, 
+          ${lastName}, 
+          ${email}, 
+          ${role}, 
+          ${teamId},
+          ${hashedPassword},
+          ${now}, 
+          ${now}
+        ) RETURNING *
+      `;
+      console.log('User created successfully:', result[0]);
+      res.status(201).json(result[0]);
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      console.error('SQL State:', dbError.code);
+      console.error('Error Message:', dbError.message);
+      console.error('Error Detail:', dbError.detail);
+      throw dbError; // Re-throw to be caught by outer catch
+    }
   } catch (error) {
     console.error('Error creating user:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Error creating user',
-      details: error.message
+      details: error.message,
+      code: error.code,
+      detail: error.detail
     });
   }
 });
