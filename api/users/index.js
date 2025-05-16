@@ -16,20 +16,72 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const { name, firstName, lastName, email, role } = req.body;
-      const fullName = name || ((firstName && lastName) ? `${firstName} ${lastName}` : null);
-      if (!fullName || !email || !role) {
-        return res.status(400).json({ error: 'Missing required fields' });
+      const { firstName, lastName, email, role } = req.body;
+
+      // Validação dos campos obrigatórios
+      if (!firstName || !lastName || !email || !role) {
+        return res.status(400).json({ 
+          error: 'Missing required fields',
+          details: { firstName, lastName, email, role }
+        });
       }
+
+      // Validação do formato do email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+
+      // Validação do role
+      const validRoles = ['superadmin', 'admin', 'contributor', 'cashier', 'manager'];
+      if (!validRoles.includes(role)) {
+        return res.status(400).json({ 
+          error: 'Invalid role',
+          validRoles
+        });
+      }
+
+      // Verificar se o email já existe
+      const existingUser = await sqlVercel`
+        SELECT id FROM users WHERE email = ${email}
+      `;
+
+      if (existingUser.length > 0) {
+        return res.status(400).json({ error: 'Email already exists' });
+      }
+
       const now = new Date().toISOString();
       const result = await sqlVercel`
-        INSERT INTO users (name, email, role, team_id, created_at, updated_at)
-        VALUES (${fullName}, ${email}, ${role}, ${teamId}, ${now}, ${now})
-        RETURNING *
+        INSERT INTO users (
+          first_name, 
+          last_name, 
+          email, 
+          role, 
+          team_id, 
+          created_at, 
+          updated_at
+        ) VALUES (
+          ${firstName}, 
+          ${lastName}, 
+          ${email}, 
+          ${role}, 
+          ${teamId}, 
+          ${now}, 
+          ${now}
+        ) RETURNING *
       `;
+
+      if (!result || result.length === 0) {
+        throw new Error('Failed to create user - no result returned');
+      }
+
       return res.status(201).json(result[0]);
-    } catch {
-      return res.status(500).json({ error: 'Erro ao criar usuário.' });
+    } catch (error) {
+      console.error('Error creating user:', error);
+      return res.status(500).json({ 
+        error: 'Error creating user',
+        details: error.message
+      });
     }
   }
 
