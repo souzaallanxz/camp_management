@@ -1979,67 +1979,78 @@ app.delete('/api/users/:id', async (req, res) => {
 
 // Create a new user for the team
 app.post('/api/users', async (req, res) => {
+  const debug = {
+    timestamp: new Date().toISOString(),
+    request: {
+      headers: req.headers,
+      body: req.body,
+      url: req.url,
+      method: req.method
+    }
+  };
+
   const teamId = getTeamId(req);
-  debugLog('Creating user request', {
-    teamId,
-    headers: req.headers,
-    body: req.body,
-    url: req.url,
-    method: req.method
-  });
+  debug.teamId = teamId;
   
   if (!teamId) {
-    debugLog('Missing teamId', { headers: req.headers });
-    return res.status(401).json({ error: 'Missing x-team-id header' });
+    return res.status(401).json({ 
+      error: 'Missing x-team-id header',
+      debug
+    });
   }
+
   try {
     const { firstName, lastName, email, role } = req.body;
+    debug.userData = { firstName, lastName, email, role };
     
     // Validação dos campos obrigatórios
     if (!firstName || !lastName || !email || !role) {
-      debugLog('Missing required fields', { firstName, lastName, email, role });
       return res.status(400).json({ 
         error: 'Missing required fields',
-        details: { firstName, lastName, email, role }
+        details: { firstName, lastName, email, role },
+        debug
       });
     }
 
     // Validação do formato do email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      debugLog('Invalid email format', { email });
-      return res.status(400).json({ error: 'Invalid email format' });
+      return res.status(400).json({ 
+        error: 'Invalid email format',
+        debug
+      });
     }
 
     // Validação do role
     const validRoles = ['superadmin', 'admin', 'contributor', 'cashier', 'manager'];
     if (!validRoles.includes(role)) {
-      debugLog('Invalid role', { role, validRoles });
       return res.status(400).json({ 
         error: 'Invalid role',
-        validRoles
+        validRoles,
+        debug
       });
     }
 
     // Verificar se o email já existe
-    debugLog('Checking existing email', { email });
-    let existingUser;
     try {
-      existingUser = await sqlVercel`
+      const existingUser = await sqlVercel`
         SELECT id FROM users WHERE email = ${email}
       `;
-      debugLog('Existing user check result', { existingUser });
+      debug.existingUserCheck = { found: existingUser.length > 0, result: existingUser };
+
+      if (existingUser.length > 0) {
+        return res.status(400).json({ 
+          error: 'Email already exists',
+          debug
+        });
+      }
     } catch (dbError) {
-      debugLog('Database error checking email', {
-        error: dbError.message,
+      debug.databaseError = {
+        message: dbError.message,
         code: dbError.code,
         detail: dbError.detail
-      });
+      };
       throw dbError;
-    }
-
-    if (existingUser.length > 0) {
-      return res.status(400).json({ error: 'Email already exists' });
     }
     
     const now = new Date().toISOString();
@@ -2051,9 +2062,17 @@ app.post('/api/users', async (req, res) => {
       teamId,
       now
     };
-    debugLog('Attempting to insert user', insertData);
+    debug.insertData = insertData;
 
     try {
+      // Primeiro, vamos verificar a estrutura da tabela
+      const tableInfo = await sqlVercel`
+        SELECT column_name, data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'users'
+      `;
+      debug.tableStructure = tableInfo;
+
       const result = await sqlVercel`
         INSERT INTO users (
           first_name, 
@@ -2073,7 +2092,7 @@ app.post('/api/users', async (req, res) => {
           ${now}
         ) RETURNING *
       `;
-      debugLog('Database insert result', { result });
+      debug.insertResult = result;
 
       if (!result || result.length === 0) {
         throw new Error('Failed to create user - no result returned');
@@ -2081,28 +2100,29 @@ app.post('/api/users', async (req, res) => {
 
       res.status(201).json(result[0]);
     } catch (dbError) {
-      debugLog('Database error during insert', {
+      debug.databaseError = {
         message: dbError.message,
         code: dbError.code,
         detail: dbError.detail,
         stack: dbError.stack,
         query: 'INSERT INTO users'
-      });
+      };
       throw dbError;
     }
   } catch (error) {
-    debugLog('Error creating user', {
+    debug.error = {
       message: error.message,
       code: error.code,
       detail: error.detail,
       stack: error.stack
-    });
+    };
     
     res.status(500).json({ 
       error: 'Error creating user',
       details: error.message,
       code: error.code,
-      detail: error.detail
+      detail: error.detail,
+      debug
     });
   }
 });
