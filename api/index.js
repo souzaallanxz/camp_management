@@ -2073,6 +2073,11 @@ app.post('/api/users', async (req, res) => {
       `;
       debug.tableStructure = tableInfo;
 
+      // Gerar um token único para o convite
+      const inviteToken = uuidv4();
+      const inviteExpiresAt = new Date();
+      inviteExpiresAt.setDate(inviteExpiresAt.getDate() + 7); // Token válido por 7 dias
+
       const result = await sqlVercel`
         INSERT INTO users (
           first_name, 
@@ -2081,7 +2086,9 @@ app.post('/api/users', async (req, res) => {
           role, 
           team_id, 
           created_at, 
-          updated_at
+          updated_at,
+          invite_token,
+          invite_expires_at
         ) VALUES (
           ${firstName}, 
           ${lastName}, 
@@ -2089,13 +2096,51 @@ app.post('/api/users', async (req, res) => {
           ${role}, 
           ${teamId}, 
           ${now}, 
-          ${now}
+          ${now},
+          ${inviteToken},
+          ${inviteExpiresAt.toISOString()}
         ) RETURNING *
       `;
       debug.insertResult = result;
 
       if (!result || result.length === 0) {
         throw new Error('Failed to create user - no result returned');
+      }
+
+      // Buscar informações do time para incluir no email
+      const teamResult = await sqlVercel`
+        SELECT name FROM teams WHERE id = ${teamId}::uuid
+      `;
+      const teamName = teamResult[0]?.name || 'Sua equipe';
+
+      // Enviar email de convite
+      try {
+        await resend.emails.send({
+          from: 'Camp Management <noreply@campmanagement.vercel.app>',
+          to: email,
+          subject: `Convite para ${teamName}`,
+          html: `
+            <h1>Bem-vindo ao Camp Management!</h1>
+            <p>Olá ${firstName},</p>
+            <p>Você foi convidado para se juntar à equipe ${teamName} no Camp Management.</p>
+            <p>Para configurar sua conta, clique no link abaixo:</p>
+            <p>
+              <a href="https://campmanagement.vercel.app/setup-account?token=${inviteToken}">
+                Configurar minha conta
+              </a>
+            </p>
+            <p>Este link expira em 7 dias.</p>
+            <p>Se você não esperava este convite, pode ignorar este email.</p>
+          `
+        });
+        debug.emailSent = true;
+      } catch (emailError) {
+        debug.emailError = {
+          message: emailError.message,
+          code: emailError.code
+        };
+        // Não vamos falhar a criação do usuário se o email falhar
+        console.error('Error sending invite email:', emailError);
       }
 
       res.status(201).json(result[0]);
@@ -2486,6 +2531,145 @@ app.post('/api/registrations', async (req, res) => {
   } catch (error) {
     console.error('Error creating registration:', error);
     res.status(500).json({ error: 'Error creating registration' });
+  }
+});
+
+// Setup user account with invite token
+app.post('/api/users/setup-account', async (req, res) => {
+  const debug = {
+    timestamp: new Date().toISOString(),
+    request: {
+      headers: req.headers,
+      body: req.body,
+      url: req.url,
+      method: req.method
+    }
+  };
+
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        details: { token: !!token, password: !!password },
+        debug
+      });
+    }
+
+    // Buscar usuário pelo token de convite
+    const userResult = await sqlVercel`
+      SELECT id, email, first_name, last_name, invite_token, invite_expires_at
+      FROM users
+      WHERE invite_token = ${token}
+      AND invite_expires_at > NOW()
+    `;
+
+    if (!userResult[0]) {
+      return res.status(400).json({
+        error: 'Invalid or expired invite token',
+        debug
+      });
+    }
+
+    const user = userResult[0];
+
+    // Gerar hash da senha
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Atualizar usuário com a senha e limpar o token de convite
+    const now = new Date().toISOString();
+    const result = await sqlVercel`
+      UPDATE users
+      SET 
+        password_hash = ${passwordHash},
+        invite_token = NULL,
+        invite_expires_at = NULL,
+        updated_at = ${now}
+      WHERE id = ${user.id}::uuid
+      RETURNING id, email, first_name, last_name, role, team_id
+    `;
+
+    if (!result[0]) {
+      throw new Error('Failed to update user');
+    }
+
+    // Enviar email de confirmação
+    try {
+      await resend.emails.send({
+        from: 'Camp Management <noreply@campmanagement.vercel.app>',
+        to: user.email,
+        subject: 'Conta configurada com sucesso',
+        html: `
+          <h1>Conta configurada com sucesso!</h1>
+          <p>Olá ${user.first_name},</p>
+          <p>Sua conta foi configurada com sucesso. Você já pode fazer login no Camp Management.</p>
+          <p>
+            <a href="https://campmanagement.vercel.app/login">
+              Fazer login
+            </a>
+          </p>
+        `
+      });
+      debug.emailSent = true;
+    } catch (emailError) {
+      debug.emailError = {
+        message: emailError.message,
+        code: emailError.code
+      };
+      console.error('Error sending confirmation email:', emailError);
+    }
+
+    res.json(result[0]);
+  } catch (error) {
+    debug.error = {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      stack: error.stack
+    };
+
+    res.status(500).json({
+      error: 'Error setting up account',
+      details: error.message,
+      debug
+    });
+  }
+});
+
+// Verificar e atualizar estrutura da tabela users
+app.get('/api/debug/check-users-table', async (req, res) => {
+  try {
+    // Verificar colunas existentes
+    const columns = await sqlVercel`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_name = 'users'
+    `;
+
+    const existingColumns = columns.map(col => col.column_name);
+    const debug = { existingColumns };
+
+    // Verificar se precisamos adicionar as novas colunas
+    if (!existingColumns.includes('invite_token')) {
+      await sqlVercel`
+        ALTER TABLE users
+        ADD COLUMN invite_token UUID,
+        ADD COLUMN invite_expires_at TIMESTAMP WITH TIME ZONE
+      `;
+      debug.addedColumns = ['invite_token', 'invite_expires_at'];
+    }
+
+    res.json({
+      success: true,
+      tableStructure: columns,
+      debug
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error checking/updating users table',
+      details: error.message
+    });
   }
 });
 
