@@ -1904,69 +1904,84 @@ app.delete('/api/users/:id', async (req, res) => {
 
 // Create a new user for the team
 app.post('/api/users', async (req, res) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
   try {
-    console.log('Received request body:', req.body);
+    // 1. Verificar teamId
+    const teamId = getTeamId(req);
+    if (!teamId) {
+      return res.status(401).json({ error: 'Missing x-team-id header' });
+    }
+
+    // 2. Verificar body
+    if (!req.body) {
+      return res.status(400).json({ error: 'Missing request body' });
+    }
+
+    // 3. Extrair e validar campos
     const { firstName, lastName, email, role } = req.body;
     
     if (!firstName || !lastName || !email || !role) {
-      console.log('Missing fields:', { firstName, lastName, email, role });
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        received: { firstName, lastName, email, role }
+      });
     }
 
-    console.log('Generating temporary password...');
-    // Generate a temporary password
-    const tempPassword = Math.random().toString(36).slice(-8);
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(tempPassword, salt);
-    
-    console.log('Preparing database insert...');
+    // 4. Verificar se email já existe
+    const existingUser = await sqlVercel`
+      SELECT id FROM users WHERE email = ${email}
+    `;
+
+    if (existingUser.length > 0) {
+      return res.status(400).json({ error: 'Email already exists' });
+    }
+
+    // 5. Criar usuário
     const now = new Date().toISOString();
     
-    try {
-      const result = await sqlVercel`
-        INSERT INTO users (
-          id,
-          first_name, 
-          last_name, 
-          email, 
-          role, 
-          team_id,
-          password_hash,
-          created_at, 
-          updated_at
-        ) VALUES (
-          gen_random_uuid(),
-          ${firstName}, 
-          ${lastName}, 
-          ${email}, 
-          ${role}, 
-          ${teamId},
-          ${hashedPassword},
-          ${now}, 
-          ${now}
-        ) RETURNING *
-      `;
-      console.log('User created successfully:', result[0]);
-      res.status(201).json(result[0]);
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      console.error('SQL State:', dbError.code);
-      console.error('Error Message:', dbError.message);
-      console.error('Error Detail:', dbError.detail);
-      throw dbError; // Re-throw to be caught by outer catch
+    // Primeiro, tentar inserir sem password_hash para ver se há outros problemas
+    const result = await sqlVercel`
+      INSERT INTO users (
+        id,
+        first_name,
+        last_name,
+        email,
+        role,
+        team_id,
+        created_at,
+        updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        ${firstName},
+        ${lastName},
+        ${email},
+        ${role},
+        ${teamId},
+        ${now},
+        ${now}
+      ) RETURNING *
+    `;
+
+    if (!result || !result[0]) {
+      throw new Error('Failed to create user - no result returned');
     }
+
+    // 6. Se chegou aqui, usuário foi criado com sucesso
+    return res.status(201).json(result[0]);
+
   } catch (error) {
-    console.error('Error creating user:', error);
+    // Log detalhado do erro
+    console.error('Error in POST /api/users:');
+    console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
-    res.status(500).json({ 
+    console.error('Request body:', req.body);
+    console.error('Team ID:', req.headers['x-team-id']);
+
+    // Retornar erro com mais detalhes
+    return res.status(500).json({
       error: 'Error creating user',
-      details: error.message,
-      code: error.code,
-      detail: error.detail
+      message: error.message,
+      type: error.name,
+      details: error.stack
     });
   }
 });
