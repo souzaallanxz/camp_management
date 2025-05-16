@@ -2107,7 +2107,7 @@ app.post('/api/users', async (req, res) => {
       // Enviar email de boas-vindas simples
       try {
         await resend.emails.send({
-          from: 'Camp Management <noreply@campmanagement.vercel.app>',
+          from: 'Camp Management <noreply@infolio.pt>',
           to: email,
           subject: `Bem-vindo à equipe ${teamName}`,
           html: `
@@ -2582,7 +2582,7 @@ app.post('/api/users/setup-account', async (req, res) => {
     // Enviar email de confirmação
     try {
       await resend.emails.send({
-        from: 'Camp Management <noreply@campmanagement.vercel.app>',
+        from: 'Camp Management <noreply@infolio.pt>',
         to: user.email,
         subject: 'Conta configurada com sucesso',
         html: `
@@ -2666,7 +2666,7 @@ app.get('/api/debug/test-email', async (req, res) => {
   }
   try {
     const result = await resend.emails.send({
-      from: 'Camp Management <noreply@campmanagement.vercel.app>',
+      from: 'Camp Management <noreply@infolio.pt>',
       to,
       subject: 'Teste de envio de email (Resend)',
       html: `<h1>Teste de envio de email</h1><p>Se você recebeu este email, o Resend está funcionando!</p>`
