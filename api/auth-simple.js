@@ -58,7 +58,7 @@ export default async function handler(req, res) {
 
     // Find user by email
     const userResult = await sql`
-      SELECT id, email, name, password_hash, team_id 
+      SELECT id, email, first_name, last_name, password_hash, team_id 
       FROM public.users 
       WHERE email = ${email}
     `;

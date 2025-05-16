@@ -50,7 +50,7 @@ app.post('/auth/sign-in', async (req, res) => {
 
     // Find user by email
     const userResult = await sqlVercel`
-      SELECT id, email, name, password_hash, team_id 
+      SELECT id, email, first_name, last_name, password_hash, team_id 
       FROM public.users 
       WHERE email = ${email}
     `;
@@ -103,7 +103,7 @@ app.get('/auth/me', async (req, res) => {
 
     // Find user by token (which is the user ID)
     const userResult = await sqlVercel`
-      SELECT id, email, name, team_id, role, created_at, updated_at
+      SELECT id, email, first_name, last_name, team_id, role, created_at, updated_at
       FROM public.users
       WHERE id = ${token}::uuid
     `;
@@ -1192,7 +1192,7 @@ app.get('/users', async (req, res) => {
     let results;
     if (teamId) {
       results = await sqlVercel`
-        SELECT id, email, name, role, team_id, created_at, updated_at
+        SELECT id, email, first_name, last_name, role, team_id, created_at, updated_at
         FROM users
         WHERE team_id = ${teamId}::uuid
         ORDER BY created_at DESC
@@ -1200,7 +1200,7 @@ app.get('/users', async (req, res) => {
     } else {
       // Modo diagnóstico - omite informações sensíveis
       results = await sqlVercel`
-        SELECT id, email, name, role, team_id, created_at, updated_at
+        SELECT id, email, first_name, last_name, role, team_id, created_at, updated_at
         FROM users
         ORDER BY created_at DESC
         LIMIT 20
@@ -1286,7 +1286,7 @@ app.get('/settings/profile', async (req, res) => {
     const token = authHeader.split(' ')[1];
     
     const result = await sqlVercel`
-      SELECT id, email, name, role, team_id, created_at, updated_at
+      SELECT id, email, first_name, last_name, role, team_id, created_at, updated_at
       FROM users
       WHERE id = ${token}::uuid
     `;

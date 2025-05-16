@@ -30,7 +30,7 @@ app.post('/api/auth/sign-in', async (req, res) => {
 
     // Find user by email
     const userResult = await sql`
-      SELECT id, email, name, password_hash, team_id 
+      SELECT id, email, first_name, last_name, password_hash, team_id 
       FROM public.users 
       WHERE email = ${email}
     `;
@@ -84,9 +84,9 @@ app.post('/api/auth/sign-up', async (req, res) => {
 
     // Create user
     const result = await sql`
-      INSERT INTO public.users (id, email, name, password_hash)
+      INSERT INTO public.users (id, email, first_name, last_name, password_hash)
       VALUES (gen_random_uuid(), ${email}, ${name}, ${hashedPassword})
-      RETURNING id, email, name, team_id
+      RETURNING id, email, first_name, last_name, team_id
     `;
 
     const user = result[0];
