@@ -42,9 +42,30 @@ app.use((req, res, next) => {
 const resend = new Resend(process.env.VITE_RESEND_API_KEY);
 
 // Adicionar no início do arquivo, após as importações
+const logs = [];
+const MAX_LOGS = 100;
+
 const debugLog = (message, data) => {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    message,
+    data
+  };
+  logs.unshift(logEntry);
+  if (logs.length > MAX_LOGS) {
+    logs.pop();
+  }
   console.error(`[DEBUG] ${message}:`, JSON.stringify(data, null, 2));
 };
+
+// Endpoint para visualizar logs
+app.get('/api/debug/logs', async (req, res) => {
+  res.json({
+    logs,
+    count: logs.length,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Endpoint de debug para testar a conexão com o banco
 app.get('/api/debug/db', async (req, res) => {
@@ -1962,10 +1983,13 @@ app.post('/api/users', async (req, res) => {
   debugLog('Creating user request', {
     teamId,
     headers: req.headers,
-    body: req.body
+    body: req.body,
+    url: req.url,
+    method: req.method
   });
   
   if (!teamId) {
+    debugLog('Missing teamId', { headers: req.headers });
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
@@ -1999,10 +2023,20 @@ app.post('/api/users', async (req, res) => {
 
     // Verificar se o email já existe
     debugLog('Checking existing email', { email });
-    const existingUser = await sqlVercel`
-      SELECT id FROM users WHERE email = ${email}
-    `;
-    debugLog('Existing user check result', { existingUser });
+    let existingUser;
+    try {
+      existingUser = await sqlVercel`
+        SELECT id FROM users WHERE email = ${email}
+      `;
+      debugLog('Existing user check result', { existingUser });
+    } catch (dbError) {
+      debugLog('Database error checking email', {
+        error: dbError.message,
+        code: dbError.code,
+        detail: dbError.detail
+      });
+      throw dbError;
+    }
 
     if (existingUser.length > 0) {
       return res.status(400).json({ error: 'Email already exists' });
@@ -2047,11 +2081,12 @@ app.post('/api/users', async (req, res) => {
 
       res.status(201).json(result[0]);
     } catch (dbError) {
-      debugLog('Database error', {
+      debugLog('Database error during insert', {
         message: dbError.message,
         code: dbError.code,
         detail: dbError.detail,
-        stack: dbError.stack
+        stack: dbError.stack,
+        query: 'INSERT INTO users'
       });
       throw dbError;
     }
