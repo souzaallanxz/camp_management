@@ -451,12 +451,11 @@ app.post('/api/auth/sign-in', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    
     // Find user by email (wrapped in try/catch)
     let userResult;
     try {
       userResult = await sqlVercel`
-        SELECT id, email, name, password_hash, team_id 
+        SELECT id, email, first_name, last_name, password_hash, team_id 
         FROM public.users 
         WHERE email = ${email}
       `;
@@ -475,7 +474,6 @@ app.post('/api/auth/sign-in', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    
     // Verify password
     let isPasswordValid;
     try {
@@ -488,9 +486,11 @@ app.post('/api/auth/sign-in', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-
     // Remove password_hash from response
-    const userWithoutPassword = { ...user };
+    const userWithoutPassword = { 
+      ...user,
+      name: `${user.first_name} ${user.last_name}` // Combine first_name and last_name for backward compatibility
+    };
     delete userWithoutPassword.password_hash;
 
     return res.status(200).json({
