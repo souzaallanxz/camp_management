@@ -41,6 +41,40 @@ app.use((req, res, next) => {
 // Initialize Resend
 const resend = new Resend(process.env.VITE_RESEND_API_KEY);
 
+// Adicionar no início do arquivo, após as importações
+const debugLog = (message, data) => {
+  console.error(`[DEBUG] ${message}:`, JSON.stringify(data, null, 2));
+};
+
+// Endpoint de debug para testar a conexão com o banco
+app.get('/api/debug/db', async (req, res) => {
+  try {
+    const test = await sqlVercel`SELECT NOW() as time`;
+    res.json({
+      success: true,
+      database: {
+        connected: true,
+        time: test[0].time
+      },
+      env: {
+        database_url_set: !!process.env.DATABASE_URL,
+        node_env: process.env.NODE_ENV
+      }
+    });
+  } catch (error) {
+    debugLog('Database connection error', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Database connection error',
+      details: error.message
+    });
+  }
+});
+
 // === VERSÃO SEM PREFIXO /api === //
 
 // Sign in route
@@ -363,10 +397,10 @@ app.get('/dashboard/camp-payments', async (req, res) => {
 });
 
 // Recent Registrations
-app.get('/dashboard/recent-registrations', async (req, res) => {
+app.get('/dashboard/recent-registrations', async (req, res) => {  
   
   const teamId = getTeamId(req);
-
+  
   try {
     // Tentar descobrir a estrutura da tabela registrations
     const tableInfo = await sqlVercel`
@@ -378,6 +412,7 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit) : 5;
     
     // Inscrições recentes - usando nome das colunas corretas
+    
     let results;
     if (teamId) {
       // Se tiver teamId, filtra por ele
@@ -388,10 +423,13 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
           r.email as camper_email, 
           r.status, 
           r.created_at,
-          c.name as camp_name
+          c.name as camp_name,
+          COALESCE(SUM(p.amount), 0) as total_paid
         FROM registrations r
         JOIN camps c ON r.camp_id = c.id
+        LEFT JOIN payments p ON r.id = p.registration_id
         WHERE c.team_id = ${teamId}::uuid
+        GROUP BY r.id, r.name, r.email, r.status, r.created_at, c.name
         ORDER BY r.created_at DESC
         LIMIT ${limit}
       `;
@@ -404,9 +442,12 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
           r.email as camper_email, 
           r.status, 
           r.created_at,
-          c.name as camp_name
+          c.name as camp_name,
+          COALESCE(SUM(p.amount), 0) as total_paid
         FROM registrations r
         JOIN camps c ON r.camp_id = c.id
+        LEFT JOIN payments p ON r.id = p.registration_id
+        GROUP BY r.id, r.name, r.email, r.status, r.created_at, c.name
         ORDER BY r.created_at DESC
         LIMIT ${limit}
       `;
@@ -415,18 +456,16 @@ app.get('/dashboard/recent-registrations', async (req, res) => {
 
     const formattedResults = results.map(item => ({
       id: item.id,
-      camper_name: item.camper_name,
-      camper_email: item.camper_email,
+      name: item.camper_name,
+      email: item.camper_email,
       status: item.status,
-      created_at: item.created_at,
-      camp_name: item.camp_name
+      createdAt: item.created_at,
+      campName: item.camp_name,
+      totalPaid: Number(item.total_paid) || 0
     }));
-
+    
     return res.json(formattedResults);
   } catch (error) {
-    console.error('Error getting recent registrations - DETALHADO:', error);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       error: 'Internal server error', 
       details: error.message,
@@ -1920,66 +1959,57 @@ app.delete('/api/users/:id', async (req, res) => {
 // Create a new user for the team
 app.post('/api/users', async (req, res) => {
   const teamId = getTeamId(req);
-  const debug = {
+  debugLog('Creating user request', {
     teamId,
     headers: req.headers,
     body: req.body
-  };
+  });
   
   if (!teamId) {
-    return res.status(401).json({ 
-      error: 'Missing x-team-id header',
-      debug
-    });
+    return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
     const { firstName, lastName, email, role } = req.body;
-    debug.receivedData = { firstName, lastName, email, role };
     
     // Validação dos campos obrigatórios
     if (!firstName || !lastName || !email || !role) {
+      debugLog('Missing required fields', { firstName, lastName, email, role });
       return res.status(400).json({ 
         error: 'Missing required fields',
-        details: { firstName, lastName, email, role },
-        debug
+        details: { firstName, lastName, email, role }
       });
     }
 
     // Validação do formato do email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ 
-        error: 'Invalid email format',
-        debug
-      });
+      debugLog('Invalid email format', { email });
+      return res.status(400).json({ error: 'Invalid email format' });
     }
 
     // Validação do role
     const validRoles = ['superadmin', 'admin', 'contributor', 'cashier', 'manager'];
     if (!validRoles.includes(role)) {
+      debugLog('Invalid role', { role, validRoles });
       return res.status(400).json({ 
         error: 'Invalid role',
-        validRoles,
-        debug
+        validRoles
       });
     }
 
     // Verificar se o email já existe
-    debug.checkingEmail = email;
+    debugLog('Checking existing email', { email });
     const existingUser = await sqlVercel`
       SELECT id FROM users WHERE email = ${email}
     `;
-    debug.existingUserResult = existingUser;
+    debugLog('Existing user check result', { existingUser });
 
     if (existingUser.length > 0) {
-      return res.status(400).json({ 
-        error: 'Email already exists',
-        debug
-      });
+      return res.status(400).json({ error: 'Email already exists' });
     }
     
     const now = new Date().toISOString();
-    debug.insertData = {
+    const insertData = {
       firstName,
       lastName,
       email,
@@ -1987,6 +2017,7 @@ app.post('/api/users', async (req, res) => {
       teamId,
       now
     };
+    debugLog('Attempting to insert user', insertData);
 
     try {
       const result = await sqlVercel`
@@ -2008,7 +2039,7 @@ app.post('/api/users', async (req, res) => {
           ${now}
         ) RETURNING *
       `;
-      debug.insertResult = result;
+      debugLog('Database insert result', { result });
 
       if (!result || result.length === 0) {
         throw new Error('Failed to create user - no result returned');
@@ -2016,26 +2047,27 @@ app.post('/api/users', async (req, res) => {
 
       res.status(201).json(result[0]);
     } catch (dbError) {
-      debug.databaseError = {
+      debugLog('Database error', {
         message: dbError.message,
         code: dbError.code,
-        detail: dbError.detail
-      };
+        detail: dbError.detail,
+        stack: dbError.stack
+      });
       throw dbError;
     }
   } catch (error) {
-    debug.error = {
+    debugLog('Error creating user', {
       message: error.message,
       code: error.code,
-      detail: error.detail
-    };
+      detail: error.detail,
+      stack: error.stack
+    });
     
     res.status(500).json({ 
       error: 'Error creating user',
       details: error.message,
       code: error.code,
-      detail: error.detail,
-      debug
+      detail: error.detail
     });
   }
 });
