@@ -1920,62 +1920,73 @@ app.delete('/api/users/:id', async (req, res) => {
 // Create a new user for the team
 app.post('/api/users', async (req, res) => {
   const teamId = getTeamId(req);
-  console.log('Creating user with teamId:', teamId);
+  const debug = {
+    teamId,
+    headers: req.headers,
+    body: req.body
+  };
   
   if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
+    return res.status(401).json({ 
+      error: 'Missing x-team-id header',
+      debug
+    });
   }
   try {
     const { firstName, lastName, email, role } = req.body;
-    console.log('Received user data:', { firstName, lastName, email, role });
+    debug.receivedData = { firstName, lastName, email, role };
     
     // Validação dos campos obrigatórios
     if (!firstName || !lastName || !email || !role) {
-      console.log('Missing required fields:', { firstName, lastName, email, role });
       return res.status(400).json({ 
         error: 'Missing required fields',
-        details: { firstName, lastName, email, role }
+        details: { firstName, lastName, email, role },
+        debug
       });
     }
 
     // Validação do formato do email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.log('Invalid email format:', email);
-      return res.status(400).json({ error: 'Invalid email format' });
+      return res.status(400).json({ 
+        error: 'Invalid email format',
+        debug
+      });
     }
 
     // Validação do role
     const validRoles = ['superadmin', 'admin', 'contributor', 'cashier', 'manager'];
     if (!validRoles.includes(role)) {
-      console.log('Invalid role:', role, 'Valid roles:', validRoles);
       return res.status(400).json({ 
         error: 'Invalid role',
-        validRoles
+        validRoles,
+        debug
       });
     }
 
     // Verificar se o email já existe
-    console.log('Checking if email exists:', email);
+    debug.checkingEmail = email;
     const existingUser = await sqlVercel`
       SELECT id FROM users WHERE email = ${email}
     `;
-    console.log('Existing user check result:', existingUser);
+    debug.existingUserResult = existingUser;
 
     if (existingUser.length > 0) {
-      console.log('Email already exists:', email);
-      return res.status(400).json({ error: 'Email already exists' });
+      return res.status(400).json({ 
+        error: 'Email already exists',
+        debug
+      });
     }
     
     const now = new Date().toISOString();
-    console.log('Attempting to insert user with data:', {
+    debug.insertData = {
       firstName,
       lastName,
       email,
       role,
       teamId,
       now
-    });
+    };
 
     try {
       const result = await sqlVercel`
@@ -1997,7 +2008,7 @@ app.post('/api/users', async (req, res) => {
           ${now}
         ) RETURNING *
       `;
-      console.log('Database insert result:', result);
+      debug.insertResult = result;
 
       if (!result || result.length === 0) {
         throw new Error('Failed to create user - no result returned');
@@ -2005,27 +2016,26 @@ app.post('/api/users', async (req, res) => {
 
       res.status(201).json(result[0]);
     } catch (dbError) {
-      console.error('Database error:', {
+      debug.databaseError = {
         message: dbError.message,
         code: dbError.code,
-        detail: dbError.detail,
-        stack: dbError.stack
-      });
+        detail: dbError.detail
+      };
       throw dbError;
     }
   } catch (error) {
-    console.error('Error creating user:', error);
-    console.error('Error details:', {
+    debug.error = {
       message: error.message,
-      stack: error.stack,
       code: error.code,
       detail: error.detail
-    });
+    };
+    
     res.status(500).json({ 
       error: 'Error creating user',
       details: error.message,
       code: error.code,
-      detail: error.detail
+      detail: error.detail,
+      debug
     });
   }
 });
