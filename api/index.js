@@ -541,8 +541,7 @@ app.get('/api/auth/me', async (req, res) => {
     return res.status(200).json({
       id: user.id,
       email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
+      name: `${user.first_name} ${user.last_name}`,
       team_id: user.team_id,
       role: user.role
     });
@@ -1477,10 +1476,20 @@ app.get('/api/users', async (req, res) => {
   }
   try {
     const users = await sqlVercel`
-      SELECT * FROM users WHERE team_id = ${teamId} ORDER BY created_at DESC
+      SELECT id, email, first_name, last_name, role, team_id, created_at, updated_at 
+      FROM users 
+      WHERE team_id = ${teamId} 
+      ORDER BY created_at DESC
     `;
-    res.json(users);
-  } catch {
+    
+    // Transform the response to include a combined name field
+    const transformedUsers = users.map(user => ({
+      ...user,
+      name: `${user.first_name} ${user.last_name}`
+    }));
+    
+    res.json(transformedUsers);
+  } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar usuários.' });
   }
 });
@@ -1512,7 +1521,7 @@ app.get('/api/settings/profile', async (req, res) => {
     const token = authHeader.split(' ')[1];
     
     const result = await sqlVercel`
-      SELECT id, email, name, role, team_id, created_at, updated_at
+      SELECT id, email, first_name, last_name, role, team_id, created_at, updated_at
       FROM users
       WHERE id = ${token}::uuid
     `;
@@ -1521,7 +1530,13 @@ app.get('/api/settings/profile', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    return res.json(result[0]);
+    // Transform the response to include a combined name field
+    const user = {
+      ...result[0],
+      name: `${result[0].first_name} ${result[0].last_name}`
+    };
+    
+    return res.json(user);
   } catch (error) {
     return res.status(500).json({ error: 'Internal server error' });
   }
