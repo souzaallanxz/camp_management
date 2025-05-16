@@ -1941,7 +1941,7 @@ app.post('/api/users', async (req, res) => {
     }
 
     // Validação do role
-    const validRoles = ['admin', 'contributor', 'viewer'];
+    const validRoles = ['superadmin', 'admin', 'contributor', 'cashier', 'manager'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ 
         error: 'Invalid role',
