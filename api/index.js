@@ -2073,11 +2073,6 @@ app.post('/api/users', async (req, res) => {
       `;
       debug.tableStructure = tableInfo;
 
-      // Gerar um token único para o convite
-      const inviteToken = uuidv4();
-      const inviteExpiresAt = new Date();
-      inviteExpiresAt.setDate(inviteExpiresAt.getDate() + 7); // Token válido por 7 dias
-
       const result = await sqlVercel`
         INSERT INTO users (
           first_name, 
@@ -2086,9 +2081,7 @@ app.post('/api/users', async (req, res) => {
           role, 
           team_id, 
           created_at, 
-          updated_at,
-          invite_token,
-          invite_expires_at
+          updated_at
         ) VALUES (
           ${firstName}, 
           ${lastName}, 
@@ -2096,9 +2089,7 @@ app.post('/api/users', async (req, res) => {
           ${role}, 
           ${teamId}, 
           ${now}, 
-          ${now},
-          ${inviteToken},
-          ${inviteExpiresAt.toISOString()}
+          ${now}
         ) RETURNING *
       `;
       debug.insertResult = result;
@@ -2113,23 +2104,17 @@ app.post('/api/users', async (req, res) => {
       `;
       const teamName = teamResult[0]?.name || 'Sua equipe';
 
-      // Enviar email de convite
+      // Enviar email de boas-vindas simples
       try {
         await resend.emails.send({
           from: 'Camp Management <noreply@campmanagement.vercel.app>',
           to: email,
-          subject: `Convite para ${teamName}`,
+          subject: `Bem-vindo à equipe ${teamName}`,
           html: `
             <h1>Bem-vindo ao Camp Management!</h1>
             <p>Olá ${firstName},</p>
-            <p>Você foi convidado para se juntar à equipe ${teamName} no Camp Management.</p>
-            <p>Para configurar sua conta, clique no link abaixo:</p>
-            <p>
-              <a href="https://campmanagement.vercel.app/setup-account?token=${inviteToken}">
-                Configurar minha conta
-              </a>
-            </p>
-            <p>Este link expira em 7 dias.</p>
+            <p>Você foi adicionado à equipe <b>${teamName}</b> no Camp Management.</p>
+            <p>Entre em contato com o administrador para receber sua senha ou redefinir sua senha na tela de login.</p>
             <p>Se você não esperava este convite, pode ignorar este email.</p>
           `
         });
@@ -2140,7 +2125,7 @@ app.post('/api/users', async (req, res) => {
           code: emailError.code
         };
         // Não vamos falhar a criação do usuário se o email falhar
-        console.error('Error sending invite email:', emailError);
+        console.error('Error sending welcome email:', emailError);
       }
 
       res.status(201).json(result[0]);
