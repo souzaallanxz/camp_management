@@ -169,10 +169,13 @@ app.get('/auth/me', async (req, res) => {
       return res.status(401).json({ error: 'User not found' });
     }
 
+    // Combine first_name and last_name to create the full name
+    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+
     return res.status(200).json({
       id: user.id,
       email: user.email,
-      name: user.name,
+      name: fullName || null, // Return null if no name is available
       team_id: user.team_id,
       role: user.role
     });
@@ -598,14 +601,18 @@ app.get('/api/auth/me', async (req, res) => {
       return res.status(401).json({ error: 'User not found' });
     }
 
+    // Combine first_name and last_name to create the full name
+    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+
     return res.status(200).json({
       id: user.id,
       email: user.email,
-      name: `${user.first_name} ${user.last_name}`,
+      name: fullName || null, // Return null if no name is available
       team_id: user.team_id,
       role: user.role
     });
   } catch (error) {
+    console.error('Error in get current user:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
