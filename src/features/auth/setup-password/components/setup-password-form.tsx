@@ -38,7 +38,7 @@ export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProp
   const [passwordSet, setPasswordSet] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const search = useSearch({ from: '/(auth)/setup-password' })
-  const { userId } = search
+  const { token } = search
   const navigate = useNavigate()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -50,19 +50,19 @@ export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProp
   })
 
   async function onSubmit({ password }: z.infer<typeof formSchema>) {
-    if (!userId) {
-      setError('ID do usuário não encontrado')
+    if (!token) {
+      setError('Token de convite não encontrado')
       return
     }
 
     setIsLoading(true)
     setError(null)
     try {
-      // Chama o backend Express para definir a senha
-      const response = await fetch(`${API_BASE_URL}/auth/setup-password`, {
+      // Chama o backend para definir a senha usando o token
+      const response = await fetch(`${API_BASE_URL}/users/setup-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, password }),
+        body: JSON.stringify({ token, password }),
       });
 
       if (!response.ok) {
@@ -87,7 +87,7 @@ export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProp
     }
   }
 
-  if (!userId) {
+  if (!token) {
     return (
       <div className="space-y-6">
         <Alert variant="destructive">
