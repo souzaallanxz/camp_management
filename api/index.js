@@ -1920,14 +1920,18 @@ app.delete('/api/users/:id', async (req, res) => {
 // Create a new user for the team
 app.post('/api/users', async (req, res) => {
   const teamId = getTeamId(req);
+  console.log('Creating user with teamId:', teamId);
+  
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
     const { firstName, lastName, email, role } = req.body;
+    console.log('Received user data:', { firstName, lastName, email, role });
     
     // Validação dos campos obrigatórios
     if (!firstName || !lastName || !email || !role) {
+      console.log('Missing required fields:', { firstName, lastName, email, role });
       return res.status(400).json({ 
         error: 'Missing required fields',
         details: { firstName, lastName, email, role }
@@ -1937,12 +1941,14 @@ app.post('/api/users', async (req, res) => {
     // Validação do formato do email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      console.log('Invalid email format:', email);
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
     // Validação do role
     const validRoles = ['superadmin', 'admin', 'contributor', 'cashier', 'manager'];
     if (!validRoles.includes(role)) {
+      console.log('Invalid role:', role, 'Valid roles:', validRoles);
       return res.status(400).json({ 
         error: 'Invalid role',
         validRoles
@@ -1950,51 +1956,76 @@ app.post('/api/users', async (req, res) => {
     }
 
     // Verificar se o email já existe
+    console.log('Checking if email exists:', email);
     const existingUser = await sqlVercel`
       SELECT id FROM users WHERE email = ${email}
     `;
+    console.log('Existing user check result:', existingUser);
 
     if (existingUser.length > 0) {
+      console.log('Email already exists:', email);
       return res.status(400).json({ error: 'Email already exists' });
     }
     
     const now = new Date().toISOString();
-    const result = await sqlVercel`
-      INSERT INTO users (
-        first_name, 
-        last_name, 
-        email, 
-        role, 
-        team_id, 
-        created_at, 
-        updated_at
-      ) VALUES (
-        ${firstName}, 
-        ${lastName}, 
-        ${email}, 
-        ${role}, 
-        ${teamId}, 
-        ${now}, 
-        ${now}
-      ) RETURNING *
-    `;
+    console.log('Attempting to insert user with data:', {
+      firstName,
+      lastName,
+      email,
+      role,
+      teamId,
+      now
+    });
 
-    if (!result || result.length === 0) {
-      throw new Error('Failed to create user - no result returned');
+    try {
+      const result = await sqlVercel`
+        INSERT INTO users (
+          first_name, 
+          last_name, 
+          email, 
+          role, 
+          team_id, 
+          created_at, 
+          updated_at
+        ) VALUES (
+          ${firstName}, 
+          ${lastName}, 
+          ${email}, 
+          ${role}, 
+          ${teamId}, 
+          ${now}, 
+          ${now}
+        ) RETURNING *
+      `;
+      console.log('Database insert result:', result);
+
+      if (!result || result.length === 0) {
+        throw new Error('Failed to create user - no result returned');
+      }
+
+      res.status(201).json(result[0]);
+    } catch (dbError) {
+      console.error('Database error:', {
+        message: dbError.message,
+        code: dbError.code,
+        detail: dbError.detail,
+        stack: dbError.stack
+      });
+      throw dbError;
     }
-
-    res.status(201).json(result[0]);
   } catch (error) {
     console.error('Error creating user:', error);
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
-      code: error.code
+      code: error.code,
+      detail: error.detail
     });
     res.status(500).json({ 
       error: 'Error creating user',
       details: error.message,
-      code: error.code
+      code: error.code,
+      detail: error.detail
     });
   }
 });
