@@ -2658,5 +2658,24 @@ app.get('/api/debug/check-users-table', async (req, res) => {
   }
 });
 
+// Endpoint para testar envio de email
+app.get('/api/debug/test-email', async (req, res) => {
+  const to = req.query.to;
+  if (!to) {
+    return res.status(400).json({ error: 'Missing ?to=EMAIL parameter' });
+  }
+  try {
+    const result = await resend.emails.send({
+      from: 'Camp Management <noreply@campmanagement.vercel.app>',
+      to,
+      subject: 'Teste de envio de email (Resend)',
+      html: `<h1>Teste de envio de email</h1><p>Se você recebeu este email, o Resend está funcionando!</p>`
+    });
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao enviar email', details: error.message });
+  }
+});
+
 // Export the Express app as a serverless function
 export default app; 
