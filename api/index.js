@@ -1914,23 +1914,32 @@ app.post('/api/users', async (req, res) => {
     if (!firstName || !lastName || !email || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+
+    // Generate a temporary password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(tempPassword, salt);
     
     const now = new Date().toISOString();
     const result = await sqlVercel`
       INSERT INTO users (
+        id,
         first_name, 
         last_name, 
         email, 
         role, 
-        team_id, 
+        team_id,
+        password_hash,
         created_at, 
         updated_at
       ) VALUES (
+        gen_random_uuid(),
         ${firstName}, 
         ${lastName}, 
         ${email}, 
         ${role}, 
-        ${teamId}, 
+        ${teamId},
+        ${hashedPassword},
         ${now}, 
         ${now}
       ) RETURNING *
@@ -1938,7 +1947,10 @@ app.post('/api/users', async (req, res) => {
     res.status(201).json(result[0]);
   } catch (error) {
     console.error('Error creating user:', error);
-    res.status(500).json({ error: 'Error creating user' });
+    res.status(500).json({ 
+      error: 'Error creating user',
+      details: error.message
+    });
   }
 });
 
