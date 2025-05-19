@@ -71,6 +71,11 @@ export default function SnackBarPage() {
     refetchInterval: 5000, // Refetch every 5 seconds
   })
 
+  const { data: campers = [], isLoading: isLoadingCampers } = useQuery({
+    queryKey: ['campers'],
+    queryFn: () => snackBarService.getCampers(),
+  })
+
   const mutation = useMutation({
     mutationFn: async (transaction: SnackBarTransaction) => {
       await snackBarService.deductBalance(transaction)
@@ -278,6 +283,7 @@ export default function SnackBarPage() {
                       setSelectedCamperId(value)
                       form.setValue('camper_id', value)
                     }}
+                    campers={campers}
                   />
                 </div>
 

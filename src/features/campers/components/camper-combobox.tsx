@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Check, ChevronsUpDown } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,20 +14,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { snackBarService } from '@/features/snack-bar/services/snack-bar-service'
+import type { CamperWithBalance } from '@/features/snack-bar/data/schema'
 
 interface CamperComboboxProps {
   value: string
   onValueChange: (value: string) => void
+  campers: CamperWithBalance[]
 }
 
-export function CamperCombobox({ value, onValueChange }: CamperComboboxProps) {
+export function CamperCombobox({ value, onValueChange, campers }: CamperComboboxProps) {
   const [open, setOpen] = useState(false)
-
-  const { data: campers = [] } = useQuery({
-    queryKey: ['current-camp-campers'],
-    queryFn: () => snackBarService.getCampers(),
-  })
 
   const selectedCamper = campers?.find((camper) => camper.id === value)
 
