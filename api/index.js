@@ -2895,22 +2895,137 @@ app.get('/api/camps/current', async (req, res) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const now = new Date();
+    const now = new Date().toISOString();
+    
+    // First, verify that we can find the team
+    const teamExists = await sqlVercel`
+      SELECT id FROM teams WHERE id = ${teamId}::uuid LIMIT 1
+    `;
+    
+    if (teamExists.length === 0) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+    
+    // Now get the current camp with proper date casting
     const result = await sqlVercel`
       SELECT *
       FROM camps
       WHERE team_id = ${teamId}::uuid
-        AND start_date <= ${now}
-        AND end_date >= ${now}
+        AND start_date::timestamp <= ${now}::timestamp
+        AND end_date::timestamp >= ${now}::timestamp
       ORDER BY start_date DESC
       LIMIT 1
     `;
+    
     if (!result[0]) {
-      return res.json(null);
+      // If no current camp, return the most recent one
+      const mostRecent = await sqlVercel`
+        SELECT *
+        FROM camps
+        WHERE team_id = ${teamId}::uuid
+        ORDER BY start_date DESC
+        LIMIT 1
+      `;
+      
+      if (mostRecent.length === 0) {
+        return res.json(null);
+      }
+      
+      return res.json(mostRecent[0]);
     }
-    res.json(result[0]);
+    
+    return res.json(result[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error in /api/camps/current:', error);
+    debugLog('Error in /api/camps/current', { 
+      error: error.message, 
+      stack: error.stack,
+      teamId 
+    });
+    return res.status(500).json({ 
+      error: 'Error fetching current camp', 
+      details: error.message
+    });
+  }
+});
+
+// Debug endpoint for camps
+app.get('/api/debug/camps', async (req, res) => {
+  try {
+    const teamId = req.query.teamId;
+    
+    // Get all camps for diagnostics
+    const allCamps = await sqlVercel`
+      SELECT 
+        id, 
+        name, 
+        team_id,
+        start_date, 
+        end_date, 
+        created_at,
+        updated_at
+      FROM camps
+      ${teamId ? sqlVercel`WHERE team_id = ${teamId}::uuid` : sqlVercel``}
+      ORDER BY created_at DESC
+      LIMIT 10
+    `;
+    
+    // Get current date in server timezone
+    const now = new Date();
+    const nowIso = now.toISOString();
+    
+    // Check if any camps are current according to date
+    const currentCamps = allCamps.filter(camp => {
+      const startDate = new Date(camp.start_date);
+      const endDate = new Date(camp.end_date);
+      return startDate <= now && endDate >= now;
+    });
+    
+    return res.json({
+      server_time: {
+        js_date: now.toString(),
+        iso_date: nowIso,
+        timestamp: now.getTime()
+      },
+      camps_found: allCamps.length,
+      current_camps_count: currentCamps.length,
+      current_camps: currentCamps,
+      all_camps: allCamps
+    });
+  } catch (error) {
+    console.error('Error in debug camps endpoint:', error);
+    return res.status(500).json({ 
+      error: 'Error getting camps debug info', 
+      details: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+// Simple diagnostic endpoint for team ID
+app.get('/api/debug/team-id', async (req, res) => {
+  try {
+    const teamId = getTeamId(req);
+    const headers = {
+      'x-team-id': req.headers['x-team-id'],
+      'authorization': req.headers.authorization ? 'Bearer [redacted]' : undefined
+    };
+    
+    return res.json({
+      teamId,
+      headers,
+      hasTeamId: !!teamId,
+      source: teamId ? (
+        req.headers['x-team-id'] ? 'header' : 
+        req.query.teamId ? 'query' : 
+        'token'
+      ) : 'none'
+    });
+  } catch (error) {
+    return res.status(500).json({ 
+      error: 'Error checking team ID', 
+      details: error.message 
+    });
   }
 });
 

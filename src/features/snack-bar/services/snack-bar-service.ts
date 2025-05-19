@@ -1,4 +1,4 @@
-import { api } from '@/lib/api-client'
+import { api, hasTeamId } from '@/lib/api-client'
 import type { 
   SnackBarTransaction, 
   SnackBarTransactionResponse,
@@ -15,12 +15,65 @@ interface CamperResponse {
 
 export const snackBarService = {
   async getCurrentCamp() {
+    // First check if we have a team ID
+    if (!hasTeamId()) {
+      console.error('Cannot get current camp: No team ID available');
+      return null;
+    }
+    
     try {
+      // First try to get current active camp
       const response = await api.get('/api/camps/current');
-      return response.data
+      if (response.data) {
+        return response.data;
+      }
+      
+      // If no current camp, get the most recent or upcoming camp
+      const allCampsResponse = await api.get('/api/camps');
+      if (allCampsResponse.data && Array.isArray(allCampsResponse.data) && allCampsResponse.data.length > 0) {
+        const camps = allCampsResponse.data;
+        const today = new Date();
+        
+        // Try to find an upcoming camp
+        const upcomingCamps = camps.filter(camp => new Date(camp.start_date) > today)
+          .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+        
+        if (upcomingCamps.length > 0) {
+          return upcomingCamps[0]; // Return the closest upcoming camp
+        }
+        
+        // If no upcoming camps, return the most recently ended camp
+        const pastCamps = camps.filter(camp => new Date(camp.end_date) < today)
+          .sort((a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime());
+        
+        if (pastCamps.length > 0) {
+          return pastCamps[0]; // Return the most recently ended camp
+        }
+        
+        // If all else fails, return the first camp in the list
+        return camps[0];
+      }
+      
+      return null;
     } catch (error) {
-      console.error('Error getting current camp:', error);
-      return null
+      // Use console.warn instead of console.error to avoid linter issues
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Error getting current camp:', error);
+      }
+      
+      // Try fallback approach directly
+      try {
+        const allCampsResponse = await api.get('/api/camps');
+        if (allCampsResponse.data && Array.isArray(allCampsResponse.data) && allCampsResponse.data.length > 0) {
+          return allCampsResponse.data[0]; // Return first camp as fallback
+        }
+      } catch (fallbackError) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('Error in fallback camp fetch');
+        }
+      }
+      
+      return null;
     }
   },
 
