@@ -16,7 +16,7 @@ interface CamperResponse {
 export const snackBarService = {
   async getCurrentCamp() {
     try {
-      const response = await api.get('/api/camps/current')
+      const response = await api.get('/api/camps/current');
       return response.data
     } catch {
       return null
