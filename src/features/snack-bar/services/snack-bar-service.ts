@@ -157,8 +157,12 @@ export const snackBarService = {
     
     try {
       const response = await api.get(`/api/snackbar-balance/${camperId}`)
+      // A resposta agora contém balance, total_deposit e total_spent
       return response.data.balance
-    } catch {
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Error getting camper balance:', error)
+      }
       return 0
     }
   },

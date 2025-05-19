@@ -2445,15 +2445,15 @@ app.post('/api/snackbar-balance', async (req, res) => {
   }
 
   try {
-    const { registration_id, amount } = req.body;
+    const { registration_id, amount, payment_method, phone_number } = req.body;
 
-    if (!registration_id || amount === undefined) {
-      return res.status(400).json({ error: 'Missing required fields: registration_id and amount' });
+    if (!registration_id || amount === undefined || !payment_method) {
+      return res.status(400).json({ error: 'Missing required fields: registration_id, amount, and payment_method' });
     }
 
     // Verify if registration belongs to the team
     const registration = await sqlVercel`
-      SELECT r.id, r.snack_bar_balance
+      SELECT r.id
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
       WHERE r.id = ${registration_id}::uuid
@@ -2464,19 +2464,24 @@ app.post('/api/snackbar-balance', async (req, res) => {
       return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
     }
 
-    const currentBalance = parseFloat(registration[0].snack_bar_balance) || 0;
-    const newBalance = currentBalance + parseFloat(amount);
-
-    // Update the registration's snack bar balance
+    // Insert into snackbar_balance table
     const result = await sqlVercel`
-      UPDATE registrations 
-      SET 
-        snack_bar_balance = ${newBalance},
-        updated_at = NOW()
-      WHERE id = ${registration_id}::uuid
-      RETURNING *
+      INSERT INTO snackbar_balance (
+        registration_id, 
+        amount, 
+        payment_method, 
+        phone_number,
+        created_at,
+        updated_at
+      ) VALUES (
+        ${registration_id}::uuid, 
+        ${amount}, 
+        ${payment_method}, 
+        ${phone_number || null},
+        NOW(),
+        NOW()
+      ) RETURNING *
     `;
-
 
     if (!result[0]) {
       return res.status(500).json({ error: 'Failed to update snack bar balance' });
@@ -2709,9 +2714,9 @@ app.get('/api/snackbar-balance/:camperId', async (req, res) => {
   try {
     const { camperId } = req.params;
 
-    // Get camper's balance with team verification
-    const result = await sqlVercel`
-      SELECT c.snack_bar_balance
+    // First, verify the camper exists and belongs to the team
+    const camperCheck = await sqlVercel`
+      SELECT c.id, c.registration_id
       FROM campers c
       JOIN registrations r ON c.registration_id = r.id
       JOIN camps camp ON r.camp_id = camp.id
@@ -2719,12 +2724,36 @@ app.get('/api/snackbar-balance/:camperId', async (req, res) => {
       AND camp.team_id = ${teamId}::uuid
     `;
 
-    if (result.length === 0) {
+    if (camperCheck.length === 0) {
       return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
     }
 
+    const registrationId = camperCheck[0].registration_id;
+
+    // Calculate total balance from snackbar_balance table
+    const depositResult = await sqlVercel`
+      SELECT COALESCE(SUM(amount), 0) as total_deposit
+      FROM snackbar_balance
+      WHERE registration_id = ${registrationId}::uuid
+    `;
+
+    // Calculate total spent from snack_bar_transactions table
+    const spentResult = await sqlVercel`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}::uuid
+    `;
+
+    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+
+    // Calculate current balance
+    const currentBalance = totalDeposit - totalSpent;
+
     return res.json({
-      balance: Number(result[0].snack_bar_balance) || 0
+      balance: currentBalance,
+      total_deposit: totalDeposit,
+      total_spent: totalSpent
     });
   } catch (error) {
     console.error('Error getting snack bar balance:', error);
@@ -2789,9 +2818,9 @@ app.post('/api/snackbar-transactions', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields: camper_id and amount' });
     }
 
-    // Verify if camper belongs to the team and get current balance
+    // Verify if camper belongs to the team and get registration_id
     const camperResult = await sqlVercel`
-      SELECT c.snack_bar_balance
+      SELECT c.id, c.registration_id
       FROM campers c
       JOIN registrations r ON c.registration_id = r.id
       JOIN camps camp ON r.camp_id = camp.id
@@ -2803,32 +2832,44 @@ app.post('/api/snackbar-transactions', async (req, res) => {
       return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
     }
 
-    const currentBalance = Number(camperResult[0].snack_bar_balance) || 0;
+    const registrationId = camperResult[0].registration_id;
+
+    // Calculate current balance from snackbar_balance and snack_bar_transactions tables
+    const depositResult = await sqlVercel`
+      SELECT COALESCE(SUM(amount), 0) as total_deposit
+      FROM snackbar_balance
+      WHERE registration_id = ${registrationId}::uuid
+    `;
+
+    const spentResult = await sqlVercel`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camper_id}::uuid
+    `;
+
+    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+    const currentBalance = totalDeposit - totalSpent;
     const newBalance = currentBalance - Number(amount);
 
     if (newBalance < 0) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
-    // Create transaction and update balance in a transaction
+    // Create transaction
     const result = await sqlVercel`
-      WITH inserted_transaction AS (
-        INSERT INTO snack_bar_transactions (camper_id, amount)
-        VALUES (${camper_id}, ${amount})
-        RETURNING id, camper_id, amount, created_at
-      )
-      UPDATE campers
-      SET snack_bar_balance = ${newBalance}
-      WHERE id = ${camper_id}
-      RETURNING (SELECT json_build_object(
-        'id', t.id,
-        'camper_id', t.camper_id,
-        'amount', t.amount,
-        'created_at', t.created_at
-      ) FROM inserted_transaction t)
+      INSERT INTO snack_bar_transactions (camper_id, amount, created_at, updated_at)
+      VALUES (${camper_id}::uuid, ${amount}, NOW(), NOW())
+      RETURNING id, camper_id, amount, created_at
     `;
 
-    return res.json(result[0].json_build_object);
+    return res.json({
+      id: result[0].id,
+      camper_id: result[0].camper_id,
+      amount: Number(result[0].amount),
+      created_at: result[0].created_at,
+      current_balance: newBalance
+    });
   } catch (error) {
     console.error('Error creating snack bar transaction:', error);
     return res.status(500).json({ error: 'Internal server error' });
@@ -3392,6 +3433,439 @@ app.get('/debug/snackbar-page', async (req, res) => {
   `;
   
   res.send(html);
+});
+
+// Debug endpoint para o balanço do snackbar
+app.get('/api/debug/snackbar-balance/:registrationId', async (req, res) => {
+  try {
+    const { registrationId } = req.params;
+    
+    if (!registrationId) {
+      return res.status(400).json({ error: 'Registration ID is required' });
+    }
+    
+    // Verificar se a tabela snackbar_balance existe
+    const tableCheckResult = await sqlVercel`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'snackbar_balance'
+      ) as exists
+    `;
+    
+    const tableExists = tableCheckResult[0]?.exists;
+    
+    if (!tableExists) {
+      return res.status(500).json({ 
+        error: 'Table snackbar_balance does not exist',
+        solution: 'You may need to create the table first' 
+      });
+    }
+    
+    // Obter detalhes do registro
+    const registration = await sqlVercel`
+      SELECT r.id, r.name, r.snack_bar_balance, c.name as camp_name
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registrationId}::uuid
+    `;
+    
+    if (registration.length === 0) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+    
+    // Obter saldo da tabela snackbar_balance
+    const depositResult = await sqlVercel`
+      SELECT COALESCE(SUM(amount), 0) as total_deposit
+      FROM snackbar_balance
+      WHERE registration_id = ${registrationId}::uuid
+    `;
+    
+    // Obter os campers associados a este registration
+    const campers = await sqlVercel`
+      SELECT id, name
+      FROM campers
+      WHERE registration_id = ${registrationId}::uuid
+    `;
+    
+    // Calcular saldo gasto em transações, se houver campers
+    let totalSpent = 0;
+    let transactions = [];
+    
+    if (campers.length > 0) {
+      // Extrair IDs dos campers
+      const camperIds = campers.map(c => c.id);
+      
+      // Obter transações
+      const spentResult = await sqlVercel`
+        SELECT camper_id, COALESCE(SUM(amount), 0) as total_spent
+        FROM snack_bar_transactions
+        WHERE camper_id = ANY(${camperIds}::uuid[])
+        GROUP BY camper_id
+      `;
+      
+      // Calcular total gasto
+      spentResult.forEach(item => {
+        totalSpent += Number(item.total_spent || 0);
+      });
+      
+      // Obter últimas transações
+      transactions = await sqlVercel`
+        SELECT *
+        FROM snack_bar_transactions
+        WHERE camper_id = ANY(${camperIds}::uuid[])
+        ORDER BY created_at DESC
+        LIMIT 10
+      `;
+    }
+    
+    // Obter os últimos 10 depósitos
+    const recentDeposits = await sqlVercel`
+      SELECT id, registration_id, amount, payment_method, phone_number, created_at
+      FROM snackbar_balance
+      WHERE registration_id = ${registrationId}::uuid
+      ORDER BY created_at DESC
+      LIMIT 10
+    `;
+    
+    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+    const calculatedBalance = totalDeposit - totalSpent;
+    const oldBalance = Number(registration[0]?.snack_bar_balance || 0);
+    
+    // Retornar informações detalhadas para debug
+    return res.json({
+      registration: registration[0],
+      campers: campers,
+      balance: {
+        calculated_balance: calculatedBalance,
+        old_balance_field: oldBalance,
+        total_deposit: totalDeposit,
+        total_spent: totalSpent,
+        difference: calculatedBalance - oldBalance
+      },
+      recent_deposits: recentDeposits,
+      recent_transactions: transactions
+    });
+  } catch (error) {
+    console.error('Error in snackbar balance debug endpoint:', error);
+    return res.status(500).json({ 
+      error: 'Error getting snackbar balance debug info', 
+      details: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+// Página HTML de debug para snackbar balance
+app.get('/debug/snackbar-balance', async (req, res) => {
+  const registrationId = req.query.id || '';
+
+  let debugData = null;
+  let error = null;
+
+  if (registrationId) {
+    try {
+      // Obter detalhes do registro
+      const registration = await sqlVercel`
+        SELECT r.id, r.name, r.snack_bar_balance, c.name as camp_name
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE r.id = ${registrationId}::uuid
+      `;
+      
+      if (registration.length === 0) {
+        error = `Registration not found with ID: ${registrationId}`;
+      } else {
+        // Obter saldo da tabela snackbar_balance
+        const depositResult = await sqlVercel`
+          SELECT COALESCE(SUM(amount), 0) as total_deposit
+          FROM snackbar_balance
+          WHERE registration_id = ${registrationId}::uuid
+        `;
+        
+        // Obter os campers associados a este registration
+        const campers = await sqlVercel`
+          SELECT id, name
+          FROM campers
+          WHERE registration_id = ${registrationId}::uuid
+        `;
+        
+        // Calcular saldo gasto em transações, se houver campers
+        let totalSpent = 0;
+        let transactions = [];
+        
+        if (campers.length > 0) {
+          // Extrair IDs dos campers
+          const camperIds = campers.map(c => c.id);
+          
+          // Obter transações
+          const spentResult = await sqlVercel`
+            SELECT camper_id, COALESCE(SUM(amount), 0) as total_spent
+            FROM snack_bar_transactions
+            WHERE camper_id = ANY(${camperIds}::uuid[])
+            GROUP BY camper_id
+          `;
+          
+          // Calcular total gasto
+          spentResult.forEach(item => {
+            totalSpent += Number(item.total_spent || 0);
+          });
+          
+          // Obter últimas transações
+          transactions = await sqlVercel`
+            SELECT *
+            FROM snack_bar_transactions
+            WHERE camper_id = ANY(${camperIds}::uuid[])
+            ORDER BY created_at DESC
+            LIMIT 10
+          `;
+        }
+        
+        // Obter os últimos 10 depósitos
+        const recentDeposits = await sqlVercel`
+          SELECT id, registration_id, amount, payment_method, phone_number, created_at
+          FROM snackbar_balance
+          WHERE registration_id = ${registrationId}::uuid
+          ORDER BY created_at DESC
+          LIMIT 10
+        `;
+        
+        const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+        const calculatedBalance = totalDeposit - totalSpent;
+        const oldBalance = Number(registration[0]?.snack_bar_balance || 0);
+        
+        debugData = {
+          registration: registration[0],
+          campers: campers,
+          balance: {
+            calculated_balance: calculatedBalance,
+            old_balance_field: oldBalance,
+            total_deposit: totalDeposit,
+            total_spent: totalSpent,
+            difference: calculatedBalance - oldBalance
+          },
+          recent_deposits: recentDeposits,
+          recent_transactions: transactions
+        };
+      }
+    } catch (e) {
+      error = e.message;
+    }
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Snackbar Balance Debug</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { color: #333; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow: auto; }
+        .error { color: red; }
+        .success { color: green; }
+        .card { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .balance { font-size: 24px; font-weight: bold; }
+        .positive { color: green; }
+        .negative { color: red; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+      </style>
+    </head>
+    <body>
+      <h1>Snackbar Balance Debug</h1>
+      
+      <div class="card">
+        <form method="get">
+          <label for="registrationId">Registration ID:</label>
+          <input type="text" id="registrationId" name="id" value="${registrationId}" style="width: 300px; padding: 5px;">
+          <button type="submit">Check Balance</button>
+        </form>
+      </div>
+      
+      ${error ? `<div class="error card"><strong>Error:</strong> ${error}</div>` : ''}
+      
+      ${debugData ? `
+        <div class="card">
+          <h2>Registration: ${debugData.registration.name}</h2>
+          <p><strong>ID:</strong> ${debugData.registration.id}</p>
+          <p><strong>Camp:</strong> ${debugData.registration.camp_name}</p>
+          
+          <div class="balance ${debugData.balance.calculated_balance >= 0 ? 'positive' : 'negative'}">
+            Balance: €${debugData.balance.calculated_balance.toFixed(2)}
+          </div>
+          
+          <div style="margin-top: 10px;">
+            <p><strong>Total Deposits:</strong> €${debugData.balance.total_deposit.toFixed(2)}</p>
+            <p><strong>Total Spent:</strong> €${debugData.balance.total_spent.toFixed(2)}</p>
+            <p><strong>Legacy Balance Field:</strong> €${debugData.balance.old_balance_field.toFixed(2)}</p>
+            <p><strong>Difference:</strong> €${debugData.balance.difference.toFixed(2)}</p>
+          </div>
+        </div>
+        
+        <div class="card">
+          <h2>Associated Campers (${debugData.campers.length})</h2>
+          ${debugData.campers.length > 0 ? `
+            <table>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+              </tr>
+              ${debugData.campers.map(camper => `
+                <tr>
+                  <td>${camper.id}</td>
+                  <td>${camper.name}</td>
+                </tr>
+              `).join('')}
+            </table>
+          ` : '<p>No campers found</p>'}
+        </div>
+        
+        <div class="card">
+          <h2>Recent Deposits (${debugData.recent_deposits.length})</h2>
+          ${debugData.recent_deposits.length > 0 ? `
+            <table>
+              <tr>
+                <th>ID</th>
+                <th>Amount</th>
+                <th>Payment Method</th>
+                <th>Phone</th>
+                <th>Date</th>
+              </tr>
+              ${debugData.recent_deposits.map(deposit => `
+                <tr>
+                  <td>${deposit.id}</td>
+                  <td>€${Number(deposit.amount).toFixed(2)}</td>
+                  <td>${deposit.payment_method}</td>
+                  <td>${deposit.phone_number || '-'}</td>
+                  <td>${new Date(deposit.created_at).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </table>
+          ` : '<p>No deposits found</p>'}
+        </div>
+        
+        <div class="card">
+          <h2>Recent Transactions (${debugData.recent_transactions.length})</h2>
+          ${debugData.recent_transactions.length > 0 ? `
+            <table>
+              <tr>
+                <th>ID</th>
+                <th>Camper ID</th>
+                <th>Amount</th>
+                <th>Date</th>
+              </tr>
+              ${debugData.recent_transactions.map(transaction => `
+                <tr>
+                  <td>${transaction.id}</td>
+                  <td>${transaction.camper_id}</td>
+                  <td>€${Number(transaction.amount).toFixed(2)}</td>
+                  <td>${new Date(transaction.created_at).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </table>
+          ` : '<p>No transactions found</p>'}
+        </div>
+      ` : ''}
+    </body>
+    </html>
+  `;
+  
+  res.send(html);
+});
+
+// Endpoint para criar a tabela snackbar_balance e migrar dados existentes
+app.get('/api/setup/snackbar-balance-table', async (req, res) => {
+  try {
+    // Verificar se a tabela já existe
+    const tableCheckResult = await sqlVercel`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'snackbar_balance'
+      ) as exists
+    `;
+    
+    const tableExists = tableCheckResult[0]?.exists;
+    
+    if (tableExists) {
+      return res.json({
+        status: 'table_exists',
+        message: 'A tabela snackbar_balance já existe'
+      });
+    }
+    
+    // Criar a tabela snackbar_balance
+    await sqlVercel`
+      CREATE TABLE IF NOT EXISTS snackbar_balance (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        registration_id UUID NOT NULL REFERENCES registrations(id),
+        amount NUMERIC NOT NULL,
+        payment_method VARCHAR(50) NOT NULL,
+        phone_number VARCHAR(20),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `;
+    
+    // Identificar registrations com saldo positivo para migração
+    const registrationsWithBalance = await sqlVercel`
+      SELECT id, snack_bar_balance
+      FROM registrations
+      WHERE snack_bar_balance > 0
+    `;
+    
+    const migrationResults = [];
+    
+    // Migrar saldos existentes para a nova tabela
+    if (registrationsWithBalance.length > 0) {
+      for (const reg of registrationsWithBalance) {
+        const balance = Number(reg.snack_bar_balance) || 0;
+        
+        if (balance > 0) {
+          // Inserir um registro na nova tabela para cada registro com saldo
+          const insertResult = await sqlVercel`
+            INSERT INTO snackbar_balance (
+              registration_id,
+              amount,
+              payment_method,
+              created_at,
+              updated_at
+            ) VALUES (
+              ${reg.id}::uuid,
+              ${balance},
+              'Migração',
+              NOW(),
+              NOW()
+            ) RETURNING id
+          `;
+          
+          migrationResults.push({
+            registration_id: reg.id,
+            amount: balance,
+            insert_id: insertResult[0]?.id
+          });
+        }
+      }
+    }
+    
+    return res.json({
+      status: 'success',
+      message: 'Tabela criada com sucesso',
+      table_created: true,
+      migrated_records: migrationResults.length,
+      migration_details: migrationResults
+    });
+  } catch (error) {
+    console.error('Erro ao configurar tabela snackbar_balance:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Erro ao configurar tabela',
+      error: error.message,
+      stack: error.stack
+    });
+  }
 });
 
 // Export the Express app as a serverless function
