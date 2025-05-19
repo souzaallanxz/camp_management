@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getTeamIdHeader } from './auth'
 
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
@@ -9,11 +10,14 @@ export const api = axios.create({
   }
 })
 
-// Add request interceptor to add auth token
+// Add request interceptor to add auth token and team id
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const headers = getTeamIdHeader()
+  if (headers['x-team-id']) {
+    config.headers['x-team-id'] = headers['x-team-id']
+  }
+  if (headers.Authorization) {
+    config.headers.Authorization = headers.Authorization
   }
   return config
 })
