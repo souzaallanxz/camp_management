@@ -23,9 +23,10 @@ export const snackBarService = {
     }
   },
 
-  async getCampers(): Promise<CamperWithBalance[]> {
+  async getCampers(campId?: string): Promise<CamperWithBalance[]> {
     try {
-      const response = await api.get('/campers')
+      const url = campId ? `/api/campers?camp_id=${campId}` : '/api/campers'
+      const response = await api.get(url)
       return response.data.map((camper: CamperResponse) => ({
         id: camper.id,
         name: camper.name,
@@ -41,7 +42,7 @@ export const snackBarService = {
   },
 
   async getCamperById(id: string): Promise<CamperWithBalance> {
-    const response = await api.get(`/campers/${id}`)
+    const response = await api.get(`/api/campers/${id}`)
     const camper = response.data as CamperResponse
     return {
       id: camper.id,

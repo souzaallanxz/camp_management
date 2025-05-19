@@ -778,24 +778,37 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const campers = await sql`
-      SELECT ca.*, 
-             c.name as camp_name, 
-             COALESCE(ca.snack_bar_balance, 0) as snack_bar_balance
-      FROM campers ca
-      JOIN registrations r ON ca.registration_id = r.id
-      JOIN camps c ON r.camp_id = c.id
-      WHERE c.team_id = ${teamId}
-      ORDER BY ca.created_at DESC
-    `;
-    
+    const { camp_id } = req.query;
+    let campers;
+    if (camp_id) {
+      campers = await sql`
+        SELECT ca.*, 
+               c.name as camp_name, 
+               COALESCE(ca.snack_bar_balance, 0) as snack_bar_balance
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId} AND c.id = ${camp_id}
+        ORDER BY ca.created_at DESC
+      `;
+    } else {
+      campers = await sql`
+        SELECT ca.*, 
+               c.name as camp_name, 
+               COALESCE(ca.snack_bar_balance, 0) as snack_bar_balance
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}
+        ORDER BY ca.created_at DESC
+      `;
+    }
     // Mapear os resultados para incluir camp como objeto e garantir que snack_bar_balance seja um número
     const campersWithCampObject = campers.map(camper => ({
       ...camper,
       camp: { name: camper.camp_name },
       snack_bar_balance: Number(camper.snack_bar_balance) || 0
     }));
-    
     res.json(campersWithCampObject);
   } catch {
     res.status(500).json({ error: 'Erro ao buscar campistas.' });

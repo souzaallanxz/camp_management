@@ -72,8 +72,9 @@ export default function SnackBarPage() {
   })
 
   const { data: campers = [], isLoading: isLoadingCampers } = useQuery({
-    queryKey: ['campers'],
-    queryFn: () => snackBarService.getCampers(),
+    queryKey: ['campers', currentCamp?.id],
+    queryFn: () => snackBarService.getCampers(currentCamp?.id),
+    enabled: !!currentCamp?.id,
   })
 
   const mutation = useMutation({
