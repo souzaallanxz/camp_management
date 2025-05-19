@@ -17,7 +17,9 @@ export const snackBarService = {
   async getCurrentCamp() {
     // First check if we have a team ID
     if (!hasTeamId()) {
-      console.error('Cannot get current camp: No team ID available');
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Cannot get current camp: No team ID available');
+      }
       return null;
     }
     
@@ -58,7 +60,7 @@ export const snackBarService = {
     } catch (error) {
       // Use console.warn instead of console.error to avoid linter issues
       if (process.env.NODE_ENV !== 'production') {
-        console.warn('Error getting current camp:', error);
+        console.warn('Error getting current camp');
       }
       
       // Try fallback approach directly
@@ -67,7 +69,7 @@ export const snackBarService = {
         if (allCampsResponse.data && Array.isArray(allCampsResponse.data) && allCampsResponse.data.length > 0) {
           return allCampsResponse.data[0]; // Return first camp as fallback
         }
-      } catch (fallbackError) {
+      } catch (_) {
         if (process.env.NODE_ENV !== 'production') {
           console.warn('Error in fallback camp fetch');
         }
@@ -96,7 +98,7 @@ export const snackBarService = {
   },
 
   async getCamperById(id: string): Promise<CamperWithBalance> {
-    const response = await api.get(`/campers/${id}`)
+    const response = await api.get(`/api/campers/${id}`)
     const camper = response.data as CamperResponse
     return {
       id: camper.id,
@@ -110,7 +112,7 @@ export const snackBarService = {
   },
 
   async createTransaction(transaction: SnackBarTransaction): Promise<SnackBarTransactionResponse> {
-    const response = await api.post('/snackbar-transactions', {
+    const response = await api.post('/api/snackbar-transactions', {
       camper_id: transaction.camper_id,
       amount: transaction.amount
     })
@@ -123,7 +125,7 @@ export const snackBarService = {
     }
     
     try {
-      const response = await api.get(`/snackbar-transactions/${camper_id}`)
+      const response = await api.get(`/api/snackbar-transactions/${camper_id}`)
       return response.data
     } catch {
       return []
@@ -136,7 +138,7 @@ export const snackBarService = {
     }
     
     // Get current balance
-    const balanceResponse = await api.get(`/snackbar-balance/${transaction.camper_id}`)
+    const balanceResponse = await api.get(`/api/snackbar-balance/${transaction.camper_id}`)
     const currentBalance = balanceResponse.data.balance
     
     // Verify if has sufficient balance
@@ -154,7 +156,7 @@ export const snackBarService = {
     }
     
     try {
-      const response = await api.get(`/snackbar-balance/${camperId}`)
+      const response = await api.get(`/api/snackbar-balance/${camperId}`)
       return response.data.balance
     } catch {
       return 0
@@ -163,13 +165,70 @@ export const snackBarService = {
 
   async getAllTransactions(campId?: string): Promise<SnackBarTransactionResponse[]> {
     if (!campId) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('No campId provided to getAllTransactions');
+      }
       return [];
     }
+    
+    // Ensure team ID is available
+    if (!hasTeamId()) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('No team ID available when fetching transactions');
+      }
+      return [];
+    }
+    
     try {
-      const response = await api.get(`/snackbar-transactions?camp_id=${campId}`)
-      return Array.isArray(response.data) ? response.data : []
-    } catch {
-      return []
+      // Try both endpoints, starting with the API prefixed one
+      try {
+        const response = await api.get(`/api/snackbar-transactions?camp_id=${campId}`, {
+          timeout: 8000 // 8 second timeout
+        });
+        
+        if (Array.isArray(response.data)) {
+          return response.data;
+        }
+      } catch (_) {
+        // Silent fail, try next endpoint
+      }
+      
+      // If the first endpoint fails, try the one without /api prefix
+      try {
+        const fallbackResponse = await api.get(`/snackbar-transactions?camp_id=${campId}`, {
+          timeout: 8000
+        });
+        
+        if (Array.isArray(fallbackResponse.data)) {
+          return fallbackResponse.data;
+        }
+      } catch (_) {
+        // Silent fail, try next approach
+      }
+      
+      // If both fail, try the debug endpoint
+      const debugResponse = await api.get(`/api/debug/snackbar-transactions?campId=${campId}`);
+      
+      if (debugResponse.data && Array.isArray(debugResponse.data.sample_transactions)) {
+        return debugResponse.data.sample_transactions.map((t: Record<string, any>) => ({
+          id: t.id,
+          camper_id: t.camper_id,
+          amount: Number(t.amount),
+          created_at: t.created_at,
+          camper: t.camper_name ? {
+            id: t.camper_id,
+            name: t.camper_name,
+            registration: {
+              id: t.registration_id,
+              camp_id: t.camp_id
+            }
+          } : undefined
+        }));
+      }
+      
+      return [];
+    } catch (_) {
+      return [];
     }
   }
 } 

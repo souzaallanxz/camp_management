@@ -2849,42 +2849,114 @@ app.get('/api/snackbar-transactions', async (req, res) => {
       return res.status(400).json({ error: 'Missing camp_id query parameter' });
     }
 
-    // Get all transactions for the camp with team verification
-    const result = await sqlVercel`
-      SELECT 
-        t.id,
-        t.camper_id,
-        t.amount,
-        t.created_at,
-        c.name as camper_name,
-        r.id as registration_id,
-        camp.id as camp_id
-      FROM snack_bar_transactions t
-      JOIN campers c ON t.camper_id = c.id
-      JOIN registrations r ON c.registration_id = r.id
-      JOIN camps camp ON r.camp_id = camp.id
-      WHERE camp.id = ${camp_id}::uuid
-      AND camp.team_id = ${teamId}::uuid
-      ORDER BY t.created_at DESC
+    // First check if the camp exists and belongs to the team
+    const campCheck = await sqlVercel`
+      SELECT id 
+      FROM camps 
+      WHERE id = ${camp_id}::uuid 
+      AND team_id = ${teamId}::uuid
     `;
 
-    return res.json(result.map(t => ({
-      id: t.id,
-      camper_id: t.camper_id,
-      amount: Number(t.amount),
-      created_at: t.created_at,
-      camper: {
-        id: t.camper_id,
-        name: t.camper_name,
-        registration: {
-          id: t.registration_id,
-          camp_id: t.camp_id
-        }
+    if (campCheck.length === 0) {
+      return res.status(404).json({ 
+        error: 'Camp not found or does not belong to your team',
+        camp_id,
+        team_id: teamId
+      });
+    }
+
+    // Check if the snack_bar_transactions table exists
+    const tableCheck = await sqlVercel`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'snack_bar_transactions'
+      ) as exists
+    `;
+
+    const tableExists = tableCheck[0]?.exists;
+
+    // If table doesn't exist, return empty array
+    if (!tableExists) {
+      console.warn('snack_bar_transactions table does not exist');
+      return res.json([]);
+    }
+
+    // Get all transactions for the camp with team verification
+    // Use a simpler query that's less likely to fail
+    try {
+      const result = await sqlVercel`
+        SELECT 
+          t.id,
+          t.camper_id,
+          t.amount,
+          t.created_at,
+          c.name as camper_name,
+          r.id as registration_id,
+          c.id as camper_id,
+          r.camp_id
+        FROM snack_bar_transactions t
+        JOIN campers c ON t.camper_id = c.id
+        JOIN registrations r ON c.registration_id = r.id
+        WHERE r.camp_id = ${camp_id}::uuid
+        ORDER BY t.created_at DESC
+      `;
+
+      // If join query fails, try a direct query
+      if (!result || result.length === 0) {
+        // For logging only
+        const directTransactions = await sqlVercel`
+          SELECT COUNT(*) FROM snack_bar_transactions
+        `;
+        console.log(`No transactions found with join. Total transactions: ${directTransactions[0]?.count || 0}`);
       }
-    })));
+
+      // Map the results to the expected format
+      const mappedResults = result.map(t => ({
+        id: t.id,
+        camper_id: t.camper_id,
+        amount: Number(t.amount),
+        created_at: t.created_at,
+        camper: {
+          id: t.camper_id,
+          name: t.camper_name,
+          registration: {
+            id: t.registration_id,
+            camp_id: t.camp_id
+          }
+        }
+      }));
+
+      return res.json(mappedResults);
+    } catch (queryError) {
+      console.error('Error in snackbar transactions query:', queryError);
+      
+      // Try a fallback query
+      try {
+        const fallbackResult = await sqlVercel`
+          SELECT t.*
+          FROM snack_bar_transactions t
+        `;
+        
+        // Return basic data if we can't get the full joined data
+        return res.json(fallbackResult.map(t => ({
+          id: t.id,
+          camper_id: t.camper_id,
+          amount: Number(t.amount),
+          created_at: t.created_at
+        })));
+      } catch (fallbackError) {
+        console.error('Fallback query also failed:', fallbackError);
+        throw queryError; // Throw original error for complete error details
+      }
+    }
   } catch (error) {
     console.error('Error getting snack bar transactions:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ 
+      error: 'Error fetching transactions', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
@@ -3029,5 +3101,298 @@ app.get('/api/debug/team-id', async (req, res) => {
   }
 });
 
+// Debug endpoint for snackbar transactions
+app.get('/api/debug/snackbar-transactions', async (req, res) => {
+  try {
+    const teamId = req.query.teamId;
+    const campId = req.query.campId;
+    
+    // Check for table existence
+    const tableCheck = await sqlVercel`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'snack_bar_transactions'
+      ) as exists
+    `;
+    
+    const tableExists = tableCheck[0]?.exists || false;
+    
+    if (!tableExists) {
+      // Try to create the table if it doesn't exist
+      try {
+        await sqlVercel`
+          CREATE TABLE IF NOT EXISTS public.snack_bar_transactions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            camper_id UUID NOT NULL,
+            amount NUMERIC NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          )
+        `;
+        
+        return res.json({
+          status: 'table_created',
+          message: 'The snack_bar_transactions table was created successfully'
+        });
+      } catch (createError) {
+        return res.status(500).json({
+          status: 'table_creation_failed',
+          error: 'Failed to create snack_bar_transactions table',
+          details: createError.message
+        });
+      }
+    }
+    
+    // Get all tables for reference
+    const allTables = await sqlVercel`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `;
+    
+    // Get table schema
+    const tableSchema = await sqlVercel`
+      SELECT column_name, data_type, is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'snack_bar_transactions'
+      ORDER BY ordinal_position
+    `;
+    
+    // Check transaction count
+    const transactionCount = await sqlVercel`
+      SELECT COUNT(*) as count
+      FROM snack_bar_transactions
+    `;
+    
+    // Sample transactions
+    let sampleTransactions = [];
+    if (teamId || campId) {
+      // If campId is provided, use it for filtering
+      if (campId) {
+        sampleTransactions = await sqlVercel`
+          SELECT 
+            t.id,
+            t.camper_id,
+            t.amount,
+            t.created_at,
+            c.name as camper_name,
+            r.id as registration_id,
+            camp.id as camp_id,
+            camp.name as camp_name
+          FROM snack_bar_transactions t
+          JOIN campers c ON t.camper_id = c.id
+          JOIN registrations r ON c.registration_id = r.id
+          JOIN camps camp ON r.camp_id = camp.id
+          WHERE camp.id = ${campId}::uuid
+          ORDER BY t.created_at DESC
+          LIMIT 10
+        `;
+      } 
+      // If only teamId is provided, use it for filtering
+      else if (teamId) {
+        sampleTransactions = await sqlVercel`
+          SELECT 
+            t.id,
+            t.camper_id,
+            t.amount,
+            t.created_at,
+            c.name as camper_name,
+            r.id as registration_id,
+            camp.id as camp_id,
+            camp.name as camp_name
+          FROM snack_bar_transactions t
+          JOIN campers c ON t.camper_id = c.id
+          JOIN registrations r ON c.registration_id = r.id
+          JOIN camps camp ON r.camp_id = camp.id
+          WHERE camp.team_id = ${teamId}::uuid
+          ORDER BY t.created_at DESC
+          LIMIT 10
+        `;
+      }
+    } else {
+      // Just get some sample transactions if no filters
+      sampleTransactions = await sqlVercel`
+        SELECT * FROM snack_bar_transactions
+        ORDER BY created_at DESC
+        LIMIT 10
+      `;
+    }
+    
+    return res.json({
+      status: 'success',
+      table_exists: tableExists,
+      all_tables: allTables.map(t => t.table_name),
+      table_schema: tableSchema,
+      transaction_count: transactionCount[0]?.count || 0,
+      sample_transactions: sampleTransactions
+    });
+  } catch (error) {
+    console.error('Error in debug snackbar transactions endpoint:', error);
+    return res.status(500).json({ 
+      error: 'Error getting snackbar transactions debug info', 
+      details: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+// Backward compatibility endpoint (without /api prefix)
+app.get('/snackbar-transactions', async (req, res) => {
+  try {
+    const { camp_id } = req.query;
+    
+    if (!camp_id) {
+      return res.status(400).json({ error: 'Missing camp_id query parameter' });
+    }
+    
+    // Extract team ID
+    const teamId = getTeamId(req);
+    if (!teamId) {
+      return res.status(401).json({ error: 'Missing x-team-id header' });
+    }
+
+    // Check if the camp exists and belongs to the team
+    const campCheck = await sqlVercel`
+      SELECT id 
+      FROM camps 
+      WHERE id = ${camp_id}::uuid 
+      AND team_id = ${teamId}::uuid
+    `;
+
+    if (campCheck.length === 0) {
+      return res.status(404).json({ error: 'Camp not found or does not belong to your team' });
+    }
+    
+    // Attempt to get transactions using a simple query
+    try {
+      const result = await sqlVercel`
+        SELECT 
+          t.id,
+          t.camper_id,
+          t.amount,
+          t.created_at,
+          c.name as camper_name,
+          r.id as registration_id,
+          r.camp_id
+        FROM snack_bar_transactions t
+        JOIN campers c ON t.camper_id = c.id
+        JOIN registrations r ON c.registration_id = r.id
+        WHERE r.camp_id = ${camp_id}::uuid
+        ORDER BY t.created_at DESC
+      `;
+
+      // Format the response in the expected structure
+      return res.json(result.map(t => ({
+        id: t.id,
+        camper_id: t.camper_id,
+        amount: Number(t.amount),
+        created_at: t.created_at,
+        camper: {
+          id: t.camper_id,
+          name: t.camper_name,
+          registration: {
+            id: t.registration_id,
+            camp_id: t.camp_id
+          }
+        }
+      })));
+    } catch (queryError) {
+      // If the query fails, return an empty array
+      console.error('Error in snackbar transactions query:', queryError);
+      return res.json([]);
+    }
+  } catch (error) {
+    console.error('Error in /snackbar-transactions endpoint:', error);
+    return res.status(500).json({ error: 'Erro ao buscar as transações.' });
+  }
+});
+
+// HTML debug page for snackbar transactions
+app.get('/debug/snackbar-page', async (req, res) => {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Snackbar Transactions Debug</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { color: #333; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow: auto; }
+        button { padding: 10px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 300px; }
+        .result { margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <h1>Snackbar Transactions Debug</h1>
+      
+      <div>
+        <label for="teamId">Team ID:</label>
+        <input type="text" id="teamId" placeholder="Team ID" value="${req.query.teamId || ''}">
+      </div>
+      
+      <div>
+        <label for="campId">Camp ID:</label>
+        <input type="text" id="campId" placeholder="Camp ID" value="${req.query.campId || ''}">
+      </div>
+      
+      <button onclick="testEndpoint('/api/snackbar-transactions')">Test /api/snackbar-transactions</button>
+      <button onclick="testEndpoint('/snackbar-transactions')">Test /snackbar-transactions</button>
+      <button onclick="testEndpoint('/api/debug/snackbar-transactions')">Test Debug Endpoint</button>
+      <button onclick="testEndpoint('/api/debug/team-id')">Test Team ID</button>
+      
+      <div class="result">
+        <h3>Result:</h3>
+        <pre id="result">Click a button to test an endpoint</pre>
+      </div>
+      
+      <script>
+        async function testEndpoint(endpoint) {
+          const resultElement = document.getElementById('result');
+          const teamId = document.getElementById('teamId').value;
+          const campId = document.getElementById('campId').value;
+          
+          resultElement.textContent = 'Loading...';
+          
+          try {
+            let url = endpoint;
+            
+            // Add query parameters if needed
+            if (endpoint.includes('snackbar-transactions')) {
+              url += '?camp_id=' + encodeURIComponent(campId);
+            } else if (endpoint.includes('debug')) {
+              // For debug endpoints, add both team and camp IDs if available
+              const params = [];
+              if (teamId) params.push('teamId=' + encodeURIComponent(teamId));
+              if (campId) params.push('campId=' + encodeURIComponent(campId));
+              if (params.length > 0) {
+                url += '?' + params.join('&');
+              }
+            }
+            
+            const headers = {};
+            if (teamId) {
+              headers['x-team-id'] = teamId;
+            }
+            
+            const response = await fetch(url, { headers });
+            const data = await response.json();
+            
+            resultElement.textContent = JSON.stringify(data, null, 2);
+          } catch (error) {
+            resultElement.textContent = 'Error: ' + error.message;
+          }
+        }
+      </script>
+    </body>
+    </html>
+  `;
+  
+  res.send(html);
+});
+
 // Export the Express app as a serverless function
-export default app; 
+export default app;
