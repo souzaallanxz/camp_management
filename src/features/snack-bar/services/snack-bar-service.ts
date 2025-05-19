@@ -16,7 +16,7 @@ interface CamperResponse {
 export const snackBarService = {
   async getCurrentCamp() {
     try {
-      const response = await api.get('/camps/current')
+      const response = await api.get('/api/camps/current')
       return response.data
     } catch {
       return null
@@ -27,9 +27,9 @@ export const snackBarService = {
     try {
       const url = campId ? `/api/campers?camp_id=${campId}` : '/api/campers'
       const response = await api.get(url)
-      return response.data.map((camper: CamperResponse) => ({
+      return response.data.map((camper: CamperResponse & { registration_name?: string }) => ({
         id: camper.id,
-        name: camper.name,
+        name: camper.name || camper.registration_name || 'Sem nome',
         snack_bar_balance: Number(camper.snack_bar_balance) || 0,
         registration: {
           id: camper.registration_id,
