@@ -2636,3 +2636,27 @@ app.get('/api/snackbar-transactions', async (req, res) => {
 
 // Export the Express app as a serverless function
 export default app; 
+
+app.get('/api/camps/current', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const now = new Date();
+    const result = await sqlVercel`
+      SELECT * FROM camps
+      WHERE team_id = ${teamId}
+      AND start_date <= ${now}
+      AND end_date >= ${now}
+      ORDER BY start_date DESC
+      LIMIT 1
+    `;
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'No active camp found' });
+    }
+    res.json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
