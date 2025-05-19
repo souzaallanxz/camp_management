@@ -18,7 +18,8 @@ export const snackBarService = {
     try {
       const response = await api.get('/api/camps/current');
       return response.data
-    } catch {
+    } catch (error) {
+      console.error('Error getting current camp:', error);
       return null
     }
   },
