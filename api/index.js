@@ -2896,21 +2896,35 @@ app.get('/api/camps/current', async (req, res) => {
   }
   try {
     const now = new Date();
+    debugLog('Fetching current camp', { teamId, now });
+    
     const result = await sqlVercel`
       SELECT *
       FROM camps
       WHERE team_id = ${teamId}::uuid
-        AND start_date <= ${now}
-        AND end_date >= ${now}
+        AND start_date::date <= ${now.toISOString().split('T')[0]}::date
+        AND end_date::date >= ${now.toISOString().split('T')[0]}::date
       ORDER BY start_date DESC
       LIMIT 1
     `;
+    
+    debugLog('Current camp query result', { result });
+    
     if (!result[0]) {
       return res.json(null);
     }
     res.json(result[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
+    debugLog('Error in /api/camps/current', {
+      error: error.message,
+      stack: error.stack,
+      teamId
+    });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message,
+      code: error.code
+    });
   }
 });
 
