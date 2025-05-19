@@ -16,7 +16,7 @@ interface CamperResponse {
 export const snackBarService = {
   async getCurrentCamp() {
     try {
-      const response = await api.get('/api/camps/current')
+      const response = await api.get('/camps/current')
       return response.data
     } catch {
       return null
@@ -42,7 +42,7 @@ export const snackBarService = {
   },
 
   async getCamperById(id: string): Promise<CamperWithBalance> {
-    const response = await api.get(`/api/campers/${id}`)
+    const response = await api.get(`/campers/${id}`)
     const camper = response.data as CamperResponse
     return {
       id: camper.id,

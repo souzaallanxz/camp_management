@@ -52,8 +52,6 @@ export default function SnackBarPage() {
     queryFn: () => snackBarService.getCurrentCamp(),
   })
 
-  console.log('currentCamp:', currentCamp)
-  console.log('currentCamp?.id:', currentCamp?.id)
   const { data: balance = 0 } = useQuery({
     queryKey: ['camper-balance', selectedCamperId],
     queryFn: () => snackBarService.getCamperBalance(selectedCamperId),

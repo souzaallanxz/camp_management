@@ -1185,48 +1185,40 @@ app.get('/api/registrations', async (req, res) => {
 // ===== CAMPERS ENDPOINTS =====
 
 // Get all campers
-app.get('/api/campers', async (req, res) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
+app.get('/campers', async (req, res) => {
+  
   try {
-    const { camp_id } = req.query;
-    let campers;
-    if (camp_id) {
-      campers = await sqlVercel`
-        SELECT 
-          ca.*, 
-          c.name as camp_name,
-          r.snack_bar_balance
-        FROM campers ca
-        JOIN registrations r ON ca.registration_id = r.id
+    const teamId = getTeamId(req);
+    
+    let results;
+    if (teamId) {
+      results = await sqlVercel`
+        SELECT cm.*, r.name as registration_name, c.name as camp_name
+        FROM campers cm
+        JOIN registrations r ON cm.registration_id = r.id
         JOIN camps c ON r.camp_id = c.id
-        WHERE c.team_id = ${teamId} AND c.id = ${camp_id}
-        ORDER BY ca.created_at DESC
+        WHERE c.team_id = ${teamId}::uuid
+        ORDER BY cm.created_at DESC
       `;
     } else {
-      campers = await sqlVercel`
-        SELECT 
-          ca.*, 
-          c.name as camp_name,
-          r.snack_bar_balance
-        FROM campers ca
-        JOIN registrations r ON ca.registration_id = r.id
+      // Modo diagnóstico
+      results = await sqlVercel`
+        SELECT cm.*, r.name as registration_name, c.name as camp_name
+        FROM campers cm
+        JOIN registrations r ON cm.registration_id = r.id
         JOIN camps c ON r.camp_id = c.id
-        WHERE c.team_id = ${teamId}
-        ORDER BY ca.created_at DESC
+        ORDER BY cm.created_at DESC
+        LIMIT 20
       `;
     }
-    // Mapear os resultados para incluir camp como objeto e garantir que snack_bar_balance seja um número
-    const campersWithCampObject = campers.map(camper => ({
-      ...camper,
-      camp: { name: camper.camp_name },
-      snack_bar_balance: Number(camper.snack_bar_balance) || 0
-    }));
-    res.json(campersWithCampObject);
+    
+    return res.json(results);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar campistas.' });
+    console.error('Error getting campers:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
   }
 });
 
@@ -1258,6 +1250,292 @@ app.get('/api/campers/:id', async (req, res) => {
 // ===== USERS ENDPOINTS =====
 
 // Get all users
+app.get('/users', async (req, res) => {
+  
+  try {
+    const teamId = getTeamId(req);
+    
+    // Usuários só são acessíveis para a mesma equipe ou superadmin
+    let results;
+    if (teamId) {
+      results = await sqlVercel`
+        SELECT id, email, first_name, last_name, role, team_id, created_at, updated_at
+        FROM users
+        WHERE team_id = ${teamId}::uuid
+        ORDER BY created_at DESC
+      `;
+    } else {
+      // Modo diagnóstico - omite informações sensíveis
+      results = await sqlVercel`
+        SELECT id, email, first_name, last_name, role, team_id, created_at, updated_at
+        FROM users
+        ORDER BY created_at DESC
+        LIMIT 20
+      `;
+    }
+    
+    return res.json(results);
+  } catch (error) {
+    console.error('Error getting users:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
+  }
+});
+
+// ===== CAMPS ENDPOINTS =====
+
+// Get all camps
+app.get('/camps', async (req, res) => {
+  
+  try {
+    const teamId = getTeamId(req);
+    
+    let results;
+    if (teamId) {
+      results = await sqlVercel`
+        SELECT *
+        FROM camps
+        WHERE team_id = ${teamId}::uuid
+        ORDER BY created_at DESC
+      `;
+    } else {
+      // Modo diagnóstico
+      results = await sqlVercel`
+        SELECT *
+        FROM camps
+        ORDER BY created_at DESC
+        LIMIT 20
+      `;
+    }
+    
+    return res.json(results);
+  } catch (error) {
+    console.error('Error getting camps:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
+  }
+});
+
+// Get camp by ID
+app.get('/api/camps/:id', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const result = await sqlVercel`
+      SELECT * FROM camps WHERE id = ${id} AND team_id = ${teamId}
+    `;
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Camp not found' });
+    }
+    res.json(result[0]);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar acampamento.' });
+  }
+});
+
+// ===== SETTINGS ENDPOINTS =====
+
+// Get profile settings
+app.get('/settings/profile', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    
+    const result = await sqlVercel`
+      SELECT id, email, first_name, last_name, role, team_id, created_at, updated_at
+      FROM users
+      WHERE id = ${token}::uuid
+    `;
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    return res.json(result[0]);
+  } catch (error) {
+    console.error('Error getting profile settings:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get organization settings
+app.get('/settings/organization', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    
+    const userResult = await sqlVercel`
+      SELECT team_id
+      FROM users
+      WHERE id = ${token}::uuid
+    `;
+    
+    if (userResult.length === 0 || !userResult[0].team_id) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+    
+    const teamId = userResult[0].team_id;
+    
+    const result = await sqlVercel`
+      SELECT *
+      FROM teams
+      WHERE id = ${teamId}::uuid
+    `;
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+    
+    return res.json(result[0]);
+  } catch (error) {
+    console.error('Error getting organization settings:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ===== VERSÃO COM PREFIXO /API =====
+
+// Get all registrations
+app.get('/api/registrations', async (req, res) => {
+  
+  try {
+    const teamId = getTeamId(req);
+      
+    let results;
+    if (teamId) {
+      results = await sqlVercel`
+        SELECT r.*, c.name as camp_name
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}::uuid
+        ORDER BY r.created_at DESC
+      `;
+    } else {
+      // Modo diagnóstico
+      results = await sqlVercel`
+        SELECT r.*, c.name as camp_name
+        FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        ORDER BY r.created_at DESC
+        LIMIT 20
+      `;
+    }
+    
+    return res.json(results);
+  } catch (error) {
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message
+    });
+  }
+});
+
+// Get registration by ID
+app.get('/api/registrations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await sqlVercel`
+      SELECT 
+        r.id,
+        r.form_id,
+        r.name as camper_name,
+        r.email as camper_email,
+        r.contact,
+        r.status,
+        r.created_at,
+        r.updated_at,
+        r.user_id,
+        r.camp_id,
+        r.onboarding_status,
+        r.snack_bar_balance,
+        r.id_number,
+        r.sns_number,
+        r.date_of_birth,
+        r.dietary_restrictions,
+        r.guardian_name,
+        r.guardian_email,
+        r.guardian_phone,
+        c.name as camp_name,
+        c.start_date as camp_start_date,
+        c.end_date as camp_end_date,
+        c.price as camp_price,
+        COALESCE(SUM(p.amount), 0) as total_paid
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      LEFT JOIN payments p ON r.id = p.registration_id
+      WHERE r.id = ${id}::uuid
+      GROUP BY r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date, c.price
+      LIMIT 1
+    `;
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+    const registration = result[0];
+    const totalPaid = parseFloat(registration.total_paid) || 0;
+    const campPrice = parseFloat(registration.camp_price) || 0;
+    let status = 'unpaid';
+    if (totalPaid >= campPrice || (campPrice > 0 && (campPrice - totalPaid) < 1)) {
+      status = 'paid';
+    } else if (totalPaid > 0) {
+      status = 'partial';
+    }
+    return res.json({
+      ...registration,
+      total_paid: totalPaid,
+      camp_price: campPrice,
+      status
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all campers
+app.get('/api/campers', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const campers = await sqlVercel`
+      SELECT 
+        ca.*, 
+        c.name as camp_name,
+        r.snack_bar_balance
+      FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY ca.created_at DESC
+    `;
+    // Mapear os resultados para incluir camp como objeto e garantir que snack_bar_balance seja um número
+    const campersWithCampObject = campers.map(camper => ({
+      ...camper,
+      camp: { name: camper.camp_name },
+      snack_bar_balance: Number(camper.snack_bar_balance) || 0
+    }));
+    res.json(campersWithCampObject);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar campistas.' });
+  }
+});
+
+// Get all users
 app.get('/api/users', async (req, res) => {
   const teamId = getTeamId(req);
   if (!teamId) {
@@ -1283,8 +1561,6 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// ===== CAMPS ENDPOINTS =====
-
 // Get all camps
 app.get('/api/camps', async (req, res) => {
   const teamId = getTeamId(req);
@@ -1300,28 +1576,6 @@ app.get('/api/camps', async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar acampamentos.' });
   }
 });
-
-// Get camp by ID
-app.get('/api/camps/:id', async (req, res) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  try {
-    const { id } = req.params;
-    const result = await sqlVercel`
-      SELECT * FROM camps WHERE id = ${id} AND team_id = ${teamId}
-    `;
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'Camp not found' });
-    }
-    res.json(result[0]);
-  } catch {
-    res.status(500).json({ error: 'Erro ao buscar acampamento.' });
-  }
-});
-
-// ===== SETTINGS ENDPOINTS =====
 
 // Get profile settings
 app.get('/api/settings/profile', async (req, res) => {
@@ -2636,27 +2890,3 @@ app.get('/api/snackbar-transactions', async (req, res) => {
 
 // Export the Express app as a serverless function
 export default app; 
-
-app.get('/api/camps/current', async (req, res) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  try {
-    const now = new Date();
-    const result = await sqlVercel`
-      SELECT * FROM camps
-      WHERE team_id = ${teamId}
-      AND start_date <= ${now}
-      AND end_date >= ${now}
-      ORDER BY start_date DESC
-      LIMIT 1
-    `;
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'No active camp found' });
-    }
-    res.json(result[0]);
-  } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
