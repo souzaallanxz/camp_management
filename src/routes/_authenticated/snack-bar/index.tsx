@@ -65,8 +65,9 @@ export default function SnackBarPage() {
   })
 
   const { data: allTransactions = [] } = useQuery({
-    queryKey: ['all-transactions'],
-    queryFn: () => snackBarService.getAllTransactions(),
+    queryKey: ['all-transactions', currentCamp?.id],
+    queryFn: () => snackBarService.getAllTransactions(currentCamp?.id),
+    enabled: !!currentCamp?.id,
     refetchInterval: 5000, // Refetch every 5 seconds
   })
 

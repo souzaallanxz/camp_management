@@ -106,10 +106,13 @@ export const snackBarService = {
     }
   },
 
-  async getAllTransactions(campId: string): Promise<SnackBarTransactionResponse[]> {
+  async getAllTransactions(campId?: string): Promise<SnackBarTransactionResponse[]> {
+    if (!campId) {
+      return [];
+    }
     try {
       const response = await api.get(`/snackbar-transactions?camp_id=${campId}`)
-      return response.data
+      return Array.isArray(response.data) ? response.data : []
     } catch {
       return []
     }
