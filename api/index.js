@@ -2699,5 +2699,194 @@ app.get('/api/debug/test-email', async (req, res) => {
   }
 });
 
+// Get camper's snack bar balance
+app.get('/api/snackbar-balance/:camperId', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
+  try {
+    const { camperId } = req.params;
+
+    // Get camper's balance with team verification
+    const result = await sqlVercel`
+      SELECT c.snack_bar_balance
+      FROM campers c
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps camp ON r.camp_id = camp.id
+      WHERE c.id = ${camperId}::uuid
+      AND camp.team_id = ${teamId}::uuid
+    `;
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+
+    return res.json({
+      balance: Number(result[0].snack_bar_balance) || 0
+    });
+  } catch (error) {
+    console.error('Error getting snack bar balance:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get camper's transactions
+app.get('/api/snackbar-transactions/:camperId', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
+  try {
+    const { camperId } = req.params;
+
+    // Get transactions with team verification
+    const result = await sqlVercel`
+      SELECT 
+        t.id,
+        t.camper_id,
+        t.amount,
+        t.created_at,
+        c.name as camper_name
+      FROM snack_bar_transactions t
+      JOIN campers c ON t.camper_id = c.id
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps camp ON r.camp_id = camp.id
+      WHERE t.camper_id = ${camperId}::uuid
+      AND camp.team_id = ${teamId}::uuid
+      ORDER BY t.created_at DESC
+    `;
+
+    return res.json(result.map(t => ({
+      id: t.id,
+      camper_id: t.camper_id,
+      amount: Number(t.amount),
+      created_at: t.created_at,
+      camper: {
+        id: t.camper_id,
+        name: t.camper_name
+      }
+    })));
+  } catch (error) {
+    console.error('Error getting snack bar transactions:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create snack bar transaction (deduct balance)
+app.post('/api/snackbar-transactions', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
+  try {
+    const { camper_id, amount } = req.body;
+
+    if (!camper_id || amount === undefined) {
+      return res.status(400).json({ error: 'Missing required fields: camper_id and amount' });
+    }
+
+    // Verify if camper belongs to the team and get current balance
+    const camperResult = await sqlVercel`
+      SELECT c.snack_bar_balance
+      FROM campers c
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps camp ON r.camp_id = camp.id
+      WHERE c.id = ${camper_id}::uuid
+      AND camp.team_id = ${teamId}::uuid
+    `;
+
+    if (camperResult.length === 0) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+
+    const currentBalance = Number(camperResult[0].snack_bar_balance) || 0;
+    const newBalance = currentBalance - Number(amount);
+
+    if (newBalance < 0) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+
+    // Create transaction and update balance in a transaction
+    const result = await sqlVercel`
+      WITH inserted_transaction AS (
+        INSERT INTO snack_bar_transactions (camper_id, amount)
+        VALUES (${camper_id}, ${amount})
+        RETURNING id, camper_id, amount, created_at
+      )
+      UPDATE campers
+      SET snack_bar_balance = ${newBalance}
+      WHERE id = ${camper_id}
+      RETURNING (SELECT json_build_object(
+        'id', t.id,
+        'camper_id', t.camper_id,
+        'amount', t.amount,
+        'created_at', t.created_at
+      ) FROM inserted_transaction t)
+    `;
+
+    return res.json(result[0].json_build_object);
+  } catch (error) {
+    console.error('Error creating snack bar transaction:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all transactions for a camp
+app.get('/api/snackbar-transactions', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+
+  try {
+    const { camp_id } = req.query;
+
+    if (!camp_id) {
+      return res.status(400).json({ error: 'Missing camp_id query parameter' });
+    }
+
+    // Get all transactions for the camp with team verification
+    const result = await sqlVercel`
+      SELECT 
+        t.id,
+        t.camper_id,
+        t.amount,
+        t.created_at,
+        c.name as camper_name,
+        r.id as registration_id,
+        camp.id as camp_id
+      FROM snack_bar_transactions t
+      JOIN campers c ON t.camper_id = c.id
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps camp ON r.camp_id = camp.id
+      WHERE camp.id = ${camp_id}::uuid
+      AND camp.team_id = ${teamId}::uuid
+      ORDER BY t.created_at DESC
+    `;
+
+    return res.json(result.map(t => ({
+      id: t.id,
+      camper_id: t.camper_id,
+      amount: Number(t.amount),
+      created_at: t.created_at,
+      camper: {
+        id: t.camper_id,
+        name: t.camper_name,
+        registration: {
+          id: t.registration_id,
+          camp_id: t.camp_id
+        }
+      }
+    })));
+  } catch (error) {
+    console.error('Error getting snack bar transactions:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Export the Express app as a serverless function
 export default app; 

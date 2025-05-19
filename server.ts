@@ -1341,3 +1341,148 @@ app.delete('/api/payments/:id', (async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Erro ao deletar pagamento.' });
   }
 }) as any);
+
+// Get camper's snack bar balance
+app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) => {
+  try {
+    const { camperId } = req.params
+    const teamId = getTeamId(req)
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    // Get camper's balance
+    const result = await sql`
+      SELECT c.snack_bar_balance
+      FROM campers c
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps cp ON r.camp_id = cp.id
+      WHERE c.id = ${camperId}
+      AND cp.team_id = ${teamId}
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Camper not found' })
+    }
+
+    return res.status(200).json({ balance: result[0].snack_bar_balance })
+  } catch {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Get camper's transactions
+app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Response) => {
+  try {
+    const { camperId } = req.params
+    const teamId = getTeamId(req)
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    // Get camper's transactions
+    const result = await sql`
+      SELECT t.*
+      FROM snack_bar_transactions t
+      JOIN campers c ON t.camper_id = c.id
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps cp ON r.camp_id = cp.id
+      WHERE c.id = ${camperId}
+      AND cp.team_id = ${teamId}
+      ORDER BY t.created_at DESC
+    `
+
+    return res.status(200).json(result)
+  } catch {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Create transaction (deduct balance)
+app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
+  try {
+    const { camper_id, amount } = req.body
+    const teamId = getTeamId(req)
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    if (!camper_id || !amount) {
+      return res.status(400).json({ error: 'Camper ID and amount are required' })
+    }
+
+    // Get camper's current balance
+    const balanceResult = await sql`
+      SELECT c.snack_bar_balance, c.registration_id
+      FROM campers c
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps cp ON r.camp_id = cp.id
+      WHERE c.id = ${camper_id}
+      AND cp.team_id = ${teamId}
+    `
+
+    if (balanceResult.length === 0) {
+      return res.status(404).json({ error: 'Camper not found' })
+    }
+
+    const currentBalance = balanceResult[0].snack_bar_balance
+    const registrationId = balanceResult[0].registration_id
+
+    // Verify if has sufficient balance
+    if (currentBalance < amount) {
+      return res.status(400).json({ error: 'Insufficient balance' })
+    }
+
+    // Create transaction and update balance in a transaction
+    const result = await sql`
+      WITH new_transaction AS (
+        INSERT INTO snack_bar_transactions (camper_id, amount, registration_id)
+        VALUES (${camper_id}, ${amount}, ${registrationId})
+        RETURNING *
+      )
+      UPDATE campers
+      SET snack_bar_balance = snack_bar_balance - ${amount}
+      WHERE id = ${camper_id}
+      RETURNING snack_bar_balance
+    `
+
+    return res.status(200).json(result[0])
+  } catch {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Get all transactions for a camp
+app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
+  try {
+    const { camp_id } = req.query
+    const teamId = getTeamId(req)
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    if (!camp_id) {
+      return res.status(400).json({ error: 'Camp ID is required' })
+    }
+
+    // Get all transactions for the camp
+    const result = await sql`
+      SELECT t.*, c.name as camper_name
+      FROM snack_bar_transactions t
+      JOIN campers c ON t.camper_id = c.id
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps cp ON r.camp_id = cp.id
+      WHERE cp.id = ${camp_id}
+      AND cp.team_id = ${teamId}
+      ORDER BY t.created_at DESC
+    `
+
+    return res.status(200).json(result)
+  } catch {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
