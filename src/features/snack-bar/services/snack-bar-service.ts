@@ -112,11 +112,35 @@ export const snackBarService = {
   },
 
   async createTransaction(transaction: SnackBarTransaction): Promise<SnackBarTransactionResponse> {
-    const response = await api.post('/api/snackbar-transactions', {
-      camper_id: transaction.camper_id,
-      amount: transaction.amount
-    })
-    return response.data
+    // Verify that we have a team ID
+    if (!hasTeamId()) {
+      throw new Error('Erro: ID da equipe necessário para criar transação')
+    }
+    
+    try {
+      console.log('Creating transaction with data:', {
+        camper_id: transaction.camper_id,
+        amount: transaction.amount,
+        teamId: localStorage.getItem('teamId') || localStorage.getItem('team_id')
+      })
+
+      const response = await api.post('/api/snackbar-transactions', {
+        camper_id: transaction.camper_id,
+        amount: transaction.amount
+      })
+      return response.data
+    } catch (error: any) {
+      console.error('Erro ao criar transação:', {
+        error: error?.response?.data || error?.message || error,
+        status: error?.response?.status,
+        headers: error?.response?.headers,
+        requestData: {
+          camper_id: transaction.camper_id,
+          amount: transaction.amount
+        }
+      })
+      throw new Error(error?.response?.data?.error || 'Erro ao processar transação')
+    }
   },
 
   async getCamperTransactions(camper_id: string): Promise<SnackBarTransactionResponse[]> {

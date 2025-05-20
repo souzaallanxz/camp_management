@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# API Index Guide
+
+The main API entry point is [api/index.js](mdc:api/index.js), which contains several important functions and utilities:
+
+## Key Functions
+
+### Debug Logging
+- `debugLog(message, data)`: Utility function for logging debug information with optional data payload
+
+### Team Management
+- `getTeamId(req)`: Helper function to extract team ID from request objects
+
+## Usage Guidelines
+1. When making API calls, ensure proper team ID handling using `getTeamId()`
+2. For debugging purposes, use `debugLog()` to maintain consistent logging format
+3. All API endpoints should be defined in this file
+
+## Best Practices
+- Always use `debugLog()` for development logging
+- Include team ID validation in all team-specific endpoints
+- Follow the established error handling patterns

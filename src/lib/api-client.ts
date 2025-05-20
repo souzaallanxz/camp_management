@@ -32,7 +32,13 @@ api.interceptors.request.use((config) => {
   if (teamId) {
     config.headers['x-team-id'] = teamId
   } else {
-    console.warn('Making API request without team ID:', config.url)
+    // Verificações específicas para rotas críticas que requerem team ID
+    if (config.url?.includes('/snackbar-transactions')) {
+      console.error('⚠️ Tentativa de acessar API de snackbar sem Team ID. Esta operação vai falhar.')
+      alert('Erro: ID da equipe não encontrado. Por favor, faça login novamente ou selecione uma equipe.')
+    } else {
+      console.warn('Making API request without team ID:', config.url)
+    }
   }
   
   return config

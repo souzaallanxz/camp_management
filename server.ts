@@ -1419,8 +1419,16 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     const { camper_id, amount } = req.body
     const teamId = getTeamId(req)
 
+    // Log request details for debugging
+    console.log('Snackbar transaction request:', { 
+      camper_id, 
+      amount, 
+      teamId,
+      headers: req.headers
+    })
+
     if (!teamId) {
-      return res.status(401).json({ error: 'Team ID is required' })
+      return res.status(401).json({ error: 'Team ID is required in x-team-id header' })
     }
 
     if (!camper_id || !amount) {
@@ -1463,8 +1471,12 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     `
 
     return res.status(200).json(result[0])
-  } catch {
-    return res.status(500).json({ error: 'Internal server error' })
+  } catch (error) {
+    console.error('Error creating snackbar transaction:', error)
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    })
   }
 }) as any)
 
