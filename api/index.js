@@ -2872,7 +2872,11 @@ app.post('/api/snackbar-transactions', async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating snack bar transaction:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error.message,
+      stack: error.stack
+    });
   }
 });
 
