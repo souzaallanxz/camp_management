@@ -48,30 +48,17 @@ export function RegistrationOnboardDialog({
 
   // Calcular o valor restante a pagar
   const campPrice = registration.camp?.price || 0
-  const totalPaid = registration.total_amount_paid || 0
+  const totalPaid = registration.total_paid || 0
   const remainingAmount = Number(campPrice) - Number(totalPaid)
 
   const createCamper = async () => {
-    try {
-      // Get camp details from registration
-      const campName = registration.camp?.name || '';
-      const campId = registration.camp?.id || '';
-      
-      // Criar o camper com os dados da registration
-      const newCamper = await camperService.create({
-        name: registration.name,
-        email: registration.email,
-        contact: registration.contact,
-        registration_id: registration.id,
-        camp: campName,
-        form_id: registration.form_id,
-        additional_notes: null
-      });
-      
-      return newCamper;
-    } catch (error) {
-      throw error;
-    }
+    // Criar o camper com os dados da registration
+    const newCamper = await camperService.create({
+      name: registration.name,
+      email: registration.email,
+      phone: registration.contact
+    });
+    return newCamper;
   }
 
   const handleConfirm = async () => {
