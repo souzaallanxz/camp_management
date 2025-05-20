@@ -1355,35 +1355,60 @@ app.delete('/api/payments/:id', (async (req: Request, res: Response) => {
   }
 }) as any);
 
-// Get camper's snack bar balance
-app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) => {
+// Get camper's snack bar balance (CORRECTED)
+app.get('/api/snackbar-balance/:camperId', async (req: Request, res: Response) => {
   try {
-    const { camperId } = req.params
-    const teamId = getTeamId(req)
+    const { camperId } = req.params;
+    const teamId = getTeamId(req);
 
     if (!teamId) {
-      return res.status(401).json({ error: 'Team ID is required' })
+      return res.status(401).json({ error: 'Team ID is required' });
     }
 
-    // Get camper's balance
-    const result = await sql`
-      SELECT c.snack_bar_balance
+    // Get camper's registration_id and check team
+    const camperResult = await sql`
+      SELECT c.registration_id
       FROM campers c
       JOIN registrations r ON c.registration_id = r.id
       JOIN camps cp ON r.camp_id = cp.id
       WHERE c.id = ${camperId}
       AND cp.team_id = ${teamId}
-    `
+    `;
 
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'Camper not found' })
+    if (camperResult.length === 0) {
+      return res.status(404).json({ error: 'Camper not found' });
     }
 
-    return res.status(200).json({ balance: result[0].snack_bar_balance })
-  } catch {
-    return res.status(500).json({ error: 'Internal server error' })
+    const registrationId = camperResult[0].registration_id;
+
+    // Sum all deposits for this registration
+    const depositResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_deposit
+      FROM snackbar_balance
+      WHERE registration_id = ${registrationId}
+    `;
+
+    // Sum all debits for this camper
+    const spentResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}
+    `;
+
+    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+    const currentBalance = totalDeposit - totalSpent;
+
+    return res.json({
+      balance: currentBalance,
+      total_deposit: totalDeposit,
+      total_spent: totalSpent
+    });
+  } catch (error) {
+    console.error('Error getting snack bar balance:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-}) as any)
+});
 
 // Get camper's transactions
 app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Response) => {
@@ -1435,9 +1460,9 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Camper ID and amount are required' })
     }
 
-    // Get camper's current balance
-    const balanceResult = await sql`
-      SELECT c.snack_bar_balance, c.registration_id
+    // Verify if camper belongs to the team and get registration_id
+    const camperResult = await sql`
+      SELECT c.id, c.registration_id
       FROM campers c
       JOIN registrations r ON c.registration_id = r.id
       JOIN camps cp ON r.camp_id = cp.id
@@ -1445,34 +1470,50 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       AND cp.team_id = ${teamId}
     `
 
-    if (balanceResult.length === 0) {
-      return res.status(404).json({ error: 'Camper not found' })
+    if (camperResult.length === 0) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' })
     }
 
-    const currentBalance = balanceResult[0].snack_bar_balance
-    const registrationId = balanceResult[0].registration_id
+    const registrationId = camperResult[0].registration_id
 
-    // Verify if has sufficient balance
-    if (currentBalance < amount) {
+    // Calculate current balance from snackbar_balance and snack_bar_transactions tables
+    const depositResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_deposit
+      FROM snackbar_balance
+      WHERE registration_id = ${registrationId}
+    `
+
+    const spentResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camper_id}
+    `
+
+    const totalDeposit = Number(depositResult[0]?.total_deposit || 0)
+    const totalSpent = Number(spentResult[0]?.total_spent || 0)
+    const currentBalance = totalDeposit - totalSpent
+    const newBalance = currentBalance - Number(amount)
+
+    if (newBalance < 0) {
       return res.status(400).json({ error: 'Insufficient balance' })
     }
 
-    // Create transaction and update balance in a transaction
+    // Create transaction
     const result = await sql`
-      WITH new_transaction AS (
-        INSERT INTO snack_bar_transactions (camper_id, amount, registration_id)
-        VALUES (${camper_id}, ${amount}, ${registrationId})
-        RETURNING *
-      )
-      UPDATE campers
-      SET snack_bar_balance = snack_bar_balance - ${amount}
-      WHERE id = ${camper_id}
-      RETURNING snack_bar_balance
+      INSERT INTO snack_bar_transactions (camper_id, amount, created_at, updated_at)
+      VALUES (${camper_id}, ${amount}, NOW(), NOW())
+      RETURNING id, camper_id, amount, created_at
     `
 
-    return res.status(200).json(result[0])
+    return res.status(200).json({
+      id: result[0].id,
+      camper_id: result[0].camper_id,
+      amount: Number(result[0].amount),
+      created_at: result[0].created_at,
+      current_balance: newBalance
+    })
   } catch (error) {
-    console.error('Error creating snackbar transaction:', error)
+    console.error('Error creating snack bar transaction:', error)
     return res.status(500).json({ 
       error: 'Internal server error', 
       details: error instanceof Error ? error.message : 'Unknown error' 
