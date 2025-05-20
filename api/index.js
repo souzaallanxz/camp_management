@@ -2858,8 +2858,8 @@ app.post('/api/snackbar-transactions', async (req, res) => {
 
     // Create transaction
     const result = await sqlVercel`
-      INSERT INTO snack_bar_transactions (camper_id, amount, created_at, updated_at)
-      VALUES (${camper_id}::uuid, ${amount}, NOW(), NOW())
+      INSERT INTO snack_bar_transactions (camper_id, amount, created_at)
+      VALUES (${camper_id}::uuid, ${amount}, NOW())
       RETURNING id, camper_id, amount, created_at
     `;
 
