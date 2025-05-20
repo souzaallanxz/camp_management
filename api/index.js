@@ -1185,40 +1185,69 @@ app.get('/api/registrations', async (req, res) => {
 // ===== CAMPERS ENDPOINTS =====
 
 // Get all campers
-app.get('/campers', async (req, res) => {
-  
+app.get('/api/campers', async (req, res) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
-    const teamId = getTeamId(req);
-    
-    let results;
-    if (teamId) {
-      results = await sqlVercel`
-        SELECT cm.*, r.name as registration_name, c.name as camp_name
-        FROM campers cm
-        JOIN registrations r ON cm.registration_id = r.id
-        JOIN camps c ON r.camp_id = c.id
-        WHERE c.team_id = ${teamId}::uuid
-        ORDER BY cm.created_at DESC
-      `;
-    } else {
-      // Modo diagnóstico
-      results = await sqlVercel`
-        SELECT cm.*, r.name as registration_name, c.name as camp_name
-        FROM campers cm
-        JOIN registrations r ON cm.registration_id = r.id
-        JOIN camps c ON r.camp_id = c.id
-        ORDER BY cm.created_at DESC
-        LIMIT 20
+    // Buscar campers, registration_id e camp_name
+    const campers = await sqlVercel`
+      SELECT 
+        ca.*, 
+        c.name as camp_name,
+        r.id as registration_id
+      FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY ca.created_at DESC
+    `;
+
+    // Para cada camper, buscar o saldo correto
+    const camperIds = campers.map(c => c.id);
+    const registrationIds = campers.map(c => c.registration_id);
+
+    // Buscar depósitos por registration_id
+    let deposits = [];
+    if (registrationIds.length > 0) {
+      deposits = await sqlVercel`
+        SELECT registration_id, COALESCE(SUM(amount), 0) as total_deposit
+        FROM snackbar_balance
+        WHERE registration_id = ANY(${registrationIds}::uuid[])
+        GROUP BY registration_id
       `;
     }
-    
-    return res.json(results);
-  } catch (error) {
-    console.error('Error getting campers:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      details: error.message
+    // Buscar gastos por camper_id
+    let spent = [];
+    if (camperIds.length > 0) {
+      spent = await sqlVercel`
+        SELECT camper_id, COALESCE(SUM(amount), 0) as total_spent
+        FROM snack_bar_transactions
+        WHERE camper_id = ANY(${camperIds}::uuid[])
+        GROUP BY camper_id
+      `;
+    }
+    // Mapear para lookup
+    const depositMap = {};
+    deposits.forEach(d => { depositMap[d.registration_id] = Number(d.total_deposit) || 0; });
+    const spentMap = {};
+    spent.forEach(s => { spentMap[s.camper_id] = Number(s.total_spent) || 0; });
+
+    // Montar resposta
+    const campersWithCampObject = campers.map(camper => {
+      const totalDeposit = depositMap[camper.registration_id] || 0;
+      const totalSpent = spentMap[camper.id] || 0;
+      const snack_bar_balance = totalDeposit - totalSpent;
+      return {
+        ...camper,
+        camp: { name: camper.camp_name },
+        snack_bar_balance
+      };
     });
+    res.json(campersWithCampObject);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar campistas.' });
   }
 });
 
@@ -1512,23 +1541,60 @@ app.get('/api/campers', async (req, res) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
+    // Buscar campers, registration_id e camp_name
     const campers = await sqlVercel`
       SELECT 
         ca.*, 
         c.name as camp_name,
-        r.snack_bar_balance
+        r.id as registration_id
       FROM campers ca
       JOIN registrations r ON ca.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
       WHERE c.team_id = ${teamId}
       ORDER BY ca.created_at DESC
     `;
-    // Mapear os resultados para incluir camp como objeto e garantir que snack_bar_balance seja um número
-    const campersWithCampObject = campers.map(camper => ({
-      ...camper,
-      camp: { name: camper.camp_name },
-      snack_bar_balance: Number(camper.snack_bar_balance) || 0
-    }));
+
+    // Para cada camper, buscar o saldo correto
+    const camperIds = campers.map(c => c.id);
+    const registrationIds = campers.map(c => c.registration_id);
+
+    // Buscar depósitos por registration_id
+    let deposits = [];
+    if (registrationIds.length > 0) {
+      deposits = await sqlVercel`
+        SELECT registration_id, COALESCE(SUM(amount), 0) as total_deposit
+        FROM snackbar_balance
+        WHERE registration_id = ANY(${registrationIds}::uuid[])
+        GROUP BY registration_id
+      `;
+    }
+    // Buscar gastos por camper_id
+    let spent = [];
+    if (camperIds.length > 0) {
+      spent = await sqlVercel`
+        SELECT camper_id, COALESCE(SUM(amount), 0) as total_spent
+        FROM snack_bar_transactions
+        WHERE camper_id = ANY(${camperIds}::uuid[])
+        GROUP BY camper_id
+      `;
+    }
+    // Mapear para lookup
+    const depositMap = {};
+    deposits.forEach(d => { depositMap[d.registration_id] = Number(d.total_deposit) || 0; });
+    const spentMap = {};
+    spent.forEach(s => { spentMap[s.camper_id] = Number(s.total_spent) || 0; });
+
+    // Montar resposta
+    const campersWithCampObject = campers.map(camper => {
+      const totalDeposit = depositMap[camper.registration_id] || 0;
+      const totalSpent = spentMap[camper.id] || 0;
+      const snack_bar_balance = totalDeposit - totalSpent;
+      return {
+        ...camper,
+        camp: { name: camper.camp_name },
+        snack_bar_balance
+      };
+    });
     res.json(campersWithCampObject);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar campistas.' });
