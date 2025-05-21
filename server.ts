@@ -35,9 +35,13 @@ app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body
 
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' })
+    }
+
     // Find user by email
     const userResult = await sql`
-      SELECT id, email, name, password_hash, team_id 
+      SELECT id, email, first_name, last_name, password_hash, team_id 
       FROM public.users 
       WHERE email = ${email}
     `
@@ -56,8 +60,8 @@ app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
     }
 
     // Remove password_hash from response
-    const userWithoutPassword = { ...user };
-    delete userWithoutPassword.password_hash;
+    const userWithoutPassword = { ...user }
+    delete userWithoutPassword.password_hash
 
     return res.status(200).json({
       user: userWithoutPassword,
@@ -66,8 +70,13 @@ app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
         token: user.id // Using user ID as token for now
       }
     })
-  } catch {
-    return res.status(500).json({ error: 'Internal server error' })
+  } catch (error) {
+    console.error('Error in sign-in:', error)
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message,
+      database_url_set: !!process.env.DATABASE_URL
+    })
   }
 }) as any)
 
@@ -233,7 +242,7 @@ app.get('/api/auth/me', (async (req: Request, res: Response) => {
 
     // Find user by token (which is the user ID)
     const userResult = await sql`
-      SELECT id, email, name, team_id, role, created_at, updated_at
+      SELECT id, email, first_name, last_name, team_id, role, created_at, updated_at
       FROM public.users
       WHERE id = ${token}::uuid
     `
@@ -244,15 +253,23 @@ app.get('/api/auth/me', (async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'User not found' })
     }
 
+    // Combine first_name and last_name to create the full name
+    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
+
     return res.status(200).json({
       id: user.id,
       email: user.email,
-      name: user.name,
+      name: fullName || null,
       team_id: user.team_id,
       role: user.role
     })
-  } catch {
-    return res.status(500).json({ error: 'Internal server error' })
+  } catch (error) {
+    console.error('Error in get current user:', error)
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message,
+      database_url_set: !!process.env.DATABASE_URL
+    })
   }
 }) as any)
 
@@ -1552,3 +1569,9 @@ app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
+
+// Start the server
+const PORT = process.env.PORT || 3001
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`)
+})

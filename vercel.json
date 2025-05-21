@@ -10,6 +10,10 @@
       "destination": "/api/auth-simple"
     },
     {
+      "source": "/api/auth/me",
+      "destination": "/api/auth-me"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api"
     },
@@ -20,6 +24,10 @@
   ],
   "functions": {
     "api/auth-simple.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/auth-me.js": {
       "memory": 1024,
       "maxDuration": 10
     }
