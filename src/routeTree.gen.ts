@@ -23,6 +23,7 @@ import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as auth500Import } from './routes/(auth)/500'
 import { Route as AuthenticatedSnackBarIndexImport } from './routes/_authenticated/snack-bar/index'
 import { Route as AuthenticatedRegistrationsIndexImport } from './routes/_authenticated/registrations/index'
+import { Route as AuthenticatedIntegrationsIndexImport } from './routes/_authenticated/integrations/index'
 import { Route as AuthenticatedCampersIndexImport } from './routes/_authenticated/campers/index'
 import { Route as AuthenticatedCampersDebugImport } from './routes/_authenticated/campers/debug'
 
@@ -285,6 +286,17 @@ const AuthenticatedRegistrationsIndexRoute =
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/registrations/index.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedIntegrationsIndexRoute =
+  AuthenticatedIntegrationsIndexImport.update({
+    id: '/integrations/',
+    path: '/integrations/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/integrations/index.lazy').then(
       (d) => d.Route,
     ),
   )
@@ -555,6 +567,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCampersIndexImport
       parentRoute: typeof AuthenticatedRouteImport
     }
+    '/_authenticated/integrations/': {
+      id: '/_authenticated/integrations/'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof AuthenticatedIntegrationsIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
     '/_authenticated/registrations/': {
       id: '/_authenticated/registrations/'
       path: '/registrations'
@@ -668,6 +687,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedCampersDebugRoute: typeof AuthenticatedCampersDebugRoute
   AuthenticatedCampersIndexRoute: typeof AuthenticatedCampersIndexRoute
+  AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedRegistrationsIndexRoute: typeof AuthenticatedRegistrationsIndexRoute
   AuthenticatedAppsIndexLazyRoute: typeof AuthenticatedAppsIndexLazyRoute
   AuthenticatedChatsIndexLazyRoute: typeof AuthenticatedChatsIndexLazyRoute
@@ -684,6 +704,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedCampersDebugRoute: AuthenticatedCampersDebugRoute,
   AuthenticatedCampersIndexRoute: AuthenticatedCampersIndexRoute,
+  AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,
   AuthenticatedRegistrationsIndexRoute: AuthenticatedRegistrationsIndexRoute,
   AuthenticatedAppsIndexLazyRoute: AuthenticatedAppsIndexLazyRoute,
   AuthenticatedChatsIndexLazyRoute: AuthenticatedChatsIndexLazyRoute,
@@ -721,6 +742,7 @@ export interface FileRoutesByFullPath {
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
   '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
   '/campers': typeof AuthenticatedCampersIndexRoute
+  '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
   '/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
@@ -754,6 +776,7 @@ export interface FileRoutesByTo {
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
   '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
   '/campers': typeof AuthenticatedCampersIndexRoute
+  '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
   '/snack-bar': typeof AuthenticatedSnackBarIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
@@ -792,6 +815,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
   '/_authenticated/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
   '/_authenticated/campers/': typeof AuthenticatedCampersIndexRoute
+  '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/registrations/': typeof AuthenticatedRegistrationsIndexRoute
   '/_authenticated/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexLazyRoute
@@ -830,6 +854,7 @@ export interface FileRouteTypes {
     | '/settings/notifications'
     | '/settings/organization'
     | '/campers'
+    | '/integrations'
     | '/registrations'
     | '/snack-bar/'
     | '/apps'
@@ -862,6 +887,7 @@ export interface FileRouteTypes {
     | '/settings/notifications'
     | '/settings/organization'
     | '/campers'
+    | '/integrations'
     | '/registrations'
     | '/snack-bar'
     | '/apps'
@@ -898,6 +924,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/notifications'
     | '/_authenticated/settings/organization'
     | '/_authenticated/campers/'
+    | '/_authenticated/integrations/'
     | '/_authenticated/registrations/'
     | '/_authenticated/snack-bar/'
     | '/_authenticated/apps/'
@@ -978,6 +1005,7 @@ export const routeTree = rootRoute
         "/_authenticated/",
         "/_authenticated/campers/debug",
         "/_authenticated/campers/",
+        "/_authenticated/integrations/",
         "/_authenticated/registrations/",
         "/_authenticated/apps/",
         "/_authenticated/chats/",
@@ -1083,6 +1111,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/campers/": {
       "filePath": "_authenticated/campers/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/integrations/": {
+      "filePath": "_authenticated/integrations/index.tsx",
       "parent": "/_authenticated"
     },
     "/_authenticated/registrations/": {

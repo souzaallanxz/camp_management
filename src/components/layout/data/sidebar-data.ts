@@ -11,6 +11,7 @@ import {
   IconCampfire,
   IconIceCream,
   IconUsers,
+  IconWebhook,
 } from '@tabler/icons-react'
 import { Command } from 'lucide-react'
 import { type SidebarData, type NavItem } from '../types'
@@ -65,6 +66,11 @@ export const sidebarData: SidebarData = {
           title: 'Snack Bar',
           url: '/snack-bar',
           icon: IconIceCream,
+        },
+        {
+          title: 'Integrações',
+          url: '/integrations',
+          icon: IconWebhook,
         },
       ],
     },
@@ -149,6 +155,13 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
       icon: IconIceCream,
     })
   }
+
+  // Add Integrations to the menu
+  generalItems.push({
+    title: 'Integrações',
+    url: '/integrations',
+    icon: IconWebhook,
+  })
 
   return {
     user: {
