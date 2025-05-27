@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, uuid, text, varchar, timestamp, numeric, date, bigint, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, pgEnum, uuid, text, varchar, timestamp, numeric, date, bigint, jsonb, boolean } from 'drizzle-orm/pg-core';
 
 // Enums
 export const paymentStatusEnum = pgEnum('payment_status_enum', ['not confirmed', 'confirmed']);
@@ -101,4 +101,15 @@ export const webhook_events = pgTable('webhook_events', {
   payload: jsonb('payload').notNull(),
   processed_at: timestamp('processed_at', { withTimezone: true }).notNull(),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const webhook_configs = pgTable('webhook_configs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  team_id: uuid('team_id').notNull().references(() => teams.id),
+  webhook_type: text('webhook_type').notNull(),
+  webhook_url: text('webhook_url').notNull(),
+  is_enabled: boolean('is_enabled').notNull().default(false),
+  hookdeck_data: jsonb('hookdeck_data').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }); 
