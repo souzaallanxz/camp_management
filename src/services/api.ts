@@ -3,7 +3,7 @@
  */
 
 // For production, directly use the correct API URL
-const API_BASE_URL = 'https://campmanagement.vercel.app/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 /**
  * Builds an API URL correctly handling the path
