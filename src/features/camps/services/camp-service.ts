@@ -1,11 +1,4 @@
-<<<<<<< HEAD
 import { api } from '@/lib/api-client'
-=======
-import { getTeamIdHeader } from '@/lib/auth';
-
-// Use environment variable for API URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
->>>>>>> integrations
 
 export interface Camp {
   id: string;
@@ -56,57 +49,53 @@ class CampService {
     }
   }
 
-  // Get all camps
-  async getCamps(): Promise<Camp[]> {
+  async findAll(): Promise<Camp[]> {
     try {
       const response = await api.get('/camps')
       return response.data
     } catch (error) {
       this.debugError('Error fetching camps:', error)
-      throw error
+      return []
     }
   }
 
-  // Get camp by ID
-  async getCampById(id: string): Promise<Camp> {
+  async findById(id: string): Promise<Camp | null> {
     try {
       const response = await api.get(`/camps/${id}`)
       return response.data
     } catch (error) {
       this.debugError(`Error fetching camp ${id}:`, error)
-      throw error
+      return null
     }
   }
 
-  // Create new camp
-  async createCamp(camp: Omit<Camp, 'id' | 'createdAt' | 'updatedAt'>): Promise<Camp> {
+  async create(camp: CreateCampData): Promise<Camp | null> {
     try {
       const response = await api.post('/camps', camp)
       return response.data
     } catch (error) {
       this.debugError('Error creating camp:', error)
-      throw error
+      return null
     }
   }
 
-  // Update camp
-  async updateCamp(id: string, camp: Partial<Camp>): Promise<Camp> {
+  async update(id: string, camp: Partial<Camp>): Promise<Camp | null> {
     try {
       const response = await api.put(`/camps/${id}`, camp)
       return response.data
     } catch (error) {
       this.debugError(`Error updating camp ${id}:`, error)
-      throw error
+      return null
     }
   }
 
-  // Delete camp
-  async deleteCamp(id: string): Promise<void> {
+  async delete(id: string): Promise<boolean> {
     try {
       await api.delete(`/camps/${id}`)
+      return true
     } catch (error) {
       this.debugError(`Error deleting camp ${id}:`, error)
-      throw error
+      return false
     }
   }
 }

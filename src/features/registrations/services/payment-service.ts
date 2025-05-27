@@ -1,7 +1,4 @@
-import { getTeamIdHeader } from '@/lib/auth';
-
-// Use environment variable for API URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { api } from '@/lib/api-client'
 
 // Definindo o tipo Payment
 export interface Payment {
@@ -25,115 +22,82 @@ export interface CreatePaymentData {
   payment_link: string | null;
 }
 
-async function getPaymentsByRegistrationId(registrationId: string) {
-  try {
-    const headers = { 
-      ...getTeamIdHeader(),
-      'Content-Type': 'application/json' 
-    };
-    
-    const response = await fetch(`${API_BASE_URL}/payments?registrationId=${registrationId}`, { headers });
-    
-    if (!response.ok) {
-      return [];
+class PaymentService {
+  private debug(message: string, data?: unknown) {
+    // Debug logging only in development
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log(`[PaymentService] ${message}`, data)
     }
-    
-    return await response.json();
-  } catch {
-    return [];
+  }
+
+  private debugError(message: string, error: unknown) {
+    // Error logging only in development
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.error(`[PaymentService] ${message}`, error)
+    }
+  }
+
+  async getPaymentsByRegistrationId(registrationId: string): Promise<Payment[]> {
+    try {
+      const response = await api.get(`/payments?registrationId=${registrationId}`)
+      return response.data
+    } catch (error) {
+      this.debugError(`Error fetching payments for registration ${registrationId}:`, error)
+      return []
+    }
+  }
+
+  async getBulkPayments(registrationIds: string[]): Promise<Payment[]> {
+    try {
+      const queryParams = registrationIds.map(id => `registrationIds=${id}`).join('&')
+      const response = await api.get(`/payments/bulk?${queryParams}`)
+      return response.data
+    } catch (error) {
+      this.debugError('Error fetching bulk payments:', error)
+      return []
+    }
+  }
+
+  async createPayment(data: CreatePaymentData): Promise<Payment> {
+    try {
+      const response = await api.post('/payments', data)
+      return response.data
+    } catch (error) {
+      this.debugError('Error creating payment:', error)
+      throw error
+    }
+  }
+
+  async updatePayment(id: number, data: Partial<Omit<Payment, 'id' | 'created_at' | 'updated_at'>>): Promise<Payment> {
+    try {
+      const response = await api.put(`/payments/${id}`, data)
+      return response.data
+    } catch (error) {
+      this.debugError(`Error updating payment ${id}:`, error)
+      throw error
+    }
+  }
+
+  async deletePayment(id: number): Promise<void> {
+    try {
+      await api.delete(`/payments/${id}`)
+    } catch (error) {
+      this.debugError(`Error deleting payment ${id}:`, error)
+      throw error
+    }
+  }
+
+  async getLatestPaymentLink(registrationId: string): Promise<string | null> {
+    try {
+      const response = await api.get(`/payments/latest-link?registrationId=${registrationId}`)
+      return response.data?.payment_link || null
+    } catch (error) {
+      this.debugError(`Error fetching latest payment link for registration ${registrationId}:`, error)
+      return null
+    }
   }
 }
 
-async function getBulkPayments(registrationIds: string[]) {
-  try {
-    const headers = { 
-      ...getTeamIdHeader(),
-      'Content-Type': 'application/json' 
-    };
-    
-    const queryParams = registrationIds.map(id => `registrationIds=${id}`).join('&');
-    const response = await fetch(`${API_BASE_URL}/payments/bulk?${queryParams}`, { headers });
-    
-    if (!response.ok) {
-      return [];
-    }
-    
-    return await response.json();
-  } catch {
-    return [];
-  }
-}
-
-async function createPayment(data: CreatePaymentData) {
-  const headers = { 
-    ...getTeamIdHeader(),
-    'Content-Type': 'application/json' 
-  };
-  
-  const response = await fetch(`${API_BASE_URL}/payments`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data),
-  });
-  
-  if (!response.ok) throw new Error('Erro ao criar pagamento');
-  return response.json();
-}
-
-async function updatePayment(id: number, data: Partial<Omit<Payment, 'id' | 'created_at' | 'updated_at'>>) {
-  const headers = { 
-    ...getTeamIdHeader(),
-    'Content-Type': 'application/json' 
-  };
-  
-  const response = await fetch(`${API_BASE_URL}/payments/${id}`, {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify(data),
-  });
-  
-  if (!response.ok) throw new Error('Erro ao atualizar pagamento');
-  return response.json();
-}
-
-async function deletePayment(id: number) {
-  const headers = { ...getTeamIdHeader() };
-  
-  const response = await fetch(`${API_BASE_URL}/payments/${id}`, {
-    method: 'DELETE',
-    headers,
-  });
-  
-  if (!response.ok) throw new Error('Erro ao deletar pagamento');
-}
-
-async function getLatestPaymentLink(registrationId: string) {
-  const headers = { 
-    ...getTeamIdHeader(),
-    'Content-Type': 'application/json' 
-  };
-  
-  const response = await fetch(`${API_BASE_URL}/payments/latest-link?registrationId=${registrationId}`, { headers });
-  
-  if (!response.ok) return null;
-  const data = await response.json();
-  return data?.payment_link || null;
-}
-
-export {
-  createPayment,
-  getPaymentsByRegistrationId,
-  getBulkPayments,
-  updatePayment,
-  deletePayment,
-  getLatestPaymentLink
-};
-
-export const paymentService = {
-  createPayment,
-  getPaymentsByRegistrationId,
-  getBulkPayments,
-  updatePayment,
-  deletePayment,
-  getLatestPaymentLink,
-}; 
+export const paymentService = new PaymentService() 
