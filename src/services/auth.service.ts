@@ -3,8 +3,8 @@
  * Este serviço conecta-se ao banco de dados Neon para operações de usuário
  */
 
-// For production, directly use the correct API URL
-const API_BASE_URL = 'https://campmanagement.vercel.app/api';
+// Use environment variable for API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export const authService = {
   /**

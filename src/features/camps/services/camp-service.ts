@@ -1,4 +1,11 @@
+<<<<<<< HEAD
 import { api } from '@/lib/api-client'
+=======
+import { getTeamIdHeader } from '@/lib/auth';
+
+// Use environment variable for API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+>>>>>>> integrations
 
 export interface Camp {
   id: string;

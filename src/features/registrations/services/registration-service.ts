@@ -1,6 +1,13 @@
 import { api } from '@/lib/api-client'
 
+<<<<<<< HEAD
 // Interface for API response
+=======
+// Use environment variable for API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+// Interface para a resposta da API
+>>>>>>> integrations
 interface ApiRegistration {
   id: string
   form_id?: string
