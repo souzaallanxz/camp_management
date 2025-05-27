@@ -15,10 +15,26 @@ const app: Application = express()
 
 // Enable CORS
 app.use(cors({
-  origin: ['http://localhost:5173', 'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app', 'https://campmanagement.vercel.app'],
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app',
+      'https://campmanagement.vercel.app'
+    ];
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id', 'Origin', 'Accept'],
+  exposedHeaders: ['x-team-id'],
+  maxAge: 86400 // 24 hours
 }))
 
 // Parse JSON request bodies
