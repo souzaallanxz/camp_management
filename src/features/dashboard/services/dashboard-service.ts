@@ -42,18 +42,10 @@ export const dashboardService = {
       }
       
       const data = await response.json();
-      
-      // Converter o formato da API para o formato esperado pelo componente
-      const current = parseFloat(data.current || '0');
-      const previous = parseFloat(data.previous || '0');
-      const percentageChange = previous === 0 
-        ? null 
-        : ((current - previous) / previous) * 100;
-      
       return {
-        total: current,
-        previousTotal: previous,
-        percentageChange
+        total: data.total || 0,
+        previousTotal: data.previousTotal || 0,
+        percentageChange: data.percentageChange
       };
     } catch (error) {
       return { total: 0, previousTotal: 0, percentageChange: null };
@@ -75,18 +67,10 @@ export const dashboardService = {
       }
       
       const data = await response.json();
-      
-      // Converter o formato da API para o formato esperado pelo componente
-      const current = parseFloat(data.current || '0');
-      const previous = parseFloat(data.previous || '0');
-      const percentageChange = previous === 0 
-        ? null 
-        : ((current - previous) / previous) * 100;
-      
       return {
-        total: current,
-        previousTotal: previous,
-        percentageChange
+        total: data.total || 0,
+        previousTotal: data.previousTotal || 0,
+        percentageChange: data.percentageChange
       };
     } catch (error) {
       return { total: 0, previousTotal: 0, percentageChange: null };
@@ -108,18 +92,10 @@ export const dashboardService = {
       }
       
       const data = await response.json();
-      
-      // Converter o formato da API para o formato esperado pelo componente
-      const current = parseFloat(data.current || '0');
-      const previous = parseFloat(data.previous || '0');
-      const percentageChange = previous === 0 
-        ? null 
-        : ((current - previous) / previous) * 100;
-      
       return {
-        total: current,
-        previousTotal: previous,
-        percentageChange
+        total: data.total || 0,
+        previousTotal: data.previousTotal || 0,
+        percentageChange: data.percentageChange
       };
     } catch (error) {
       return { total: 0, previousTotal: 0, percentageChange: null };
@@ -141,18 +117,10 @@ export const dashboardService = {
       }
       
       const data = await response.json();
-      
-      // Converter o formato da API para o formato esperado pelo componente
-      const current = parseFloat(data.current || '0');
-      const previous = parseFloat(data.previous || '0');
-      const percentageChange = previous === 0 
-        ? null 
-        : ((current - previous) / previous) * 100;
-      
       return {
-        total: current,
-        previousTotal: previous,
-        percentageChange
+        total: data.total || 0,
+        previousTotal: data.previousTotal || 0,
+        percentageChange: data.percentageChange
       };
     } catch (error) {
       return { total: 0, previousTotal: 0, percentageChange: null };
