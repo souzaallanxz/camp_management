@@ -88,6 +88,11 @@ app.get('/auth/me', async (req, res) => {
 
     const token = authHeader.split(' ')[1]
 
+    // Validate token format
+    if (!token || token.length < 10) {
+      return res.status(401).json({ error: 'Invalid token format' })
+    }
+
     // Find user by token (which is the user ID)
     const userResult = await sql`
       SELECT id, email, first_name, last_name, team_id, role, created_at, updated_at
