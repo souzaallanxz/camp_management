@@ -4,6 +4,12 @@
   "installCommand": "pnpm install",
   "framework": "vite",
   "outputDirectory": "dist",
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
