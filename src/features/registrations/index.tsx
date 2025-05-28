@@ -38,7 +38,7 @@ function RegistrationsContent() {
   const { data: registrationsData = [], refetch, isLoading, error } = useQuery({
     queryKey: ['registrations'],
     queryFn: async () => {
-      const data = await registrationService.findAll() as unknown as ApiRegistration[];
+      const data = await registrationService.getRegistrations() as unknown as ApiRegistration[];
       
       // Adicionando propriedades necessárias para compatibilidade com o tipo Registration do schema
       return data.map(reg => {

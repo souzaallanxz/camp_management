@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/select'
 import { useToast } from '@/components/ui/use-toast'
 import { PaymentMethod } from '../data/schema'
-import { createPayment } from '../services/payment-service'
+import { paymentService } from '../services/payment-service'
 import { MBWayService } from '../services/mbway-service'
 import { registrationService, Registration } from '../services/registration-service'
 
@@ -107,7 +107,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
       }
 
       // Only proceed with payment creation if we get here
-      await createPayment({
+      await paymentService.createPayment({
         registration_id: registrationId,
         amount: numericAmount,
         payment_method: paymentMethod,

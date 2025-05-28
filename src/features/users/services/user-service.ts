@@ -1,7 +1,7 @@
 import { User } from '../data/schema'
 
-// For production, directly use the correct API URL
-const API_BASE_URL = 'https://campmanagement.vercel.app/api'
+// Use environment variable for API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');

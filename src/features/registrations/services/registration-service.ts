@@ -1,40 +1,23 @@
-import { getTeamIdHeader } from '@/lib/auth';
-
-// For production, directly use the correct API URL with /api prefix
-const API_BASE_URL = 'https://campmanagement.vercel.app/api';
+import { api } from '@/lib/api-client'
 
 // Interface para a resposta da API
 interface ApiRegistration {
-  id: string;
-  form_id?: string;
-  name?: string;
-  email?: string;
-  contact?: string;
-  status?: string;
-  created_at?: string;
-  updated_at?: string;
-  camp_id?: string;
-  camp_name?: string;
-  camper_name?: string;
-  camper_email?: string;
-  total_paid?: number | string;
-  onboarding_status?: string;
-  // Para outros campos que possam existir
-  [key: string]: unknown;
-}
-
-// Interface para pagamentos
-interface ApiPayment {
-  id: string;
-  registration_id: string;
-  amount: string | number;
-  payment_method: string;
-  payment_status: string;
-  payment_date: string;
-  payment_link?: string | null;
-  phone_number?: string | null;
-  created_at: string;
-  updated_at: string;
+  id: string
+  form_id?: string
+  name?: string
+  email?: string
+  contact?: string
+  status?: string
+  created_at?: string
+  updated_at?: string
+  camp_id?: string
+  camp_name?: string
+  camper_name?: string
+  camper_email?: string
+  total_paid?: number | string
+  onboarding_status?: string
+  // For other fields that might exist
+  [key: string]: unknown
 }
 
 export interface Registration {
@@ -56,411 +39,109 @@ export interface CreateRegistrationData {
   totalAmount: number;
 }
 
-// Helper function to get the total paid amount for a registration
-async function getTotalPaidForRegistration(registrationId: string): Promise<number> {
-  try {
-    const headers = { ...getTeamIdHeader() };
-    const response = await fetch(`${API_BASE_URL}/payments?registrationId=${registrationId}`, { 
-      headers,
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      return 0;
+class RegistrationService {
+  private debug(message: string, data?: unknown) {
+    // Debug logging only in development
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.log(`[RegistrationService] ${message}`, data)
     }
-    
-    const payments: ApiPayment[] = await response.json();
-    // Ensure all amounts are converted to numbers before summing
-    return payments.reduce((total, payment) => total + Number(payment.amount || 0), 0);
-  } catch {
-    return 0;
+  }
+
+  private debugError(message: string, error: unknown) {
+    // Error logging only in development
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.error(`[RegistrationService] ${message}`, error)
+    }
+  }
+
+  // Get all registrations
+  async getRegistrations(): Promise<ApiRegistration[]> {
+    try {
+      const response = await api.get('/registrations')
+      return response.data
+    } catch (error) {
+      this.debugError('Error fetching registrations:', error)
+      throw error
+    }
+  }
+
+  // Get registration by ID
+  async getRegistrationById(id: string): Promise<ApiRegistration> {
+    try {
+      const response = await api.get(`/registrations/${id}`)
+      return response.data
+    } catch (error) {
+      this.debugError(`Error fetching registration ${id}:`, error)
+      throw error
+    }
+  }
+
+  // Create new registration
+  async createRegistration(registration: Omit<ApiRegistration, 'id' | 'created_at' | 'updated_at'>): Promise<ApiRegistration> {
+    try {
+      const response = await api.post('/registrations', registration)
+      return response.data
+    } catch (error) {
+      this.debugError('Error creating registration:', error)
+      throw error
+    }
+  }
+
+  // Update registration
+  async updateRegistration(id: string, registration: Partial<ApiRegistration>): Promise<ApiRegistration> {
+    try {
+      const response = await api.put(`/registrations/${id}`, registration)
+      return response.data
+    } catch (error) {
+      this.debugError(`Error updating registration ${id}:`, error)
+      throw error
+    }
+  }
+
+  // Delete registration
+  async deleteRegistration(id: string): Promise<void> {
+    try {
+      await api.delete(`/registrations/${id}`)
+    } catch (error) {
+      this.debugError(`Error deleting registration ${id}:`, error)
+      throw error
+    }
+  }
+
+  // Get registrations by camp ID
+  async getRegistrationsByCampId(campId: string): Promise<ApiRegistration[]> {
+    try {
+      const response = await api.get(`/camps/${campId}/registrations`)
+      return response.data
+    } catch (error) {
+      this.debugError(`Error fetching registrations for camp ${campId}:`, error)
+      throw error
+    }
+  }
+
+  // Update registration status
+  async updateRegistrationStatus(id: string, status: string): Promise<ApiRegistration> {
+    try {
+      const response = await api.patch(`/registrations/${id}/status`, { status })
+      return response.data
+    } catch (error) {
+      this.debugError(`Error updating registration ${id} status:`, error)
+      throw error
+    }
+  }
+
+  // Update registration onboarding status
+  async updateOnboardingStatus(id: string, status: string): Promise<ApiRegistration> {
+    try {
+      const response = await api.patch(`/registrations/${id}/onboarding-status`, { status })
+      return response.data
+    } catch (error) {
+      this.debugError(`Error updating registration ${id} onboarding status:`, error)
+      throw error
+    }
   }
 }
 
-// Helper function to calculate registration status based on total paid and camp price
-function calculateRegistrationStatus(totalPaid: number | string, campPrice: number | string): string {
-  // Garantir que estamos trabalhando com números
-  const totalPaidNum = Number(totalPaid) || 0;
-  const campPriceNum = Number(campPrice) || 0;
-  
-  // Se o preço do acampamento for 0 ou não definido, não faz sentido calcular status
-  if (campPriceNum <= 0) {
-    return totalPaidNum > 0 ? 'paid' : 'unpaid';
-  }
-  
-  // Comparação com tolerância para evitar problemas de arredondamento
-  // Consideramos como pago se a diferença for menor que 1 euro
-  if (totalPaidNum >= campPriceNum || (campPriceNum - totalPaidNum) < 1) {
-    return 'paid';
-  } else if (totalPaidNum > 0) {
-    return 'partial';
-  } else {
-    return 'unpaid';
-  }
-}
-
-// Helper function to get the camp price
-async function getCampPrice(campId: string): Promise<number> {
-  try {
-    const headers = { ...getTeamIdHeader() };
-    
-    // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
-    
-    const response = await fetch(`${API_BASE_URL}/camps/${campId}`, { 
-      headers,
-      credentials: 'include',
-      signal: controller.signal
-    });
-    
-    // Limpar o timeout independentemente do resultado
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      return 0;
-    }
-    
-    const camp = await response.json();
-    return Number(camp.price) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-export const registrationService = {
-  async findAll(): Promise<Registration[]> {
-    try {
-      const headers = { ...getTeamIdHeader() };
-      
-      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos de timeout
-      
-      const response = await fetch(`${API_BASE_URL}/registrations`, { 
-        headers,
-        credentials: 'include',
-        signal: controller.signal
-      });
-      
-      // Limpar o timeout independentemente do resultado
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        return [];
-      }
-      
-      const data = await response.json();
-      
-      // Mapeamento básico inicial dos registros
-      const registrations = data.map((registration: ApiRegistration) => ({
-        ...registration,
-        total_paid: Number(registration.total_paid) || 0,
-        camp_price: Number(registration.camp_price) || 0
-      }));
-      
-      // Para cada registro, usar o total_paid e camp_price já retornados pela API
-      // em vez de fazer múltiplas chamadas adicionais
-      return registrations.map(registration => {
-        const totalPaid = Number(registration.total_paid) || 0;
-        const campPrice = Number(registration.camp_price) || 0;
-        
-        // Recalcular o status com base no valor pago e preço do acampamento
-        const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-        
-        return {
-          ...registration,
-          total_paid: totalPaid,
-          camp_price: campPrice,
-          status: calculatedStatus
-        };
-      });
-    } catch {
-      // Tratamento silencioso do erro
-      return [];
-    }
-  },
-
-  async findById(id: string): Promise<Registration | null> {
-    try {
-      const headers = { ...getTeamIdHeader() };
-      
-      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
-      
-      const response = await fetch(`${API_BASE_URL}/registrations/${id}`, { 
-        headers,
-        credentials: 'include',
-        signal: controller.signal
-      });
-      
-      // Limpar o timeout independentemente do resultado
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        return null;
-      }
-      
-      const data = await response.json();
-      
-      // Usar os valores retornados diretamente pela API
-      const totalPaid = Number(data.total_paid) || 0;
-      const campPrice = Number(data.camp_price) || 0;
-      
-      // Calcular o status com base no pagamento e preço
-      const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-      
-      return {
-        ...data,
-        total_paid: totalPaid,
-        camp_price: campPrice,
-        status: calculatedStatus
-      };
-    } catch {
-      // Erro silencioso
-      return null;
-    }
-  },
-
-  async create(data: CreateRegistrationData): Promise<Registration | null> {
-    try {
-      const headers = { 
-        ...getTeamIdHeader(),
-        'Content-Type': 'application/json' 
-      };
-      
-      // Adicionar timeout para evitar requisição pendente
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`${API_BASE_URL}/registrations`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(data),
-        credentials: 'include',
-        signal: controller.signal
-      });
-      
-      // Limpar o timeout
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        return null;
-      }
-      
-      const result = await response.json();
-      
-      return {
-        ...result,
-        total_paid: 0 // Nova inscrição, sem pagamentos
-      };
-    } catch {
-      return null;
-    }
-  },
-
-  async update(id: string, data: Partial<Registration>): Promise<Registration | null> {
-    try {
-      const headers = { 
-        ...getTeamIdHeader(),
-        'Content-Type': 'application/json' 
-      };
-      
-      // Adicionar timeout para evitar requisição pendente
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(data),
-        credentials: 'include',
-        signal: controller.signal
-      });
-      
-      // Limpar o timeout
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        return null;
-      }
-      
-      const result = await response.json();
-      
-      // Usar os valores retornados diretamente pela API
-      const totalPaid = Number(result.total_paid) || 0;
-      const campPrice = Number(result.camp_price) || 0;
-      
-      // Calcular o status com base no pagamento e preço
-      const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-      
-      return {
-        ...result,
-        total_paid: totalPaid,
-        camp_price: campPrice,
-        status: calculatedStatus
-      };
-    } catch {
-      return null;
-    }
-  },
-
-  async delete(id: string): Promise<boolean> {
-    try {
-      const headers = { ...getTeamIdHeader() };
-      
-      // Adicionar timeout para evitar requisição pendente
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`${API_BASE_URL}/registrations/${id}`, {
-        method: 'DELETE',
-        headers,
-        credentials: 'include',
-        signal: controller.signal
-      });
-      
-      // Limpar o timeout
-      clearTimeout(timeoutId);
-      
-      return response.ok;
-    } catch {
-      return false;
-    }
-  },
-
-  async getRegistrationsByCamp(campId: string): Promise<Registration[]> {
-    try {
-      const headers = { ...getTeamIdHeader() };
-      
-      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
-      
-      const response = await fetch(`${API_BASE_URL}/registrations/camp/${campId}`, { 
-        headers,
-        credentials: 'include',
-        signal: controller.signal
-      });
-      
-      // Limpar o timeout independentemente do resultado
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        return [];
-      }
-      
-      const data = await response.json();
-      
-      // Buscar o preço do acampamento uma vez para todas as inscrições
-      const campPrice = await getCampPrice(campId);
-      
-      // Para cada registro, usar os valores retornados pela API quando disponíveis
-      return data.map((registration: ApiRegistration) => {
-        const totalPaid = Number(registration.total_paid) || 0;
-        
-        // Calcular o status com base no valor pago e preço do acampamento
-        const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-        
-        return {
-          ...registration,
-          total_paid: totalPaid,
-          camp_price: campPrice,
-          status: calculatedStatus
-        };
-      });
-    } catch {
-      return [];
-    }
-  },
-
-  async getRegistrationsByCamper(camperId: string): Promise<Registration[]> {
-    try {
-      const headers = { ...getTeamIdHeader() };
-      
-      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
-      
-      const response = await fetch(`${API_BASE_URL}/registrations/camper/${camperId}`, { 
-        headers,
-        credentials: 'include',
-        signal: controller.signal
-      });
-      
-      // Limpar o timeout independentemente do resultado
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        return [];
-      }
-      
-      const data = await response.json();
-      
-      // Para cada registro, usar os valores retornados pela API quando disponíveis
-      return data.map((registration: ApiRegistration) => {
-        const totalPaid = Number(registration.total_paid) || 0;
-        const campPrice = Number(registration.camp_price) || 0;
-        
-        // Calcular o status com base no valor pago e preço do acampamento
-        const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-        
-        return {
-          ...registration,
-          total_paid: totalPaid,
-          camp_price: campPrice,
-          status: calculatedStatus
-        };
-      });
-    } catch {
-      return [];
-    }
-  },
-
-  async updateOnboardingStatus(registrationId: string, onboardingStatus: string): Promise<Registration | null> {
-    try {
-      const headers = { 
-        ...getTeamIdHeader(),
-        'Content-Type': 'application/json' 
-      };
-      
-      // Adicionar um timeout para evitar que a requisição fique pendente por muito tempo
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos de timeout
-      
-      const response = await fetch(`${API_BASE_URL}/registrations/${registrationId}/onboarding-status`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({ onboarding_status: onboardingStatus }),
-        credentials: 'include',
-        signal: controller.signal
-      });
-      
-      // Limpar o timeout independentemente do resultado
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        return null;
-      }
-      
-      const result = await response.json();
-      
-      // Usar os valores retornados diretamente pela API
-      const totalPaid = Number(result.total_paid) || 0;
-      const campPrice = Number(result.camp_price) || 0;
-      
-      // Calcular o status com base no pagamento e preço
-      const calculatedStatus = calculateRegistrationStatus(totalPaid, campPrice);
-      
-      return {
-        ...result,
-        total_paid: totalPaid,
-        camp_price: campPrice,
-        status: calculatedStatus
-      };
-    } catch {
-      return null;
-    }
-  }
-};
+export const registrationService = new RegistrationService()

@@ -6,6 +6,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/auth/sign-in",
+      "destination": "/api/auth-simple"
+    },
+    {
+      "source": "/api/auth/me",
+      "destination": "/api"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api"
     },

@@ -10,7 +10,7 @@ import { IconDots, IconEye, IconUserCheck, IconCreditCard, IconCopy } from '@tab
 import { RegistrationDetailsSheet } from './registration-details-dialog'
 import { RegistrationOnboardDialog } from './registration-onboard-dialog'
 import { SnackbarBalanceDialog } from './snackbar-balance-dialog'
-import { getLatestPaymentLink } from '../services/payment-service'
+import { paymentService } from '../services/payment-service'
 import { useToast } from '@/components/ui/use-toast'
 
 export interface RegistrationWithActions extends Registration {
@@ -33,7 +33,7 @@ function CopyLinkButton({ registrationId }: { registrationId: string }) {
   
   const copyPaymentLink = async () => {
     try {
-      const link = await getLatestPaymentLink(registrationId)
+      const link = await paymentService.getLatestPaymentLink(registrationId)
       if (link) {
         await navigator.clipboard.writeText(link)
         toast({
