@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createPayment } from '../services/payment-service'
+import { paymentService } from '../services/payment-service'
 import { formatCurrency } from '@/lib/utils'
 import { camperService } from '@/features/campers/services/camper-service'
 import { useQueryClient } from '@tanstack/react-query'
@@ -115,7 +115,7 @@ export function RegistrationOnboardDialog({
       }
 
       // Criar o pagamento
-      await createPayment({
+      await paymentService.createPayment({
         registration_id: registration.id,
         amount: remainingAmount,
         payment_method: paymentMethod,

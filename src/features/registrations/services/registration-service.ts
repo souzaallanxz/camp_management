@@ -1,13 +1,6 @@
 import { api } from '@/lib/api-client'
 
-<<<<<<< HEAD
-// Interface for API response
-=======
-// Use environment variable for API URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-
 // Interface para a resposta da API
->>>>>>> integrations
 interface ApiRegistration {
   id: string
   form_id?: string
@@ -135,6 +128,17 @@ class RegistrationService {
       return response.data
     } catch (error) {
       this.debugError(`Error updating registration ${id} status:`, error)
+      throw error
+    }
+  }
+
+  // Update registration onboarding status
+  async updateOnboardingStatus(id: string, status: string): Promise<ApiRegistration> {
+    try {
+      const response = await api.patch(`/registrations/${id}/onboarding-status`, { status })
+      return response.data
+    } catch (error) {
+      this.debugError(`Error updating registration ${id} onboarding status:`, error)
       throw error
     }
   }

@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { DataTable } from '@/components/ui/data-table'
 import { columns } from './payments-columns'
 import { Registration, Payment } from '../data/schema'
-import { getPaymentsByRegistrationId } from '../services/payment-service'
+import { paymentService } from '../services/payment-service'
 import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +41,7 @@ export function RegistrationDetailsSheet({
   const loadPayments = async () => {
     if (!registration) return
     try {
-      const paymentsData = await getPaymentsByRegistrationId(registration.id)
+      const paymentsData = await paymentService.getPaymentsByRegistrationId(registration.id)
       setPayments(paymentsData)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load payments'
@@ -62,7 +62,7 @@ export function RegistrationDetailsSheet({
 
       try {
         // Load payments
-        const paymentsData = await getPaymentsByRegistrationId(registration.id)
+        const paymentsData = await paymentService.getPaymentsByRegistrationId(registration.id)
         setPayments(paymentsData)
         
         // If registration has a camp_id but no camp object, fetch the camp details
