@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless'
 import express from 'express'
 import cors from 'cors'
-import authRouter from './auth'
+import authRouter from './auth.js'
 
 const app = express()
 
