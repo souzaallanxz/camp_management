@@ -32,7 +32,7 @@ function getTeamId(req) {
 // === AUTH ROUTES === //
 
 // Sign in route
-app.post('/auth/sign-in', async (req, res) => {
+app.post('/api/auth/sign-in', async (req, res) => {
   try {
     const { email, password } = req.body
 
@@ -82,7 +82,7 @@ app.post('/auth/sign-in', async (req, res) => {
 })
 
 // Get current user route
-app.get('/auth/me', async (req, res) => {
+app.get('/api/auth/me', async (req, res) => {
   try {
     const authHeader = req.headers.authorization
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -130,7 +130,7 @@ app.get('/auth/me', async (req, res) => {
 })
 
 // Sign up route
-app.post('/auth/sign-up', async (req, res) => {
+app.post('/api/auth/sign-up', async (req, res) => {
   try {
     const { email, password, name } = req.body
 
@@ -306,6 +306,32 @@ app.delete('/api/users/:id', async (req, res) => {
 
 // === TEAM ROUTES === //
 
+// Get current team information
+app.get('/api/teams/current', async (req, res) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const result = await sql`
+      SELECT t.*, u.email as owner_email
+      FROM teams t
+      LEFT JOIN users u ON t.owner_id = u.id
+      WHERE t.id = ${teamId}::uuid
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Team not found' })
+    }
+
+    return res.json(result[0])
+  } catch (error) {
+    console.error('Error getting current team:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 // Get team information
 app.get('/api/teams/info', async (req, res) => {
   try {
@@ -328,6 +354,94 @@ app.get('/api/teams/info', async (req, res) => {
     return res.json(result[0])
   } catch (error) {
     console.error('Error getting team info:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// === DASHBOARD ROUTES === //
+
+// Get monthly payments
+app.get('/api/dashboard/monthly-payments', async (req, res) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const result = await sql`
+      SELECT 
+        DATE_TRUNC('month', created_at) as month,
+        COUNT(*) as total_registrations,
+        SUM(total_amount_paid) as total_paid,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_registrations,
+        COUNT(CASE WHEN status = 'unpaid' THEN 1 END) as unpaid_registrations
+      FROM registrations
+      WHERE user_id = ${teamId}::uuid
+      GROUP BY DATE_TRUNC('month', created_at)
+      ORDER BY month DESC
+    `
+
+    return res.json(result)
+  } catch (error) {
+    console.error('Error getting monthly payments:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Get dashboard overview
+app.get('/api/dashboard/overview', async (req, res) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const result = await sql`
+      SELECT 
+        COUNT(*) as total_registrations,
+        SUM(total_amount_paid) as total_paid,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_registrations,
+        COUNT(CASE WHEN status = 'unpaid' THEN 1 END) as unpaid_registrations,
+        COUNT(CASE WHEN onboarding_status = 'Concluído' THEN 1 END) as completed_onboarding,
+        COUNT(CASE WHEN onboarding_status = 'Pendente' THEN 1 END) as pending_onboarding
+      FROM registrations
+      WHERE user_id = ${teamId}::uuid
+    `
+
+    return res.json(result[0])
+  } catch (error) {
+    console.error('Error getting dashboard overview:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Get recent registrations
+app.get('/api/dashboard/recent-registrations', async (req, res) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const result = await sql`
+      SELECT 
+        id,
+        name,
+        email,
+        contact,
+        status,
+        total_amount_paid,
+        onboarding_status,
+        created_at
+      FROM registrations
+      WHERE user_id = ${teamId}::uuid
+      ORDER BY created_at DESC
+      LIMIT 10
+    `
+
+    return res.json(result)
+  } catch (error) {
+    console.error('Error getting recent registrations:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 })
