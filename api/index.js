@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless'
 import express from 'express'
-import bcrypt from 'bcryptjs'
 import cors from 'cors'
+import authRouter from './auth'
 
 const app = express()
 
@@ -15,6 +15,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }))
+
+// Mount auth routes
+app.use('/api/auth', authRouter)
 
 // Helper function to get team ID from request
 function getTeamId(req) {
