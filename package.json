@@ -4,9 +4,9 @@
   "version": "1.0.3",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"vite\" \"tsx server.ts\"",
-    "server": "tsx server.ts",
-    "build": "tsc server.ts --esModuleInterop --outDir dist && node ./node_modules/vite/bin/vite.js build",
+    "dev": "concurrently \"vite\" \"tsx api/server.ts\"",
+    "server": "tsx api/server.ts",
+    "build": "tsc api/server.ts --esModuleInterop --outDir dist && node ./node_modules/vite/bin/vite.js build",
     "lint": "eslint .",
     "preview": "vite preview",
     "format:check": "prettier --check .",
