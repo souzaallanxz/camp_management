@@ -184,7 +184,7 @@ app.post('/auth/sign-up', async (req, res) => {
 // === USER ROUTES === //
 
 // Get user profile
-app.get('/users/profile', async (req, res) => {
+app.get('/api/users/profile', async (req, res) => {
   try {
     const teamId = getTeamId(req)
     if (!teamId) {
@@ -215,7 +215,7 @@ app.get('/users/profile', async (req, res) => {
 })
 
 // Get user by ID
-app.get('/users/:id', async (req, res) => {
+app.get('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params
     const teamId = getTeamId(req)
@@ -240,7 +240,7 @@ app.get('/users/:id', async (req, res) => {
 })
 
 // Update user by ID
-app.put('/users/:id', async (req, res) => {
+app.put('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params
     const teamId = getTeamId(req)
@@ -279,7 +279,7 @@ app.put('/users/:id', async (req, res) => {
 })
 
 // Delete user by ID
-app.delete('/users/:id', async (req, res) => {
+app.delete('/api/users/:id', async (req, res) => {
   try {
     const { id } = req.params
     const teamId = getTeamId(req)
@@ -307,7 +307,7 @@ app.delete('/users/:id', async (req, res) => {
 // === TEAM ROUTES === //
 
 // Get team information
-app.get('/teams/info', async (req, res) => {
+app.get('/api/teams/info', async (req, res) => {
   try {
     const teamId = getTeamId(req)
     if (!teamId) {
@@ -485,7 +485,7 @@ app.delete('/api/webhooks/cleanup', async (req, res) => {
 })
 
 // Webhook endpoint for registrations
-app.post('/webhooks/registrations/:userId', async (req, res) => {
+app.post('/api/webhooks/registrations/:userId', async (req, res) => {
   try {
     const { userId } = req.params
     const payload = req.body
@@ -552,7 +552,7 @@ app.post('/webhooks/registrations/:userId', async (req, res) => {
 })
 
 // Webhook endpoint for payments
-app.post('/webhooks/payments/:userId', async (req, res) => {
+app.post('/api/webhooks/payments/:userId', async (req, res) => {
   try {
     const { userId } = req.params
     const payload = req.body
