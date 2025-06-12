@@ -16,8 +16,6 @@ import { useToast } from '@/components/ui/use-toast'
 export interface RegistrationWithActions extends Registration {
   onRegistrationUpdated: () => void
   actions: React.ReactElement
-  camper_name?: string
-  camper_email?: string
   camp_name?: string
   total_paid?: number
 }
@@ -137,22 +135,22 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
     }
   },
   {
-    accessorKey: 'camper_name',
+    accessorKey: 'name',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Nome" />
     ),
     cell: ({ row }) => {
-      return <div>{row.original.camper_name || '-'}</div>
+      return <div>{row.original.name || '-'}</div>
     },
     enableGlobalFilter: true
   },
   {
-    accessorKey: 'camper_email',
+    accessorKey: 'email',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Email" />
     ),
     cell: ({ row }) => {
-      return <div>{row.original.camper_email || '-'}</div>
+      return <div>{row.original.email || '-'}</div>
     },
     enableGlobalFilter: true
   },
