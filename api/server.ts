@@ -1,9 +1,9 @@
-import express, { Request, Response, RequestHandler } from 'express'
+import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import { Resend } from 'resend'
 import bcrypt from 'bcryptjs'
-import { query } from './db'
+import { query } from './db.js'
 
 // Load environment variables
 dotenv.config()
@@ -47,6 +47,12 @@ app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' })
+    }
+
+    // Log database connection status
+    const dbStatus = {
+      hasDbUrl: !!process.env.DATABASE_URL,
+      dbUrlLength: process.env.DATABASE_URL?.length || 0
     }
 
     // Find user by email
