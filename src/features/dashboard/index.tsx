@@ -32,7 +32,7 @@ function formatCurrency(value: number) {
 function MetricCard({
   title,
   value,
-  percentageChange,
+  percentageChange = null,
   icon,
   isLoading,
   valueFormatter = (val: number) => String(val),
@@ -40,7 +40,7 @@ function MetricCard({
 }: {
   title: string
   value: number
-  percentageChange: number | null
+  percentageChange?: number | null
   icon: React.ReactNode
   isLoading: boolean
   valueFormatter?: (value: number) => string
@@ -80,7 +80,7 @@ function MetricCard({
 }
 
 export default function Dashboard() {
-  const { monthlyPayments, monthlyRegistrations, monthlySnackbar, yearlyCampers, isLoading, error } = useDashboardMetrics()
+  const { totalPayments, totalRegistrations, totalSnackbar, totalCampers, isLoading, error } = useDashboardMetrics()
   const permissions = useTeamPermissions()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
 
@@ -132,8 +132,7 @@ export default function Dashboard() {
             <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
               <MetricCard
                 title='Total Pagamentos'
-                value={monthlyPayments?.total || 0}
-                percentageChange={monthlyPayments?.percentageChange || null}
+                value={totalPayments?.total || 0}
                 isLoading={isLoading}
                 valueFormatter={formatCurrency}
                 icon={
@@ -153,8 +152,7 @@ export default function Dashboard() {
               />
               <MetricCard
                 title='Total de Inscrições'
-                value={monthlyRegistrations?.total || 0}
-                percentageChange={monthlyRegistrations?.percentageChange || null}
+                value={totalRegistrations?.total || 0}
                 isLoading={isLoading}
                 icon={
                   <svg
@@ -175,8 +173,7 @@ export default function Dashboard() {
               />
               <MetricCard
                 title='Total de Carregamentos'
-                value={monthlySnackbar?.total || 0}
-                percentageChange={monthlySnackbar?.percentageChange || null}
+                value={totalSnackbar?.total || 0}
                 isLoading={isLoading}
                 valueFormatter={formatCurrency}
                 isLocked={!permissions.dashboard.viewRechargesTotal}
@@ -198,8 +195,7 @@ export default function Dashboard() {
               />
               <MetricCard
                 title='Total de Campistas'
-                value={yearlyCampers?.total || 0}
-                percentageChange={yearlyCampers?.percentageChange || null}
+                value={totalCampers?.total || 0}
                 isLoading={isLoading}
                 icon={
                   <svg
@@ -233,7 +229,7 @@ export default function Dashboard() {
                   <CardHeader>
                     <CardTitle>Últimas Inscrições</CardTitle>
                     <CardDescription>
-                      {monthlyRegistrations?.total || 0} inscrições este mês
+                      {totalRegistrations?.total || 0} inscrições no total
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

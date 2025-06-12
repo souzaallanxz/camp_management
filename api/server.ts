@@ -422,35 +422,17 @@ app.get('/api/dashboard/monthly-payments', (async (req: Request, res: Response) 
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    // Pagamentos do mês atual
-    const current = await sql`
+    // Get total payments across all time
+    const result = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM payments p
       JOIN registrations r ON p.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
-      WHERE EXTRACT(YEAR FROM payment_date) = ${currentYear}
-      AND EXTRACT(MONTH FROM payment_date) = ${currentMonth}
-      AND c.team_id = ${teamId}
+      WHERE c.team_id = ${teamId}
     `;
-    // Pagamentos do mês anterior
-    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-    const previous = await sql`
-      SELECT COALESCE(SUM(amount), 0) as previous_month_total
-      FROM payments p
-      JOIN registrations r ON p.registration_id = r.id
-      JOIN camps c ON r.camp_id = c.id
-      WHERE EXTRACT(YEAR FROM payment_date) = ${prevYear}
-      AND EXTRACT(MONTH FROM payment_date) = ${prevMonth}
-      AND c.team_id = ${teamId}
-    `;
-    const total = Number(current[0]?.total_amount) || 0;
-    const previousTotal = Number(previous[0]?.previous_month_total) || 0;
-    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
-    res.json({ total, previousTotal, percentageChange });
+    
+    const total = Number(result[0]?.total_amount) || 0;
+    res.json({ total, previousTotal: 0, percentageChange: null });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar pagamentos.' });
   }
@@ -462,33 +444,16 @@ app.get('/api/dashboard/monthly-registrations', (async (req: Request, res: Respo
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    // Inscrições do mês atual
-    const current = await sql`
+    // Get total registrations across all time
+    const result = await sql`
       SELECT COUNT(*) as total_count
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      WHERE EXTRACT(YEAR FROM r.created_at) = ${currentYear}
-      AND EXTRACT(MONTH FROM r.created_at) = ${currentMonth}
-      AND c.team_id = ${teamId}
+      WHERE c.team_id = ${teamId}
     `;
-    // Inscrições do mês anterior
-    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-    const previous = await sql`
-      SELECT COUNT(*) as previous_month_count
-      FROM registrations r
-      JOIN camps c ON r.camp_id = c.id
-      WHERE EXTRACT(YEAR FROM r.created_at) = ${prevYear}
-      AND EXTRACT(MONTH FROM r.created_at) = ${prevMonth}
-      AND c.team_id = ${teamId}
-    `;
-    const total = Number(current[0]?.total_count) || 0;
-    const previousTotal = Number(previous[0]?.previous_month_count) || 0;
-    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
-    res.json({ total, previousTotal, percentageChange });
+    
+    const total = Number(result[0]?.total_count) || 0;
+    res.json({ total, previousTotal: 0, percentageChange: null });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar inscrições.' });
   }
@@ -500,35 +465,17 @@ app.get('/api/dashboard/monthly-snackbar', (async (req: Request, res: Response) 
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    // Carregamentos do mês atual
-    const current = await sql`
+    // Get total snackbar balance loads across all time
+    const result = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
       JOIN camps camp ON r.camp_id = camp.id
-      WHERE EXTRACT(YEAR FROM sb.created_at) = ${currentYear}
-      AND EXTRACT(MONTH FROM sb.created_at) = ${currentMonth}
-      AND camp.team_id = ${teamId}
+      WHERE camp.team_id = ${teamId}
     `;
-    // Carregamentos do mês anterior
-    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-    const previous = await sql`
-      SELECT COALESCE(SUM(amount), 0) as previous_month_total
-      FROM snackbar_balance sb
-      JOIN registrations r ON sb.registration_id = r.id
-      JOIN camps camp ON r.camp_id = camp.id
-      WHERE EXTRACT(YEAR FROM sb.created_at) = ${prevYear}
-      AND EXTRACT(MONTH FROM sb.created_at) = ${prevMonth}
-      AND camp.team_id = ${teamId}
-    `;
-    const total = Number(current[0]?.total_amount) || 0;
-    const previousTotal = Number(previous[0]?.previous_month_total) || 0;
-    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
-    res.json({ total, previousTotal, percentageChange });
+    
+    const total = Number(result[0]?.total_amount) || 0;
+    res.json({ total, previousTotal: 0, percentageChange: null });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar carregamentos.' });
   }
@@ -540,30 +487,17 @@ app.get('/api/dashboard/yearly-campers', (async (req: Request, res: Response) =>
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    // Campistas do ano atual
-    const current = await sql`
+    // Get total campers across all time
+    const result = await sql`
       SELECT COUNT(*) as total_count
       FROM campers c
       JOIN registrations r ON c.registration_id = r.id
       JOIN camps camp ON r.camp_id = camp.id
-      WHERE EXTRACT(YEAR FROM c.created_at) = ${currentYear}
-      AND camp.team_id = ${teamId}
+      WHERE camp.team_id = ${teamId}
     `;
-    // Campistas do ano anterior
-    const previous = await sql`
-      SELECT COUNT(*) as previous_year_count
-      FROM campers c
-      JOIN registrations r ON c.registration_id = r.id
-      JOIN camps camp ON r.camp_id = camp.id
-      WHERE EXTRACT(YEAR FROM c.created_at) = ${currentYear - 1}
-      AND camp.team_id = ${teamId}
-    `;
-    const total = Number(current[0]?.total_count) || 0;
-    const previousTotal = Number(previous[0]?.previous_year_count) || 0;
-    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
-    res.json({ total, previousTotal, percentageChange });
+    
+    const total = Number(result[0]?.total_count) || 0;
+    res.json({ total, previousTotal: 0, percentageChange: null });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar campistas.' });
   }

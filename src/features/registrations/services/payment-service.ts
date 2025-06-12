@@ -4,7 +4,7 @@ import { api } from '@/lib/api-client'
 export interface Payment {
   id: number;
   registration_id: string;
-  payment_method: 'MB Way' | 'Transferência Bancária' | 'Dinheiro';
+  payment_method: 'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Desconto';
   amount: number;
   payment_date: string;
   phone_number: string | null;
@@ -15,7 +15,7 @@ export interface Payment {
 
 export interface CreatePaymentData {
   registration_id: string;
-  payment_method: 'MB Way' | 'Transferência Bancária' | 'Dinheiro';
+  payment_method: 'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Desconto';
   amount: number;
   payment_date: string;
   phone_number: string | null;

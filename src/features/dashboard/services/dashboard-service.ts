@@ -5,8 +5,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 export interface MetricData {
   total: number
-  previousTotal: number
-  percentageChange: number | null
+  previousTotal?: number
+  percentageChange?: number | null
 }
 
 export interface CampPaymentsData {
@@ -27,7 +27,7 @@ export interface RecentRegistration {
 }
 
 export const dashboardService = {
-  async getMonthlyPayments(): Promise<MetricData> {
+  async getTotalPayments(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
       const url = `${API_BASE_URL}/dashboard/monthly-payments`;
@@ -38,21 +38,20 @@ export const dashboardService = {
       });
       
       if (!response.ok) {
-        return { total: 0, previousTotal: 0, percentageChange: null };
+        return { total: 0 };
       }
       
       const data = await response.json();
       return {
-        total: data.total || 0,
-        previousTotal: data.previousTotal || 0,
-        percentageChange: data.percentageChange
+        total: data.total || 0
       };
     } catch (error) {
-      return { total: 0, previousTotal: 0, percentageChange: null };
+      console.error('Error fetching total payments:', error);
+      return { total: 0 };
     }
   },
 
-  async getMonthlyRegistrations(): Promise<MetricData> {
+  async getTotalRegistrations(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
       const url = `${API_BASE_URL}/dashboard/monthly-registrations`;
@@ -63,21 +62,20 @@ export const dashboardService = {
       });
       
       if (!response.ok) {
-        return { total: 0, previousTotal: 0, percentageChange: null };
+        return { total: 0 };
       }
       
       const data = await response.json();
       return {
-        total: data.total || 0,
-        previousTotal: data.previousTotal || 0,
-        percentageChange: data.percentageChange
+        total: data.total || 0
       };
     } catch (error) {
-      return { total: 0, previousTotal: 0, percentageChange: null };
+      console.error('Error fetching total registrations:', error);
+      return { total: 0 };
     }
   },
 
-  async getMonthlySnackbarTransactions(): Promise<MetricData> {
+  async getTotalSnackbarTransactions(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
       const url = `${API_BASE_URL}/dashboard/monthly-snackbar`;
@@ -88,21 +86,20 @@ export const dashboardService = {
       });
       
       if (!response.ok) {
-        return { total: 0, previousTotal: 0, percentageChange: null };
+        return { total: 0 };
       }
       
       const data = await response.json();
       return {
-        total: data.total || 0,
-        previousTotal: data.previousTotal || 0,
-        percentageChange: data.percentageChange
+        total: data.total || 0
       };
     } catch (error) {
-      return { total: 0, previousTotal: 0, percentageChange: null };
+      console.error('Error fetching total snackbar transactions:', error);
+      return { total: 0 };
     }
   },
 
-  async getYearlyCampers(): Promise<MetricData> {
+  async getTotalCampers(): Promise<MetricData> {
     try {
       const headers = { ...getTeamIdHeader() };
       const url = `${API_BASE_URL}/dashboard/yearly-campers`;
@@ -113,17 +110,16 @@ export const dashboardService = {
       });
       
       if (!response.ok) {
-        return { total: 0, previousTotal: 0, percentageChange: null };
+        return { total: 0 };
       }
       
       const data = await response.json();
       return {
-        total: data.total || 0,
-        previousTotal: data.previousTotal || 0,
-        percentageChange: data.percentageChange
+        total: data.total || 0
       };
     } catch (error) {
-      return { total: 0, previousTotal: 0, percentageChange: null };
+      console.error('Error fetching total campers:', error);
+      return { total: 0 };
     }
   },
 
@@ -154,6 +150,7 @@ export const dashboardService = {
       
       return [];
     } catch (error) {
+      console.error('Error fetching camp payments:', error);
       return [];
     }
   },
@@ -200,6 +197,7 @@ export const dashboardService = {
       
       return [];
     } catch (error) {
+      console.error('Error fetching recent registrations:', error);
       return [];
     }
   }
