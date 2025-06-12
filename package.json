@@ -3,10 +3,16 @@
   "private": true,
   "version": "1.0.3",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  },
   "scripts": {
     "dev": "concurrently \"vite\" \"tsx api/server.ts\"",
     "server": "tsx api/server.ts",
-    "build": "tsc api/server.ts --esModuleInterop --outDir dist && node ./node_modules/vite/bin/vite.js build",
+    "build:server": "tsx api/server.ts",
+    "build:client": "vite build",
+    "build": "pnpm build:client && pnpm build:server",
     "lint": "eslint .",
     "preview": "vite preview",
     "format:check": "prettier --check .",
@@ -82,12 +88,8 @@
     "uuid": "^11.0.5",
     "vite": "^6.0.9",
     "zod": "^3.24.2",
-    "zustand": "^5.0.2"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.16.0",
-    "@faker-js/faker": "^9.3.0",
-    "@tanstack/eslint-plugin-query": "^5.62.1",
+    "zustand": "^5.0.2",
+    "typescript": "~5.7.2",
     "@types/cors": "^2.8.17",
     "@types/crypto-js": "^4.2.2",
     "@types/express": "^5.0.0",
@@ -95,19 +97,23 @@
     "@types/node": "^22.14.0",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.1",
-    "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "@faker-js/faker": "^9.3.0",
+    "@tanstack/eslint-plugin-query": "^5.62.1",
+    "concurrently": "^9.1.2",
     "eslint": "^9.16.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
-    "express": "^4.21.2",
     "globals": "^15.13.0",
     "knip": "^5.41.1",
     "prettier": "^3.4.2",
     "prettier-plugin-tailwindcss": "^0.6.9",
-    "tsx": "^4.19.2",
-    "typescript": "~5.7.2",
     "typescript-eslint": "^8.17.0",
     "uploadthing": "^7.4.4"
   }
