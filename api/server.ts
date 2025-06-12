@@ -1,4 +1,4 @@
-import express, { Request, Response, RequestHandler, Application } from 'express'
+import express, { Request, Response, RequestHandler } from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import { Resend } from 'resend'
@@ -8,10 +8,7 @@ import { query } from './db'
 // Load environment variables
 dotenv.config()
 
-// Custom type for our route handlers
-type AsyncRequestHandler = (req: Request, res: Response) => Promise<Response>
-
-const app: Application = express()
+const app = express()
 
 // Enable CORS
 app.use(cors({
@@ -91,7 +88,6 @@ app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Error in sign-in:', error)
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error',
@@ -284,7 +280,6 @@ app.get('/api/auth/me', (async (req: Request, res: Response) => {
       role: user.role
     })
   } catch (error) {
-    console.error('Error in get current user:', error)
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message,

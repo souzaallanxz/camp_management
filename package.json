@@ -10,9 +10,8 @@
   "scripts": {
     "dev": "concurrently \"vite\" \"tsx api/server.ts\"",
     "server": "tsx api/server.ts",
-    "build:server": "tsx api/server.ts",
     "build:client": "vite build",
-    "build": "pnpm build:client && pnpm build:server",
+    "build": "pnpm build:client",
     "lint": "eslint .",
     "preview": "vite preview",
     "format:check": "prettier --check .",
