@@ -4,21 +4,14 @@
   "installCommand": "pnpm install",
   "framework": "vite",
   "outputDirectory": "dist",
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
   "rewrites": [
     {
-      "source": "/api/auth/sign-in",
-      "destination": "/api/auth-simple"
-    },
-    {
-      "source": "/api/auth/me",
-      "destination": "/api"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "/api"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!api).*)",
       "destination": "/index.html"
     }
   ]
