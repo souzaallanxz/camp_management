@@ -27,4 +27,6 @@ node_modules/
 
 # Database migration files
 *.sql
-migrate.ts 
+migrate.ts
+src/lib/neon-db.ts
+src/scripts/ 

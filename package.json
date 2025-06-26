@@ -96,7 +96,11 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "@neondatabase/serverless": "^1.0.1",
+    "resend": "^4.0.1",
+    "bcryptjs": "^2.4.3",
+    "crypto-js": "^4.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",
