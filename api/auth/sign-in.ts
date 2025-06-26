@@ -1,10 +1,9 @@
 import { neon } from '@neondatabase/serverless'
-import bcrypt from 'bcryptjs'
 
 // Initialize Neon database connection
 const sql = neon(process.env.DATABASE_URL!)
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
@@ -39,8 +38,11 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Invalid credentials' })
     }
 
+    // Import bcryptjs dynamically to avoid CommonJS issues
+    const bcrypt = await import('bcryptjs')
+    
     // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash)
+    const isPasswordValid = await bcrypt.default.compare(password, user.password_hash)
 
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' })
