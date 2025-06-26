@@ -16,6 +16,8 @@
     "dev": "concurrently \"vite\" \"tsx server.ts\"",
     "server": "tsx server.ts",
     "build": "node ./node_modules/vite/bin/vite.js build",
+    "build:api": "tsc --project tsconfig.api.json",
+    "clean": "rm -rf dist .vercel .next",
     "lint": "eslint .",
     "preview": "vite preview",
     "format:check": "prettier --check .",

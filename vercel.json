@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/**/*.ts": {
-      "runtime": "@vercel/node@3.0.0"
+      "runtime": "@vercel/node@3.0.0",
+      "excludeFiles": "node_modules/**"
     }
   },
   "rewrites": [
@@ -10,9 +11,11 @@
       "destination": "/index.html"
     }
   ],
-  "buildCommand": "pnpm run build",
-  "installCommand": "pnpm install",
+  "buildCommand": "pnpm run clean && pnpm run build",
+  "installCommand": "pnpm install --prefer-frozen-lockfile",
   "framework": null,
+  "outputDirectory": "dist",
+  "cleanUrls": true,
   "headers": [
     {
       "source": "/api/(.*)",
