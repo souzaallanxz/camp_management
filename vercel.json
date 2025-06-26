@@ -1,38 +1,63 @@
 {
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "@vercel/node@3.0.0",
-      "excludeFiles": "node_modules/**"
-    }
-  },
+  "buildCommand": "pnpm run build",
+  "devCommand": "pnpm run dev",
+  "installCommand": "pnpm install",
+  "framework": "vite",
+  "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!api).*)",
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/auth/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/teams/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/dashboard/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/camps/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/registrations/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/payments/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/campers/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/users/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/settings/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/debug/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
-  "buildCommand": "pnpm run clean && pnpm run build",
-  "installCommand": "pnpm install --prefer-frozen-lockfile",
-  "framework": null,
-  "outputDirectory": "dist",
-  "cleanUrls": true,
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization, x-team-id"
-        }
-      ]
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 30
     }
-  ]
+  }
 } 

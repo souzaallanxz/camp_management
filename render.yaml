@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: shadcn-admin-backend
+    runtime: node
+    plan: free
+    buildCommand: pnpm install
+    startCommand: pnpm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: neon-database
+          property: connectionString
+      - key: RESEND_API_KEY
+        sync: false
+      - key: VITE_RESEND_API_KEY
+        sync: false
+      - key: VITE_TOKEN_SECRET
+        sync: false
+      - key: VITE_IFTHENPAY_MBWAY_KEY
+        sync: false
+      - key: VITE_MBWAY_KEY
+        sync: false
+      - key: HOOKDECK_API_KEY
+        sync: false 

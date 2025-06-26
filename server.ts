@@ -15,30 +15,23 @@ const app: Application = express()
 
 // Enable CORS
 app.use(cors({
-  origin: function(origin, callback) {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app',
-      'https://campmanagement.vercel.app'
-    ];
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
+  origin: ['http://localhost:5173', 'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app', 'https://campmanagement.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id', 'Origin', 'Accept'],
-  exposedHeaders: ['x-team-id'],
-  maxAge: 86400 // 24 hours
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id']
 }))
 
 // Parse JSON request bodies
 app.use(express.json())
+
+// Health check endpoint for Render
+app.get('/api/health', (req: Request, res: Response) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  })
+})
 
 // Initialize Neon database connection
 const sql = neon(process.env.DATABASE_URL!)
@@ -422,17 +415,35 @@ app.get('/api/dashboard/monthly-payments', (async (req: Request, res: Response) 
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    // Get total payments across all time
-    const result = await sql`
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    // Pagamentos do mês atual
+    const current = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM payments p
       JOIN registrations r ON p.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
-      WHERE c.team_id = ${teamId}
+      WHERE EXTRACT(YEAR FROM payment_date) = ${currentYear}
+      AND EXTRACT(MONTH FROM payment_date) = ${currentMonth}
+      AND c.team_id = ${teamId}
     `;
-    
-    const total = Number(result[0]?.total_amount) || 0;
-    res.json({ total, previousTotal: 0, percentageChange: null });
+    // Pagamentos do mês anterior
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const previous = await sql`
+      SELECT COALESCE(SUM(amount), 0) as previous_month_total
+      FROM payments p
+      JOIN registrations r ON p.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE EXTRACT(YEAR FROM payment_date) = ${prevYear}
+      AND EXTRACT(MONTH FROM payment_date) = ${prevMonth}
+      AND c.team_id = ${teamId}
+    `;
+    const total = Number(current[0]?.total_amount) || 0;
+    const previousTotal = Number(previous[0]?.previous_month_total) || 0;
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
+    res.json({ total, previousTotal, percentageChange });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar pagamentos.' });
   }
@@ -444,16 +455,33 @@ app.get('/api/dashboard/monthly-registrations', (async (req: Request, res: Respo
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    // Get total registrations across all time
-    const result = await sql`
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    // Inscrições do mês atual
+    const current = await sql`
       SELECT COUNT(*) as total_count
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      WHERE c.team_id = ${teamId}
+      WHERE EXTRACT(YEAR FROM r.created_at) = ${currentYear}
+      AND EXTRACT(MONTH FROM r.created_at) = ${currentMonth}
+      AND c.team_id = ${teamId}
     `;
-    
-    const total = Number(result[0]?.total_count) || 0;
-    res.json({ total, previousTotal: 0, percentageChange: null });
+    // Inscrições do mês anterior
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const previous = await sql`
+      SELECT COUNT(*) as previous_month_count
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE EXTRACT(YEAR FROM r.created_at) = ${prevYear}
+      AND EXTRACT(MONTH FROM r.created_at) = ${prevMonth}
+      AND c.team_id = ${teamId}
+    `;
+    const total = Number(current[0]?.total_count) || 0;
+    const previousTotal = Number(previous[0]?.previous_month_count) || 0;
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
+    res.json({ total, previousTotal, percentageChange });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar inscrições.' });
   }
@@ -465,17 +493,35 @@ app.get('/api/dashboard/monthly-snackbar', (async (req: Request, res: Response) 
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    // Get total snackbar balance loads across all time
-    const result = await sql`
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    // Carregamentos do mês atual
+    const current = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
       JOIN camps camp ON r.camp_id = camp.id
-      WHERE camp.team_id = ${teamId}
+      WHERE EXTRACT(YEAR FROM sb.created_at) = ${currentYear}
+      AND EXTRACT(MONTH FROM sb.created_at) = ${currentMonth}
+      AND camp.team_id = ${teamId}
     `;
-    
-    const total = Number(result[0]?.total_amount) || 0;
-    res.json({ total, previousTotal: 0, percentageChange: null });
+    // Carregamentos do mês anterior
+    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const previous = await sql`
+      SELECT COALESCE(SUM(amount), 0) as previous_month_total
+      FROM snackbar_balance sb
+      JOIN registrations r ON sb.registration_id = r.id
+      JOIN camps camp ON r.camp_id = camp.id
+      WHERE EXTRACT(YEAR FROM sb.created_at) = ${prevYear}
+      AND EXTRACT(MONTH FROM sb.created_at) = ${prevMonth}
+      AND camp.team_id = ${teamId}
+    `;
+    const total = Number(current[0]?.total_amount) || 0;
+    const previousTotal = Number(previous[0]?.previous_month_total) || 0;
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
+    res.json({ total, previousTotal, percentageChange });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar carregamentos.' });
   }
@@ -487,17 +533,30 @@ app.get('/api/dashboard/yearly-campers', (async (req: Request, res: Response) =>
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    // Get total campers across all time
-    const result = await sql`
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    // Campistas do ano atual
+    const current = await sql`
       SELECT COUNT(*) as total_count
       FROM campers c
       JOIN registrations r ON c.registration_id = r.id
       JOIN camps camp ON r.camp_id = camp.id
-      WHERE camp.team_id = ${teamId}
+      WHERE EXTRACT(YEAR FROM c.created_at) = ${currentYear}
+      AND camp.team_id = ${teamId}
     `;
-    
-    const total = Number(result[0]?.total_count) || 0;
-    res.json({ total, previousTotal: 0, percentageChange: null });
+    // Campistas do ano anterior
+    const previous = await sql`
+      SELECT COUNT(*) as previous_year_count
+      FROM campers c
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps camp ON r.camp_id = camp.id
+      WHERE EXTRACT(YEAR FROM c.created_at) = ${currentYear - 1}
+      AND camp.team_id = ${teamId}
+    `;
+    const total = Number(current[0]?.total_count) || 0;
+    const previousTotal = Number(previous[0]?.previous_year_count) || 0;
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
+    res.json({ total, previousTotal, percentageChange });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar campistas.' });
   }
@@ -1520,438 +1579,8 @@ app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   }
 }) as any)
 
-// === WEBHOOK ROUTES === //
-
-// Helper function to validate webhook payload for registrations
-function validateRegistrationPayload(payload: any) {
-  const errors: string[] = []
-  if (!payload.name) errors.push('name is required')
-  if (!payload.email) errors.push('email is required')
-  if (!payload.contact) errors.push('contact is required')
-  return errors
-}
-
-// Helper function to map webhook payload to registration fields
-function mapRegistrationPayload(payload: any, userId: string) {
-  return {
-    id: payload.id || null, // UUID will be generated if not provided
-    form_id: payload.form_id || null,
-    name: payload.name,
-    email: payload.email,
-    contact: payload.contact,
-    status: payload.status || 'unpaid',
-    user_id: userId,
-    camp_id: payload.camp_id || null,
-    onboarding_status: payload.onboarding_status || 'Pendente',
-    snack_bar_balance: payload.snack_bar_balance || 0.00,
-    total_amount_paid: payload.total_amount_paid || 0,
-    id_number: payload.id_number || null,
-    sns_number: payload.sns_number || null,
-    date_of_birth: payload.date_of_birth || null,
-    dietary_restrictions: payload.dietary_restrictions || null,
-    guardian_name: payload.guardian_name || null,
-    guardian_email: payload.guardian_email || null,
-    guardian_phone: payload.guardian_phone || null
-  }
-}
-
-// Helper function to make Hookdeck API calls
-async function makeHookdeckRequest(endpoint: string, method: string = 'GET', body: any = null) {
-  const url = `https://api.hookdeck.com/2025-01-01${endpoint}`
-  const options: any = {
-    method,
-    headers: {
-      'Authorization': `Bearer ${process.env.HOOKDECK_API_KEY}`,
-      'Content-Type': 'application/json',
-    }
-  }
-  if (body) {
-    options.body = JSON.stringify(body)
-  }
-  const response = await fetch(url, options)
-  const responseText = await response.text()
-  if (!response.ok) {
-    throw new Error(`Hookdeck API error: ${response.status} ${response.statusText} - ${responseText}`)
-  }
-  return JSON.parse(responseText)
-}
-
-// Endpoint para ler configuração atual dos webhooks do time
-app.get('/api/webhooks/config', async (req: Request, res: Response) => {
-  const teamId = getTeamId(req)
-  if (!teamId) return res.status(401).json({ error: 'Unauthorized' })
-  try {
-    const configs = await sql`
-      SELECT * FROM webhook_configs WHERE team_id = ${teamId}
-    `
-    // Se não houver configurações, retornar um array vazio
-    if (!configs || configs.length === 0) {
-      return res.json([])
-    }
-    res.json(configs)
-  } catch (error) {
-    console.error('Error fetching webhook configs:', error)
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-})
-
-// Endpoint para salvar configuração dos webhooks
-app.post('/api/webhooks/config', async (req: Request, res: Response) => {
-  const teamId = getTeamId(req)
-  if (!teamId) return res.status(401).json({ error: 'Unauthorized' })
-  
-  try {
-    const {
-      apiKey,
-      registrationWebhook,
-      paymentWebhook,
-      isConnected,
-      registrationWebhookUrl,
-      paymentWebhookUrl,
-      hookdeckData
-    } = req.body
-    
-    // Verificar se já existe configuração para este time
-    const existingConfig = await sql`
-      SELECT id, api_key FROM webhook_configs WHERE team_id = ${teamId}
-    `
-    
-    if (existingConfig.length > 0) {
-      // Atualizar configuração existente, mantendo a api_key existente se não fornecida
-      const currentApiKey = existingConfig[0].api_key
-      await sql`
-        UPDATE webhook_configs
-        SET 
-          api_key = ${apiKey || currentApiKey},
-          registration_webhook = ${registrationWebhook},
-          payment_webhook = ${paymentWebhook},
-          is_connected = ${isConnected},
-          registration_webhook_url = ${registrationWebhookUrl},
-          payment_webhook_url = ${paymentWebhookUrl},
-          hookdeck_data = ${JSON.stringify(hookdeckData)}::jsonb,
-          updated_at = NOW()
-        WHERE team_id = ${teamId}
-      `
-    } else {
-      // Criar nova configuração com uma nova api_key se não fornecida
-      await sql`
-        INSERT INTO webhook_configs (
-          team_id,
-          api_key,
-          registration_webhook,
-          payment_webhook,
-          is_connected,
-          registration_webhook_url,
-          payment_webhook_url,
-          hookdeck_data,
-          created_at,
-          updated_at
-        ) VALUES (
-          ${teamId},
-          ${apiKey || crypto.randomUUID()},
-          ${registrationWebhook},
-          ${paymentWebhook},
-          ${isConnected},
-          ${registrationWebhookUrl},
-          ${paymentWebhookUrl},
-          ${JSON.stringify(hookdeckData)}::jsonb,
-          NOW(),
-          NOW()
-        )
-      `
-    }
-    
-    return res.status(200).json({ success: true })
-  } catch (error) {
-    console.error('Error saving webhook config:', error)
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-})
-
-// Setup webhook endpoint
-app.post('/api/webhooks/setup', async (req: Request, res: Response) => {
-  try {
-    const teamId = getTeamId(req)
-    if (!teamId) {
-      return res.status(401).json({ error: 'Unauthorized' })
-    }
-    const { webhookType } = req.body
-    if (!webhookType || !['registrations', 'payments'].includes(webhookType)) {
-      return res.status(400).json({ error: 'Invalid webhook type. Must be "registrations" or "payments"' })
-    }
-
-    // Step 1: Create destination
-    const timestamp = Date.now()
-    const destination = await makeHookdeckRequest('/destinations', 'POST', {
-      name: `webhook-${webhookType}-user-${teamId}-${timestamp}`,
-      config: {
-        url: `${req.protocol}://${req.get('host')}/api/webhooks/${webhookType}/${teamId}`
-      }
-    })
-
-    // Step 2: Create source
-    const source = await makeHookdeckRequest('/sources', 'POST', {
-      name: `${webhookType}-user-${teamId}-${timestamp}`,
-      type: 'WEBHOOK',
-      alias: `${webhookType}-user-${teamId}-${timestamp}`,
-      label: `${webhookType.charAt(0).toUpperCase() + webhookType.slice(1)} Webhook`
-    })
-
-    // Step 3: Create connection
-    const connection = await makeHookdeckRequest('/connections', 'POST', {
-      name: `connection-${webhookType}-user-${teamId}-${timestamp}`,
-      source_id: source.id,
-      destination_id: destination.id
-    })
-
-    // Check if webhook config exists
-    const existing = await sql`
-      SELECT id FROM webhook_configs WHERE team_id = ${teamId}
-    `
-
-    const hookdeckData = {
-      [webhookType]: { destination, source, connection }
-    }
-
-    if (existing.length > 0) {
-      // Update existing config
-      if (webhookType === 'registrations') {
-        await sql`
-          UPDATE webhook_configs
-          SET registration_webhook = true,
-              registration_webhook_url = ${source.url},
-              is_connected = true,
-              hookdeck_data = COALESCE(hookdeck_data, '{}'::jsonb) || ${JSON.stringify(hookdeckData)}::jsonb,
-              updated_at = NOW()
-          WHERE team_id = ${teamId}
-        `
-      } else {
-        await sql`
-          UPDATE webhook_configs
-          SET payment_webhook = true,
-              payment_webhook_url = ${source.url},
-              is_connected = true,
-              hookdeck_data = COALESCE(hookdeck_data, '{}'::jsonb) || ${JSON.stringify(hookdeckData)}::jsonb,
-              updated_at = NOW()
-          WHERE team_id = ${teamId}
-        `
-      }
-    } else {
-      // Create new config
-      await sql`
-        INSERT INTO webhook_configs (
-          team_id,
-          api_key,
-          registration_webhook,
-          payment_webhook,
-          is_connected,
-          registration_webhook_url,
-          payment_webhook_url,
-          hookdeck_data,
-          created_at,
-          updated_at
-        ) VALUES (
-          ${teamId},
-          ${crypto.randomUUID()},
-          ${webhookType === 'registrations'},
-          ${webhookType === 'payments'},
-          true,
-          ${webhookType === 'registrations' ? source.url : null},
-          ${webhookType === 'payments' ? source.url : null},
-          ${JSON.stringify(hookdeckData)}::jsonb,
-          NOW(),
-          NOW()
-        )
-      `
-    }
-
-    return res.status(200).json({
-      success: true,
-      webhookUrl: source.url,
-      destination,
-      source,
-      connection
-    })
-  } catch (error) {
-    console.error('Error setting up webhook:', error)
-    return res.status(500).json({ 
-      error: 'Failed to setup webhook',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    })
-  }
-})
-
-// Cleanup webhook endpoint
-app.delete('/api/webhooks/cleanup', async (req: Request, res: Response) => {
-  try {
-    const teamId = getTeamId(req)
-    if (!teamId) {
-      return res.status(401).json({ error: 'Unauthorized' })
-    }
-    const { connectionId, sourceId, destinationId } = req.body
-    if (!connectionId || !sourceId || !destinationId) {
-      return res.status(400).json({ error: 'Missing required IDs for cleanup' })
-    }
-    // Delete in reverse order: connection, source, destination
-    await makeHookdeckRequest(`/connections/${connectionId}`, 'DELETE')
-    await makeHookdeckRequest(`/sources/${sourceId}`, 'DELETE')
-    await makeHookdeckRequest(`/destinations/${destinationId}`, 'DELETE')
-
-    // Atualizar webhook_configs para is_enabled = false
-    await sql`
-      UPDATE webhook_configs
-      SET is_enabled = false, updated_at = NOW()
-      WHERE team_id = ${teamId} AND (
-        (hookdeck_data->'source'->>'id' = ${sourceId})
-        OR (hookdeck_data->'connection'->>'id' = ${connectionId})
-      )
-    `
-
-    return res.status(200).json({
-      success: true,
-      message: 'Webhook cleaned up successfully'
-    })
-  } catch (error) {
-    return res.status(500).json({ 
-      error: 'Failed to cleanup webhook',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    })
-  }
-})
-
-// Webhook endpoint for registrations
-app.post('/api/webhooks/registrations/:userId', (async (req: Request, res: Response) => {
-  try {
-    const { userId } = req.params
-    const payload = req.body
-    // Validate required fields
-    const validationErrors = validateRegistrationPayload(payload)
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: validationErrors 
-      })
-    }
-    // Map payload to registration fields
-    const registrationData = mapRegistrationPayload(payload, userId)
-    // Insert registration into database
-    const result = await sql`
-      INSERT INTO registrations (
-        id, form_id, name, email, contact, status, user_id, camp_id,
-        onboarding_status, snack_bar_balance, total_amount_paid,
-        id_number, sns_number, date_of_birth, dietary_restrictions,
-        guardian_name, guardian_email, guardian_phone, created_at, updated_at
-      ) VALUES (
-        COALESCE(${registrationData.id}::uuid, gen_random_uuid()),
-        ${registrationData.form_id},
-        ${registrationData.name},
-        ${registrationData.email},
-        ${registrationData.contact},
-        ${registrationData.status}::registration_status,
-        ${registrationData.user_id}::uuid,
-        ${registrationData.camp_id}::uuid,
-        ${registrationData.onboarding_status}::onboarding_status_type,
-        ${registrationData.snack_bar_balance},
-        ${registrationData.total_amount_paid},
-        ${registrationData.id_number},
-        ${registrationData.sns_number},
-        ${registrationData.date_of_birth}::date,
-        ${registrationData.dietary_restrictions},
-        ${registrationData.guardian_name},
-        ${registrationData.guardian_email},
-        ${registrationData.guardian_phone},
-        timezone('utc'::text, now()),
-        timezone('utc'::text, now())
-      )
-      RETURNING *
-    `
-    const registration = result[0]
-    return res.status(201).json({
-      success: true,
-      message: 'Registration created successfully',
-      registration: registration
-    })
-  } catch (error) {
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    })
-  }
-}) as any)
-
-// Webhook endpoint for payments
-app.post('/api/webhooks/payments/:userId', (async (req: Request, res: Response) => {
-  try {
-    const { userId } = req.params
-    const payload = req.body
-    // Validate required fields for payment
-    if (!payload.registration_id && !payload.email) {
-      return res.status(400).json({ 
-        error: 'Either registration_id or email is required to identify the registration' 
-      })
-    }
-    if (!payload.amount) {
-      return res.status(400).json({ 
-        error: 'Payment amount is required' 
-      })
-    }
-    // Find the registration to update
-    let registration
-    if (payload.registration_id) {
-      const result = await sql`
-        SELECT * FROM registrations 
-        WHERE id = ${payload.registration_id}::uuid AND user_id = ${userId}::uuid
-      `
-      registration = result[0]
-    } else {
-      const result = await sql`
-        SELECT * FROM registrations 
-        WHERE email = ${payload.email} AND user_id = ${userId}::uuid
-        ORDER BY created_at DESC
-        LIMIT 1
-      `
-      registration = result[0]
-    }
-    if (!registration) {
-      return res.status(404).json({ 
-        error: 'Registration not found' 
-      })
-    }
-    // Update payment information
-    const newTotalPaid = (parseFloat(registration.total_amount_paid) || 0) + parseFloat(payload.amount)
-    const newStatus = payload.status || (newTotalPaid > 0 ? 'paid' : 'unpaid')
-    const updateResult = await sql`
-      UPDATE registrations 
-      SET 
-        total_amount_paid = ${newTotalPaid},
-        status = ${newStatus}::registration_status,
-        updated_at = timezone('utc'::text, now())
-      WHERE id = ${registration.id}::uuid
-      RETURNING *
-    `
-    const updatedRegistration = updateResult[0]
-    return res.status(200).json({
-      success: true,
-      message: 'Payment processed successfully',
-      registration: updatedRegistration,
-      payment: {
-        amount: parseFloat(payload.amount),
-        total_paid: newTotalPaid,
-        status: newStatus
-      }
-    })
-  } catch (error) {
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    })
-  }
-}) as any)
-
 // Start the server
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`)
 })
-
-export { app }
