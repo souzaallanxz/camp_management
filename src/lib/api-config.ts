@@ -5,7 +5,7 @@ export const API_CONFIG = {
   // Base URL for API calls
   baseUrl: env.MODE === 'development' 
     ? env.VITE_API_URL || 'http://localhost:3001/api'
-    : 'https://shadcn-admin-backend.onrender.com/api',
+    : 'https://camp-management-1.onrender.com/api',
 
   // Default headers for all API calls
   defaultHeaders: {
