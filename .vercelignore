@@ -1,10 +1,30 @@
+# Backend files - não incluir no deployment do frontend
+server.ts
+api/
+backend/
+scripts/
+render.yaml
+tsconfig.api.json
+RENDER_DEPLOYMENT.md
+
+# Build artifacts
 dist/
 .next/
 .vercel/
 node_modules/
+
+# Logs
 *.log
-.DS_Store
+
+# Environment files
 .env.local
 .env.development.local
 .env.test.local
-.env.production.local 
+.env.production.local
+
+# System files
+.DS_Store
+
+# Database migration files
+*.sql
+migrate.ts 
