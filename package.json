@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.3",
   "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "dev": "concurrently \"vite\" \"tsx server.ts\"",
     "server": "tsx server.ts",

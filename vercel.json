@@ -9,5 +9,9 @@
       "source": "/((?!api).*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "buildCommand": "pnpm run build",
+  "installCommand": "pnpm install",
+  "framework": null,
+  "nodeVersion": "18.x"
 } 
