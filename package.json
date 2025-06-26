@@ -4,7 +4,7 @@
   "version": "1.0.3",
   "type": "module",
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   },
   "exports": {
     ".": {
@@ -95,7 +95,10 @@
     "uuid": "^11.0.5",
     "vite": "^6.0.9",
     "zod": "^3.24.2",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",
@@ -110,12 +113,9 @@
     "@types/react-dom": "^19.0.1",
     "@vercel/node": "^3.0.0",
     "concurrently": "^9.1.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
     "eslint": "^9.16.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
-    "express": "^4.21.2",
     "globals": "^15.13.0",
     "knip": "^5.41.1",
     "prettier": "^3.4.2",
