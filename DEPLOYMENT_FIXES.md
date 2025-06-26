@@ -12,6 +12,7 @@ Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'resend' imported from server.
 ```
 [vite]: Rollup failed to resolve import "@neondatabase/serverless" from neon-db.ts
 [vite]: Rollup failed to resolve import "crypto-js" from token.service.ts
+Could not resolve "./neon-db" from "src/lib/db.ts"
 ```
 
 ## ✅ **Soluções Implementadas:**
@@ -60,8 +61,13 @@ Adicionados arquivos backend para não incluir no build do frontend:
 *.sql
 migrate.ts
 src/lib/neon-db.ts
+src/lib/db.ts
+src/lib/supabase-storage.ts
+src/features/registrations/services/snackbar-service.ts
 src/scripts/
 ```
+
+**Motivo:** Frontend não deve acessar banco diretamente - deve usar API calls
 
 ### **4. Configuração Dual Deployment:**
 - **Vercel**: Usa `.vercelignore` para excluir arquivos backend
@@ -115,8 +121,8 @@ curl https://camp-management-1.onrender.com/api/health
 
 - [x] ✅ Dependencies backend adicionadas
 - [x] ✅ Frontend refatorado (sem imports diretos do banco)
-- [x] ✅ .vercelignore atualizado
-- [x] ✅ Build local funcionando
+- [x] ✅ .vercelignore atualizado com TODOS os arquivos backend
+- [x] ✅ Build local funcionando (✓ built in 7.55s)
 - [x] ✅ Configuração dual deployment
 - [ ] 🔄 Teste Render deploy
 - [ ] 🔄 Teste Vercel deploy
