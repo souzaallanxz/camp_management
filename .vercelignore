@@ -30,6 +30,7 @@ node_modules/
 migrate.ts
 src/lib/neon-db.ts
 src/lib/db.ts
+src/lib/db/
 src/lib/supabase-storage.ts
 src/features/registrations/services/snackbar-service.ts
 src/scripts/ 

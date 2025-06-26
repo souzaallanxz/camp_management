@@ -13,6 +13,7 @@ Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'resend' imported from server.
 [vite]: Rollup failed to resolve import "@neondatabase/serverless" from neon-db.ts
 [vite]: Rollup failed to resolve import "crypto-js" from token.service.ts
 Could not resolve "./neon-db" from "src/lib/db.ts"
+[vite]: Rollup failed to resolve import "drizzle-orm/neon-http" from "src/lib/db/index.ts"
 ```
 
 ## ✅ **Soluções Implementadas:**
@@ -30,7 +31,8 @@ Adicionadas todas as dependências que o backend (`server.ts`) precisa:
     "@neondatabase/serverless": "^1.0.1",
     "resend": "^4.0.1",
     "bcryptjs": "^2.4.3",
-    "crypto-js": "^4.2.0"
+    "crypto-js": "^4.2.0",
+    "drizzle-orm": "^0.36.0"
   }
 }
 ```
@@ -62,6 +64,7 @@ Adicionados arquivos backend para não incluir no build do frontend:
 migrate.ts
 src/lib/neon-db.ts
 src/lib/db.ts
+src/lib/db/
 src/lib/supabase-storage.ts
 src/features/registrations/services/snackbar-service.ts
 src/scripts/
@@ -91,6 +94,7 @@ pnpm run build
 - ✅ resend: Serviço de email
 - ✅ bcryptjs: Hash de senhas
 - ✅ crypto-js: Criptografia frontend
+- ✅ drizzle-orm: ORM para banco de dados
 
 ## 🚀 **Deploy Commands:**
 
