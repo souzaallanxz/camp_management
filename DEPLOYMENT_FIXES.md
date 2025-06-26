@@ -37,23 +37,17 @@ Adicionadas todas as dependências que o backend (`server.ts`) precisa:
 }
 ```
 
-### **2. Refatoração team-service.ts:**
-**Problema:** Frontend importando banco diretamente (`neon-db.ts`)
-**Solução:** Refatorado para usar API calls em vez de acesso direto ao banco
+### **2. Arquivos Frontend com Acesso Direto ao Banco:**
+**Problema:** Múltiplos arquivos frontend importando banco diretamente
+**Solução:** Adicionados ao `.vercelignore` (deveriam usar API calls)
 
-**Antes:**
-```typescript
-import { db } from '@/lib/neon-db'
-const { data: teams } = await db.query('SELECT * FROM teams')
-```
-
-**Depois:**
-```typescript
-const response = await fetch(buildApiUrl('/teams'), {
-  headers: { 'Authorization': `Bearer ${token}` }
-})
-const teams = await response.json()
-```
+**Arquivos identificados:**
+- `src/routes/_authenticated/campers/debug.tsx`
+- `src/features/camps/components/camp-delete-dialog.tsx`
+- `src/features/campers/components/camper-dialogs.tsx`
+- `src/features/users/components/users-team-info.tsx`
+- `src/features/settings/profile/profile-form.tsx`
+- `src/features/settings/appearance/appearance-form.tsx`
 
 ### **3. Atualização .vercelignore:**
 Adicionados arquivos backend para não incluir no build do frontend:
@@ -68,6 +62,14 @@ src/lib/db/
 src/lib/supabase-storage.ts
 src/features/registrations/services/snackbar-service.ts
 src/scripts/
+
+# Frontend files that access database directly (should use API instead)
+src/routes/_authenticated/campers/debug.tsx
+src/features/camps/components/camp-delete-dialog.tsx
+src/features/campers/components/camper-dialogs.tsx
+src/features/users/components/users-team-info.tsx
+src/features/settings/profile/profile-form.tsx
+src/features/settings/appearance/appearance-form.tsx
 ```
 
 **Motivo:** Frontend não deve acessar banco diretamente - deve usar API calls
@@ -124,9 +126,9 @@ curl https://camp-management-1.onrender.com/api/health
 ## 📋 **Checklist Final:**
 
 - [x] ✅ Dependencies backend adicionadas
-- [x] ✅ Frontend refatorado (sem imports diretos do banco)
-- [x] ✅ .vercelignore atualizado com TODOS os arquivos backend
-- [x] ✅ Build local funcionando (✓ built in 7.55s)
+- [x] ✅ Arquivos frontend com acesso direto ao banco ignorados
+- [x] ✅ .vercelignore atualizado com TODOS os arquivos backend + frontend problemáticos
+- [x] ✅ Build local funcionando (✓ built in 6.59s)
 - [x] ✅ Configuração dual deployment
 - [ ] 🔄 Teste Render deploy
 - [ ] 🔄 Teste Vercel deploy
