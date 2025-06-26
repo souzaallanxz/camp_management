@@ -1,12 +1,7 @@
 {
-  "buildCommand": "pnpm run build",
-  "devCommand": "pnpm run dev",
-  "installCommand": "pnpm install",
-  "framework": "vite",
-  "outputDirectory": "dist",
   "functions": {
-    "api/**/*.ts": {
-      "runtime": "nodejs18.x"
+    "api/index.ts": {
+      "runtime": "@vercel/node@3.0.0"
     }
   },
   "rewrites": [
