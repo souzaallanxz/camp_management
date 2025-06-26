@@ -6,6 +6,12 @@
   "engines": {
     "node": "18.x"
   },
+  "exports": {
+    ".": {
+      "import": "./src/main.ts",
+      "require": "./src/main.ts"
+    }
+  },
   "scripts": {
     "dev": "concurrently \"vite\" \"tsx server.ts\"",
     "server": "tsx server.ts",
