@@ -15,9 +15,9 @@ Este guia te ajudará a fazer o deploy do backend Express/TypeScript no Render.
 | Campo | Valor |
 |-------|-------|
 | **Runtime** | `Node` |
-| **Build Command** | `pnpm install` |
-| **Start Command** | `pnpm run start` |
-| **Node Version** | `18.18.0` (via .node-version) |
+| **Build Command** | `npm install` |
+| **Start Command** | `npm run start` |
+| **Node Version** | `20.15.1` (via .node-version) |
 | **Health Check Path** | `/api/health` |
 
 ### Variáveis de Ambiente Necessárias:

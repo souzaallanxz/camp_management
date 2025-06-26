@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "concurrently \"vite\" \"tsx server.ts\"",
     "server": "tsx server.ts",
-    "build": "pnpm install",
+    "build": "npm install",
     "start": "tsx server.ts",
     "build:api": "tsc --project tsconfig.api.json",
     "clean": "rm -rf dist .vercel .next",
