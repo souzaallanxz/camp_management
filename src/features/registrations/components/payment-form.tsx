@@ -38,8 +38,8 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
   useEffect(() => {
     async function loadRegistration() {
       try {
-        const data = await registrationService.findById(registrationId)
-        setRegistration(data as ExtendedRegistration)
+        const data = await registrationService.getRegistrationById(registrationId)
+        setRegistration(data as unknown as ExtendedRegistration)
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to load registration'
         toast({
@@ -54,6 +54,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
   }, [registrationId, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log('Form submit triggered')
     e.preventDefault()
     setLoading(true)
 
@@ -196,7 +197,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading} onClick={() => console.log('Botão Criar Pagamento clicado')}>
           {loading ? 'A processar...' : 'Criar Pagamento'}
         </Button>
       </div>
