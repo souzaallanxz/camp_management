@@ -67,13 +67,63 @@ export async function getCurrentUser() {
   }
 }
 
-export async function getCurrentUserTeam() {
-  try {
-    const user = await getCurrentUser()
-    return user.team_id || null
-  } catch {
-    return null
+export async function getCurrentUserTeam(): Promise<string | null> {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+
+  const response = await fetch(buildApiUrl('/api/teams/current'), {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include'
+  })
+
+  if (!response.ok) return null
+
+  const data = await response.json()
+  return data.team?.id || null
+}
+
+// Get current user profile
+export async function getCurrentUserProfile() {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+
+  const response = await fetch(buildApiUrl('/api/auth/profile'), {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include'
+  })
+
+  if (!response.ok) return null
+
+  return await response.json()
+}
+
+// Update current user profile
+export async function updateCurrentUserProfile(profileData: { name: string; language?: string; theme?: string }) {
+  const token = localStorage.getItem('token')
+  if (!token) throw new Error('No token found')
+
+  const response = await fetch(buildApiUrl('/api/auth/profile'), {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(profileData),
+    credentials: 'include'
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to update profile')
   }
+
+  return await response.json()
 }
 
 export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Session | null) => void) {

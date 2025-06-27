@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { db } from "@/lib/db";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { camperService, type Camper } from "@/features/campers/services/camper-service";
 
 // Define the component first
 function CampersDebugPage() {
-  const [campers, setCampers] = useState<Record<string, any>[]>([]);
+  const [campers, setCampers] = useState<Camper[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [dataStructure, setDataStructure] = useState<string | null>(null);
@@ -14,50 +14,15 @@ function CampersDebugPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await db
-        .from('campers')
-        .select(`
-          *,
-          registration:registration_id (
-            snackbar_balance (
-              amount
-            )
-          )
-        `)
-        .order('created_at', { ascending: false });
+      const result = await camperService.findAll();
       
       setDataStructure(JSON.stringify(result, null, 2));
       
-      if (result.data) {
-        setCampers(result.data);
+      if (result) {
+        setCampers(result);
       } else {
         setCampers([]);
         setError("Nenhum dado retornado, mas sem erro específico");
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadCampersDirect = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Tentativa direta de SQL
-      const result = await db.query(`
-        SELECT * FROM campers ORDER BY created_at DESC
-      `);
-      
-      setDataStructure(JSON.stringify(result, null, 2));
-      
-      if (result.data) {
-        setCampers(result.data);
-      } else {
-        setCampers([]);
-        setError("Nenhum dado retornado do SQL direto, mas sem erro específico");
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
@@ -78,15 +43,7 @@ function CampersDebugPage() {
           disabled={loading}
           variant="default"
         >
-          {loading ? 'Carregando...' : 'Carregar Campistas ORM'}
-        </Button>
-        
-        <Button 
-          onClick={loadCampersDirect} 
-          disabled={loading}
-          variant="secondary"
-        >
-          {loading ? 'Carregando...' : 'Carregar Campistas SQL'}
+          {loading ? 'Carregando...' : 'Carregar Campistas via API'}
         </Button>
       </div>
       
@@ -116,8 +73,8 @@ function CampersDebugPage() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inscrição ID</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cidade</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -126,8 +83,8 @@ function CampersDebugPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{camper.id}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{camper.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{camper.email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{camper.contact}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{camper.registration_id || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{camper.phone}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{camper.city}</td>
                 </tr>
               ))}
             </tbody>

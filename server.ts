@@ -1579,6 +1579,130 @@ app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   }
 }) as any)
 
+// Get current user profile
+app.get('/api/auth/profile', (async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.token
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
+    const userResult = await sql`
+      SELECT id, email, name, team_id, created_at, updated_at
+      FROM public.users 
+      WHERE id = ${token}::uuid
+    `
+
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const user = userResult[0]
+
+    // Get team info if user has a team
+    let teamInfo = null
+    if (user.team_id) {
+      const teamResult = await sql`
+        SELECT id, name
+        FROM public.teams 
+        WHERE id = ${user.team_id}::uuid
+      `
+      if (teamResult.length > 0) {
+        teamInfo = teamResult[0]
+      }
+    }
+
+    return res.status(200).json({
+      user,
+      team: teamInfo
+    })
+  } catch (error) {
+    console.error('Error getting user profile:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Update current user profile
+app.put('/api/auth/profile', (async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.token
+    const { name, language } = req.body
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
+
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' })
+    }
+
+    const result = await sql`
+      UPDATE public.users 
+      SET name = ${name}, 
+          updated_at = NOW()
+      WHERE id = ${token}::uuid
+      RETURNING id, email, name, team_id, created_at, updated_at
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const user = result[0]
+
+    return res.status(200).json({
+      user,
+      message: 'Profile updated successfully'
+    })
+  } catch (error) {
+    console.error('Error updating user profile:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Check if camp can be deleted (has no registrations)
+app.get('/api/camps/:id/can-delete', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const teamId = getTeamId(req)
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    // Check if camp belongs to the team
+    const campResult = await sql`
+      SELECT id, name
+      FROM public.camps 
+      WHERE id = ${id}::uuid 
+      AND team_id = ${teamId}::uuid
+    `
+
+    if (campResult.length === 0) {
+      return res.status(404).json({ error: 'Camp not found' })
+    }
+
+    // Check if camp has any registrations
+    const registrationsResult = await sql`
+      SELECT COUNT(*) as count
+      FROM public.registrations 
+      WHERE camp_id = ${id}::uuid
+    `
+
+    const hasRegistrations = Number(registrationsResult[0]?.count || 0) > 0
+
+    return res.status(200).json({
+      canDelete: !hasRegistrations,
+      hasRegistrations,
+      registrationCount: Number(registrationsResult[0]?.count || 0)
+    })
+  } catch (error) {
+    console.error('Error checking if camp can be deleted:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
 // Start the server
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {

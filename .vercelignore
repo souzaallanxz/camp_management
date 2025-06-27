@@ -36,11 +36,13 @@ src/features/registrations/services/snackbar-service.ts
 src/scripts/
 
 # Frontend files that access database directly (should use API instead)
-src/routes/_authenticated/campers/debug.tsx
-src/features/camps/components/camp-delete-dialog.tsx
-src/features/campers/components/camper-dialogs.tsx
-src/features/campers/index.tsx
-src/routes/_authenticated/campers/index.lazy.tsx
-src/features/users/components/users-team-info.tsx
-src/features/settings/profile/profile-form.tsx
-src/features/settings/appearance/appearance-form.tsx 
+# These files have been refactored to use API calls:
+# src/routes/_authenticated/campers/debug.tsx
+# src/routes/_authenticated/campers/index.tsx
+# src/features/camps/components/camp-delete-dialog.tsx
+# src/features/campers/components/camper-dialogs.tsx
+# src/features/campers/index.tsx
+# src/routes/_authenticated/campers/index.lazy.tsx
+# src/features/users/components/users-team-info.tsx
+# src/features/settings/profile/profile-form.tsx
+# src/features/settings/appearance/appearance-form.tsx 

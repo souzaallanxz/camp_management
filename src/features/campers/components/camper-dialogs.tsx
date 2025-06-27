@@ -14,7 +14,6 @@ import { useCamperDialogs } from '../context/camper-dialogs-context'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { insertCamperSchema, type InsertCamper } from '../data/schema'
-import { db } from '@/lib/db'
 import { toast } from 'sonner'
 import { useCamps } from '@/features/camps/hooks/use-camps'
 import {
@@ -24,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { camperService } from '../services/camper-service'
 
 interface CamperDialogsProps {
   onCamperCreated?: () => void
@@ -47,31 +47,33 @@ export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
 
   const onSubmit = async (data: InsertCamper) => {
     try {
-      const { error } = await db.query(
-        `INSERT INTO campers (
-          form_id,
-          name,
-          email,
-          contact,
-          camp,
-          additional_notes,
-          created_at,
-          updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *`,
-        [
-          data.form_id || null,
-          data.name,
-          data.email,
-          data.contact,
-          data.camp || null,
-          data.additional_notes || null,
-          new Date().toISOString(),
-          new Date().toISOString(),
-        ]
-      )
+      // Convert form data to camper service format
+      const camperData = {
+        name: data.name,
+        email: data.email,
+        phone: data.contact,
+        // Add other required fields with default values
+        city: '',
+        birthday: new Date().toISOString(),
+        emergencyContact: '',
+        emergencyPhone: '',
+        identificationDocument: '',
+        guardianName: '',
+        guardianPhone: '',
+        allergies: '',
+        medications: '',
+        foodRestrictions: '',
+        observations: data.additional_notes || '',
+        pictureAuthorization: false,
+        shirtSize: '',
+        isMinor: false
+      }
 
-      if (error) throw error
+      const result = await camperService.create(camperData)
+
+      if (!result) {
+        throw new Error('Failed to create camper')
+      }
 
       toast.success('Campista criado com sucesso!')
       closeCreateDialog()
