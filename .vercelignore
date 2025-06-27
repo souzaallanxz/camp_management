@@ -39,6 +39,8 @@ src/scripts/
 src/routes/_authenticated/campers/debug.tsx
 src/features/camps/components/camp-delete-dialog.tsx
 src/features/campers/components/camper-dialogs.tsx
+src/features/campers/index.tsx
+src/routes/_authenticated/campers/index.lazy.tsx
 src/features/users/components/users-team-info.tsx
 src/features/settings/profile/profile-form.tsx
 src/features/settings/appearance/appearance-form.tsx 

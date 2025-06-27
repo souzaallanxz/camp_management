@@ -14,6 +14,7 @@ Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'resend' imported from server.
 [vite]: Rollup failed to resolve import "crypto-js" from token.service.ts
 Could not resolve "./neon-db" from "src/lib/db.ts"
 [vite]: Rollup failed to resolve import "drizzle-orm/neon-http" from "src/lib/db/index.ts"
+Could not resolve "./components/camper-dialogs" from "src/features/campers/index.tsx"
 ```
 
 ## ✅ **Soluções Implementadas:**
@@ -45,6 +46,8 @@ Adicionadas todas as dependências que o backend (`server.ts`) precisa:
 - `src/routes/_authenticated/campers/debug.tsx`
 - `src/features/camps/components/camp-delete-dialog.tsx`
 - `src/features/campers/components/camper-dialogs.tsx`
+- `src/features/campers/index.tsx`
+- `src/routes/_authenticated/campers/index.lazy.tsx`
 - `src/features/users/components/users-team-info.tsx`
 - `src/features/settings/profile/profile-form.tsx`
 - `src/features/settings/appearance/appearance-form.tsx`
@@ -67,6 +70,8 @@ src/scripts/
 src/routes/_authenticated/campers/debug.tsx
 src/features/camps/components/camp-delete-dialog.tsx
 src/features/campers/components/camper-dialogs.tsx
+src/features/campers/index.tsx
+src/routes/_authenticated/campers/index.lazy.tsx
 src/features/users/components/users-team-info.tsx
 src/features/settings/profile/profile-form.tsx
 src/features/settings/appearance/appearance-form.tsx
@@ -84,7 +89,7 @@ src/features/settings/appearance/appearance-form.tsx
 ### ✅ **Frontend Build Local:**
 ```bash
 pnpm run build
-# ✓ built in 6.81s - SUCCESS!
+# ✓ built in 6.60s - SUCCESS!
 ```
 
 ### ✅ **Backend Dependencies:**
@@ -128,7 +133,7 @@ curl https://camp-management-1.onrender.com/api/health
 - [x] ✅ Dependencies backend adicionadas
 - [x] ✅ Arquivos frontend com acesso direto ao banco ignorados
 - [x] ✅ .vercelignore atualizado com TODOS os arquivos backend + frontend problemáticos
-- [x] ✅ Build local funcionando (✓ built in 6.59s)
+- [x] ✅ Build local funcionando (✓ built in 6.60s)
 - [x] ✅ Configuração dual deployment
 - [ ] 🔄 Teste Render deploy
 - [ ] 🔄 Teste Vercel deploy
