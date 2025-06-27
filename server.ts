@@ -794,8 +794,7 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
     if (camp_id) {
       campers = await sql`
         SELECT ca.*, 
-               c.name as camp_name, 
-               COALESCE(ca.snack_bar_balance, 0) as snack_bar_balance
+               c.name as camp_name
         FROM campers ca
         JOIN registrations r ON ca.registration_id = r.id
         JOIN camps c ON r.camp_id = c.id
@@ -805,8 +804,7 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
     } else {
       campers = await sql`
         SELECT ca.*, 
-               c.name as camp_name, 
-               COALESCE(ca.snack_bar_balance, 0) as snack_bar_balance
+               c.name as camp_name
         FROM campers ca
         JOIN registrations r ON ca.registration_id = r.id
         JOIN camps c ON r.camp_id = c.id
@@ -814,14 +812,33 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
         ORDER BY ca.created_at DESC
       `;
     }
-    // Mapear os resultados para incluir camp como objeto e garantir que snack_bar_balance seja um número
-    const campersWithCampObject = campers.map(camper => ({
-      ...camper,
-      camp: { name: camper.camp_name },
-      snack_bar_balance: Number(camper.snack_bar_balance) || 0
+
+    // For each camper, calculate the correct snack_bar_balance
+    const camperBalances = await Promise.all(campers.map(async camper => {
+      // Get total deposit for this registration
+      const depositResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_deposit
+        FROM snackbar_balance
+        WHERE registration_id = ${camper.registration_id}
+      `;
+      // Get total spent for this camper
+      const spentResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_spent
+        FROM snack_bar_transactions
+        WHERE camper_id = ${camper.id}
+      `;
+      const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+      const totalSpent = Number(spentResult[0]?.total_spent || 0);
+      const snack_bar_balance = totalDeposit - totalSpent;
+      return {
+        ...camper,
+        camp: { name: camper.camp_name },
+        snack_bar_balance
+      };
     }));
-    res.json(campersWithCampObject);
-  } catch {
+    res.json(camperBalances);
+  } catch (error) {
+    console.error('Error fetching campers:', error);
     res.status(500).json({ error: 'Erro ao buscar campistas.' });
   }
 }) as any);
