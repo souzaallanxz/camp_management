@@ -1,0 +1,459 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Camp Management System - Development Guidelines
+
+## 🏗️ Backend Development (server.ts)
+
+### Endpoint Structure & Best Practices
+
+#### 1. Authentication & Authorization
+- Always use `getTeamId(req)` function to extract team ID from request headers
+- Include proper error handling with try/catch blocks
+- Return consistent error responses: `{ error: 'message' }`
+- Use proper HTTP status codes (200, 400, 401, 404, 500)
+
+#### 2. Database Operations
+- Use the `sql` template literal from Neon for all database queries
+- Always include team_id filtering for multi-tenant data
+- Use parameterized queries to prevent SQL injection
+- Include proper error handling for database operations
+
+#### 3. Endpoint Patterns
+
+**GET Endpoints:**
+```typescript
+app.get('/api/resource', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    const result = await sql`
+      SELECT * FROM resource 
+      WHERE team_id = ${teamId}::uuid
+      ORDER BY created_at DESC
+    `
+
+    return res.status(200).json(result)
+  } catch (error) {
+    console.error('Error fetching resource:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+```
+
+**POST Endpoints:**
+```typescript
+app.post('/api/resource', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    const { field1, field2 } = req.body
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    if (!field1) {
+      return res.status(400).json({ error: 'Field1 is required' })
+    }
+
+    const result = await sql`
+      INSERT INTO resource (field1, field2, team_id, created_at, updated_at)
+      VALUES (${field1}, ${field2}, ${teamId}::uuid, NOW(), NOW())
+      RETURNING *
+    `
+
+    return res.status(200).json(result[0])
+  } catch (error) {
+    console.error('Error creating resource:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+```
+
+**PUT Endpoints:**
+```typescript
+app.put('/api/resource/:id', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const teamId = getTeamId(req)
+    const { field1, field2 } = req.body
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    const result = await sql`
+      UPDATE resource 
+      SET field1 = ${field1}, field2 = ${field2}, updated_at = NOW()
+      WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid
+      RETURNING *
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Resource not found' })
+    }
+
+    return res.status(200).json(result[0])
+  } catch (error) {
+    console.error('Error updating resource:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+```
+
+**DELETE Endpoints:**
+```typescript
+app.delete('/api/resource/:id', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const teamId = getTeamId(req)
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    const result = await sql`
+      DELETE FROM resource 
+      WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid
+      RETURNING id
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Resource not found' })
+    }
+
+    return res.status(200).json({ message: 'Resource deleted successfully' })
+  } catch (error) {
+    console.error('Error deleting resource:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+```
+
+#### 4. Validation Endpoints
+For operations that need validation (like checking if something can be deleted):
+```typescript
+app.get('/api/resource/:id/can-delete', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const teamId = getTeamId(req)
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    // Check if resource belongs to team
+    const resourceResult = await sql`
+      SELECT id, name FROM resource 
+      WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid
+    `
+
+    if (resourceResult.length === 0) {
+      return res.status(404).json({ error: 'Resource not found' })
+    }
+
+    // Check dependencies
+    const dependenciesResult = await sql`
+      SELECT COUNT(*) as count FROM dependent_table 
+      WHERE resource_id = ${id}::uuid
+    `
+
+    const hasDependencies = Number(dependenciesResult[0]?.count || 0) > 0
+
+    return res.status(200).json({
+      canDelete: !hasDependencies,
+      hasDependencies,
+      dependencyCount: Number(dependenciesResult[0]?.count || 0)
+    })
+  } catch (error) {
+    console.error('Error checking if resource can be deleted:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+```
+
+## 🎨 Frontend Development
+
+### Service Layer Pattern
+
+#### 1. Service Structure
+Create services in `src/features/{feature}/services/{feature}-service.ts`:
+
+```typescript
+import { getTeamIdHeader } from '@/lib/auth';
+import { buildApiUrl } from '@/services/api';
+
+export interface Resource {
+  id: string;
+  name: string;
+  // ... other fields
+}
+
+export const resourceService = {
+  async findAll(): Promise<Resource[]> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(buildApiUrl('/api/resource'), { 
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        return [];
+      }
+      
+      return await response.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async findById(id: string): Promise<Resource | null> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(buildApiUrl(`/api/resource/${id}`), { 
+        headers,
+        credentials: 'include' 
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      return await response.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async create(resource: Partial<Resource>): Promise<Resource | null> {
+    try {
+      const headers = { 
+        ...getTeamIdHeader(),
+        'Content-Type': 'application/json' 
+      };
+      
+      const response = await fetch(buildApiUrl('/api/resource'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(resource),
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      return await response.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async update(id: string, resource: Partial<Resource>): Promise<Resource | null> {
+    try {
+      const headers = { 
+        ...getTeamIdHeader(),
+        'Content-Type': 'application/json' 
+      };
+      
+      const response = await fetch(buildApiUrl(`/api/resource/${id}`), {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(resource),
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        return null;
+      }
+      
+      return await response.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(buildApiUrl(`/api/resource/${id}`), {
+        method: 'DELETE',
+        headers,
+        credentials: 'include'
+      });
+      
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+};
+```
+
+#### 2. Component Usage
+Always use services instead of direct database access:
+
+```typescript
+import { useQuery } from '@tanstack/react-query';
+import { resourceService } from '../services/resource-service';
+
+function ResourceComponent() {
+  const { data: resources = [], refetch } = useQuery({
+    queryKey: ['resources'],
+    queryFn: () => resourceService.findAll(),
+  });
+
+  const handleCreate = async (data: ResourceData) => {
+    const result = await resourceService.create(data);
+    if (result) {
+      toast.success('Resource created successfully');
+      refetch();
+    } else {
+      toast.error('Failed to create resource');
+    }
+  };
+
+  // ... rest of component
+}
+```
+
+#### 3. Authentication Service
+Use the auth service for user-related operations:
+
+```typescript
+import { getCurrentUserProfile, updateCurrentUserProfile } from '@/features/auth/auth-service';
+
+// Get user profile
+const profile = await getCurrentUserProfile();
+
+// Update user profile
+await updateCurrentUserProfile({
+  name: 'New Name',
+  theme: 'dark'
+});
+```
+
+## 🚀 Deployment Guidelines
+
+### Backend Deployment (Render)
+
+#### 1. Environment Variables
+Ensure these are set in Render:
+- `DATABASE_URL` - Neon database connection string
+- `VITE_RESEND_API_KEY` - For email functionality
+- `NODE_ENV` - Set to 'production'
+
+#### 2. Build Configuration
+- Use `server.ts` as the main entry point
+- Set build command: `npm install`
+- Set start command: `node server.ts`
+- Use Node.js 18+ runtime
+
+#### 3. Health Check
+The backend includes a health check endpoint at `/api/health` for monitoring.
+
+### Frontend Deployment (Vercel)
+
+#### 1. Environment Variables
+Set in Vercel:
+- `VITE_API_URL` - Backend API URL (e.g., `https://your-app.onrender.com/api`)
+
+#### 2. Build Configuration
+- Framework preset: Vite
+- Build command: `npm run build`
+- Output directory: `dist`
+- Install command: `pnpm install`
+
+#### 3. Ignored Files
+The `.vercelignore` file excludes backend files and database access files.
+
+## 🔧 Development Workflow
+
+### 1. Adding New Features
+1. Create backend endpoint in `server.ts`
+2. Create frontend service in `src/features/{feature}/services/`
+3. Create components using the service
+4. Test both backend and frontend
+5. Deploy backend to Render first
+6. Deploy frontend to Vercel
+
+### 2. Database Changes
+1. Create migration SQL files
+2. Test locally with `migrate.ts`
+3. Apply to production database
+4. Update backend endpoints if needed
+5. Update frontend types if needed
+
+### 3. API Changes
+1. Update backend endpoint
+2. Update frontend service
+3. Update component usage
+4. Test thoroughly
+5. Deploy in order: backend → frontend
+
+## 📋 Code Quality Standards
+
+### Backend
+- Use TypeScript for all endpoints
+- Include proper error handling
+- Use consistent response formats
+- Log errors for debugging
+- Validate input data
+- Use proper HTTP status codes
+
+### Frontend
+- Use TypeScript for all components
+- Use React Query for data fetching
+- Use proper error boundaries
+- Implement loading states
+- Use toast notifications for user feedback
+- Follow component composition patterns
+
+### Security
+- Always validate team_id in backend
+- Use proper authentication headers
+- Sanitize user inputs
+- Use parameterized queries
+- Implement rate limiting (future enhancement)
+
+## 🧪 Testing Guidelines
+
+### Backend Testing
+- Test all endpoints with valid and invalid data
+- Test team isolation
+- Test error scenarios
+- Test database constraints
+
+### Frontend Testing
+- Test service layer functions
+- Test component interactions
+- Test error handling
+- Test loading states
+
+## 📚 Documentation
+
+- Keep `REFACTORING_SUMMARY.md` updated
+- Document new endpoints in comments
+- Update `.vercelignore` when adding new files
+- Maintain API documentation
+
+## 🔄 Migration Checklist
+
+When refactoring existing code:
+1. ✅ Create backend endpoint
+2. ✅ Create frontend service
+3. ✅ Update components to use service
+4. ✅ Remove direct database access
+5. ✅ Update `.vercelignore`
+6. ✅ Test thoroughly
+7. ✅ Deploy backend first
+8. ✅ Deploy frontend
+9. ✅ Update documentation
+
+This ensures consistent, maintainable, and scalable code across the entire application. 
