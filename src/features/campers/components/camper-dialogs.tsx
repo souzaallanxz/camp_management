@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { camperService } from '../services/camper-service'
+import { camperService, type CreateManualCamperData } from '../services/camper-service'
 
 interface CamperDialogsProps {
   onCamperCreated?: () => void
@@ -48,25 +48,13 @@ export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
   const onSubmit = async (data: InsertCamper) => {
     try {
       // Convert form data to camper service format
-      const camperData = {
+      const camperData: CreateManualCamperData = {
         name: data.name,
         email: data.email,
-        phone: data.contact,
-        // Add other required fields with default values
-        city: '',
-        birthday: new Date().toISOString(),
-        emergencyContact: '',
-        emergencyPhone: '',
-        identificationDocument: '',
-        guardianName: '',
-        guardianPhone: '',
-        allergies: '',
-        medications: '',
-        foodRestrictions: '',
-        observations: data.additional_notes || '',
-        pictureAuthorization: false,
-        shirtSize: '',
-        isMinor: false
+        contact: data.contact,
+        camp: data.camp,
+        form_id: data.form_id || null,
+        additional_notes: data.additional_notes || null
       }
 
       const result = await camperService.create(camperData)

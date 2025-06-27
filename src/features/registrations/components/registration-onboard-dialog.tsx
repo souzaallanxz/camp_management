@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { paymentService } from '../services/payment-service'
 import { formatCurrency } from '@/lib/utils'
-import { camperService } from '@/features/campers/services/camper-service'
+import { camperService, type CreateCamperData } from '@/features/campers/services/camper-service'
 import { useQueryClient } from '@tanstack/react-query'
 import { MBWayService } from '../services/mbway-service'
 
@@ -53,11 +53,17 @@ export function RegistrationOnboardDialog({
 
   const createCamper = async () => {
     // Criar o camper com os dados da registration
-    const newCamper = await camperService.create({
+    const camperData: CreateCamperData = {
       name: registration.name,
       email: registration.email,
-      phone: registration.contact
-    });
+      contact: registration.contact,
+      registration_id: registration.id,
+      camp: registration.camp?.name || 'Campo',
+      form_id: registration.form_id || null,
+      additional_notes: null
+    };
+    
+    const newCamper = await camperService.create(camperData);
     return newCamper;
   }
 

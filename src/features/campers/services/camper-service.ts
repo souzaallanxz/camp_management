@@ -31,6 +31,28 @@ export interface Camper {
   updatedAt: string;
 }
 
+// Interface específica para criar campers que corresponde aos campos do backend
+export interface CreateCamperData {
+  name: string;
+  email: string;
+  contact: string;
+  registration_id: string;
+  camp?: string;
+  form_id?: string | null;
+  additional_notes?: string | null;
+}
+
+// Interface para criar campers manualmente (sem registration_id)
+export interface CreateManualCamperData {
+  name: string;
+  email: string;
+  contact: string;
+  registration_id?: string;
+  camp?: string;
+  form_id?: string | null;
+  additional_notes?: string | null;
+}
+
 export const camperService = {
   async findAll(): Promise<Camper[]> {
     try {
@@ -68,7 +90,7 @@ export const camperService = {
     }
   },
 
-  async create(camper: Partial<Camper>): Promise<Camper | null> {
+  async create(camper: CreateCamperData | CreateManualCamperData): Promise<Camper | null> {
     try {
       const headers = { 
         ...getTeamIdHeader(),

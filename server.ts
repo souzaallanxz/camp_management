@@ -859,18 +859,22 @@ app.post('/api/campers', (async (req: Request, res: Response) => {
   }
   try {
     const { name, email, contact, registration_id, form_id, camp, additional_notes } = req.body;
-    if (!name || !email || !contact || !registration_id) {
+    if (!name || !email || !contact) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    // Check if registration belongs to the team
-    const reg = await sql`
-      SELECT r.id FROM registrations r
-      JOIN camps c ON r.camp_id = c.id
-      WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
-    `;
-    if (!reg[0]) {
-      return res.status(400).json({ error: 'Registration does not belong to your team' });
+    
+    // If registration_id is provided, check if it belongs to the team
+    if (registration_id) {
+      const reg = await sql`
+        SELECT r.id FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
+      `;
+      if (!reg[0]) {
+        return res.status(400).json({ error: 'Registration does not belong to your team' });
+      }
     }
+    
     const now = new Date().toISOString();
     const result = await sql`
       INSERT INTO campers (name, email, contact, registration_id, form_id, camp, additional_notes, created_at, updated_at)
@@ -1183,6 +1187,39 @@ app.delete('/api/registrations/:id', (async (req: Request, res: Response) => {
     res.status(204).end();
   } catch {
     res.status(500).json({ error: 'Erro ao deletar inscrição.' });
+  }
+}) as any);
+
+// Update registration onboarding status
+app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+    
+    const now = new Date().toISOString();
+    
+    // Only update if registration belongs to a camp of the team
+    const result = await sql.unsafe(
+      `UPDATE registrations SET onboarding_status = $1, updated_at = $2 WHERE id = $3 AND camp_id IN (SELECT id FROM camps WHERE team_id = $4) RETURNING *`,
+      [status, now, id, teamId]
+    );
+    
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Registration not found or you do not have permission to update it' });
+    }
+    
+    res.json(result[0]);
+  } catch (error) {
+    console.error('Error updating registration onboarding status:', error);
+    res.status(500).json({ error: 'Erro ao atualizar status de onboarding.' });
   }
 }) as any);
 
