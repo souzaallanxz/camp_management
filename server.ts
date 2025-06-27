@@ -1497,6 +1497,65 @@ app.get('/api/snackbar-balance/:camperId', async (req: Request, res: Response) =
   }
 });
 
+// Create snackbar balance entry (add balance)
+app.post('/api/snackbar-balance', async (req: Request, res: Response) => {
+  try {
+    const { registration_id, amount, payment_method, phone_number } = req.body;
+    const teamId = getTeamId(req);
+
+    console.log('Snackbar balance request:', { 
+      registration_id, 
+      amount, 
+      payment_method, 
+      phone_number,
+      teamId 
+    });
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' });
+    }
+
+    if (!registration_id || !amount || !payment_method) {
+      return res.status(400).json({ error: 'Registration ID, amount, and payment method are required' });
+    }
+
+    // Verify if registration belongs to the team
+    const registrationResult = await sql`
+      SELECT r.id
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registration_id}
+      AND c.team_id = ${teamId}
+    `;
+
+    if (registrationResult.length === 0) {
+      return res.status(404).json({ error: 'Registration not found or does not belong to your team' });
+    }
+
+    // Create snackbar balance entry
+    const result = await sql`
+      INSERT INTO snackbar_balance (registration_id, amount, payment_method, phone_number, created_at, updated_at)
+      VALUES (${registration_id}, ${amount}, ${payment_method}, ${phone_number}, NOW(), NOW())
+      RETURNING id, registration_id, amount, payment_method, phone_number, created_at
+    `;
+
+    return res.status(201).json({
+      id: result[0].id,
+      registration_id: result[0].registration_id,
+      amount: Number(result[0].amount),
+      payment_method: result[0].payment_method,
+      phone_number: result[0].phone_number,
+      created_at: result[0].created_at
+    });
+  } catch (error) {
+    console.error('Error creating snackbar balance entry:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
 // Get camper's transactions
 app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Response) => {
   try {
