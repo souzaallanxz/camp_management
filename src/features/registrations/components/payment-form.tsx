@@ -162,7 +162,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
             <span className="font-medium">Número de Telemóvel</span>
             <div className="col-span-3">
               <Input
-                type="tel"
+                type="text"
                 required
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
