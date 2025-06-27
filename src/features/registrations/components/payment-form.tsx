@@ -60,29 +60,35 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
 
     try {
       const numericAmount = Number(amount)
+      console.log('numericAmount:', numericAmount)
       
       // Não cria pagamento se o valor for 0
       if (numericAmount <= 0) {
+        console.log('Valor inválido')
         toast({
           variant: 'destructive',
           title: 'Error',
           description: 'O valor do pagamento deve ser maior que 0',
         })
+        setLoading(false)
         return
       }
 
       // If payment method is MB Way, trigger the payment request first
       if (paymentMethod === 'MB Way') {
         if (!registration) {
+          console.log('Registration não carregada')
           toast({
             variant: 'destructive',
             title: 'Error',
             description: 'Erro ao carregar dados da inscrição',
           })
+          setLoading(false)
           return
         }
 
         try {
+          console.log('Chamando MBWayService.requestPayment')
           await MBWayService.requestPayment({
             mobileNumber: phoneNumber,
             amount: numericAmount,
@@ -90,13 +96,13 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
             orderId: registration.form_id || `${registrationId}-${Date.now()}`,
             email: registration.email || '',
           })
-
-          // If we get here, the MB Way request was successful
+          console.log('MBWayService.requestPayment OK')
           toast({
             title: 'MB Way',
             description: 'Pedido MB Way enviado. Por favor, confirme o pagamento na sua app.',
           })
         } catch (error) {
+          console.log('Erro MBWay:', error)
           toast({
             variant: 'destructive',
             title: 'Erro MB Way',
@@ -108,6 +114,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
       }
 
       // Only proceed with payment creation if we get here
+      console.log('Chamando paymentService.createPayment')
       await paymentService.createPayment({
         registration_id: registrationId,
         amount: numericAmount,
@@ -116,13 +123,14 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
         payment_link: null,
         phone_number: paymentMethod === 'MB Way' ? phoneNumber : null
       })
-
+      console.log('Pagamento criado com sucesso')
       toast({
         title: 'Success',
         description: 'Payment created successfully',
       })
       onSuccess()
     } catch (error) {
+      console.log('Erro geral:', error)
       const message = error instanceof Error ? error.message : 'Failed to create payment'
       toast({
         variant: 'destructive',
