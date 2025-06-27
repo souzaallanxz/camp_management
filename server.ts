@@ -1688,6 +1688,35 @@ app.get('/api/camps/:id/can-delete', (async (req: Request, res: Response) => {
   }
 }) as any)
 
+app.get('/api/registrations/:id', async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  const { id } = req.params;
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const result = await sql`
+      SELECT 
+        r.*, 
+        c.name as camp_name, 
+        c.start_date as camp_start_date, 
+        c.end_date as camp_end_date, 
+        c.price as camp_price
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${id} AND c.team_id = ${teamId}
+      LIMIT 1
+    `;
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+    res.json(result[0]);
+  } catch (error) {
+    console.error('Error fetching registration by id:', error);
+    res.status(500).json({ error: 'Erro ao buscar inscrição.' });
+  }
+});
+
 // Start the server
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
