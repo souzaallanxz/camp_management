@@ -1193,6 +1193,17 @@ app.delete('/api/registrations/:id', (async (req: Request, res: Response) => {
 // Update registration onboarding status
 app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
+  
+  // Debug logs
+  console.log('=== ONBOARDING STATUS DEBUG ===');
+  console.log('Headers received:', req.headers);
+  console.log('Team ID from getTeamId:', teamId);
+  console.log('x-team-id header:', req.headers['x-team-id']);
+  console.log('Authorization header:', req.headers['authorization']);
+  console.log('Request body:', req.body);
+  console.log('Request params:', req.params);
+  console.log('==============================');
+  
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
