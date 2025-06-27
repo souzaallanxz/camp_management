@@ -1200,20 +1200,48 @@ app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res:
     const { id } = req.params;
     const { status } = req.body;
     
+    console.log('Onboarding status update request:', { id, status, teamId });
+    
     if (!status) {
       return res.status(400).json({ error: 'Status is required' });
     }
     
     const now = new Date().toISOString();
     
-    // Only update if registration belongs to a camp of the team
-    const result = await sql.unsafe(
-      `UPDATE registrations SET onboarding_status = $1, updated_at = $2 WHERE id = $3 AND camp_id IN (SELECT id FROM camps WHERE team_id = $4) RETURNING *`,
-      [status, now, id, teamId]
-    );
+    // First, check if the registration exists and belongs to the team
+    const registrationCheck = await sql`
+      SELECT r.id, r.camp_id, c.team_id 
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${id}::uuid
+    `;
+    
+    console.log('Registration check result:', registrationCheck);
+    
+    if (registrationCheck.length === 0) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+    
+    // Compare team_id as strings
+    const registrationTeamId = registrationCheck[0].team_id;
+    console.log('Team ID comparison:', { registrationTeamId, teamId, match: registrationTeamId === teamId });
+    
+    if (registrationTeamId !== teamId) {
+      return res.status(404).json({ error: 'Registration does not belong to your team' });
+    }
+    
+    // Update the registration
+    const result = await sql`
+      UPDATE registrations 
+      SET onboarding_status = ${status}, updated_at = ${now}
+      WHERE id = ${id}::uuid
+      RETURNING *
+    `;
+    
+    console.log('Update result:', result);
     
     if (!result[0]) {
-      return res.status(404).json({ error: 'Registration not found or you do not have permission to update it' });
+      return res.status(404).json({ error: 'Failed to update registration' });
     }
     
     res.json(result[0]);
@@ -1753,6 +1781,43 @@ app.get('/api/registrations/:id', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Erro ao buscar inscrição.' });
   }
 });
+
+// Debug endpoint to check registration
+app.get('/api/debug/registration/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    
+    console.log('Debug registration request:', { id, teamId });
+    
+    // Check if the registration exists
+    const registration = await sql`
+      SELECT r.id, r.name, r.camp_id, c.team_id, c.name as camp_name
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${id}::uuid
+    `;
+    
+    console.log('Debug registration result:', registration);
+    
+    if (registration.length === 0) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+    
+    res.json({
+      registration: registration[0],
+      teamId,
+      registrationTeamId: registration[0].team_id,
+      match: registration[0].team_id === teamId
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}) as any);
 
 // Start the server
 const PORT = process.env.PORT || 3001
