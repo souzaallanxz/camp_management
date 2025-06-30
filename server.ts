@@ -1907,6 +1907,65 @@ app.get('/api/debug/registration/:id', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// Get current camp for the team
+app.get('/api/camps/current', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const today = new Date();
+    // 1. Try to get current active camp
+    const currentCamp = await sql`
+      SELECT * FROM camps 
+      WHERE team_id = ${teamId} 
+        AND start_date <= ${today.toISOString()} 
+        AND end_date >= ${today.toISOString()}
+      ORDER BY start_date ASC
+      LIMIT 1
+    `;
+    if (currentCamp.length > 0) {
+      return res.status(200).json(currentCamp[0]);
+    }
+    // 2. Try to get the next upcoming camp
+    const upcomingCamp = await sql`
+      SELECT * FROM camps 
+      WHERE team_id = ${teamId} 
+        AND start_date > ${today.toISOString()}
+      ORDER BY start_date ASC
+      LIMIT 1
+    `;
+    if (upcomingCamp.length > 0) {
+      return res.status(200).json(upcomingCamp[0]);
+    }
+    // 3. Try to get the most recently ended camp
+    const pastCamp = await sql`
+      SELECT * FROM camps 
+      WHERE team_id = ${teamId} 
+        AND end_date < ${today.toISOString()}
+      ORDER BY end_date DESC
+      LIMIT 1
+    `;
+    if (pastCamp.length > 0) {
+      return res.status(200).json(pastCamp[0]);
+    }
+    // 4. If all else fails, return the first camp (if any)
+    const anyCamp = await sql`
+      SELECT * FROM camps 
+      WHERE team_id = ${teamId}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+    if (anyCamp.length > 0) {
+      return res.status(200).json(anyCamp[0]);
+    }
+    return res.status(404).json({ error: 'No camps found' });
+  } catch (error) {
+    console.error('Error fetching current camp:', error);
+    return res.status(500).json({ error: 'Erro ao buscar acampamento atual.' });
+  }
+}) as any);
+
 // Start the server
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
