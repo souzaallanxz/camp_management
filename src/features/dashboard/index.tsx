@@ -124,7 +124,7 @@ export default function Dashboard() {
                 Analytics
               </TabsTrigger>
               <TabsTrigger value='reports' disabled>
-                Reports
+                Relatórios
               </TabsTrigger>
             </TabsList>
           </div>

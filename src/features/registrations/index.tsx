@@ -82,7 +82,7 @@ function RegistrationsContent() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>Inscrições</h2>
             <p className='text-muted-foreground'>
-              Gerencie todas as inscrições registradas no sistema.
+              Gere todas as inscrições registradas na plataforma.
             </p>
           </div>
           <div>

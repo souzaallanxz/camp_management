@@ -9,7 +9,7 @@ export function UsersPrimaryButtons() {
     <div className='flex items-center gap-2'>
       <Button onClick={openInviteDialog}>
         <IconUserPlus className='mr-2 h-4 w-4' />
-        Adicionar Usuário
+        Adicionar Utilizador
       </Button>
     </div>
   )

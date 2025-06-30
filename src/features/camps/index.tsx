@@ -31,7 +31,7 @@ function CampsContent() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Acampamentos</h2>
             <p className="text-muted-foreground">
-              Gerencie os acampamentos do sistema
+              Gere os acampamentos da plataforma.
             </p>
           </div>
           <Button onClick={() => onOpenEdit(null)}>

@@ -70,7 +70,7 @@ function CampersContent() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>Campistas</h2>
             <p className='text-muted-foreground'>
-              Gerencie todos os campistas registrados no sistema.
+              Gere todos os campistas registrados na plataforma.
             </p>
           </div>
           <Button 

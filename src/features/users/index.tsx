@@ -43,7 +43,7 @@ function UsersContent() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>Lista de Usuários</h2>
             <p className='text-muted-foreground'>
-              Gerencie os usuários e seus papéis na plataforma.
+              Gere os utilizadores e as suas permissões na plataforma.
             </p>
           </div>
           <UsersPrimaryButtons />
@@ -51,9 +51,9 @@ function UsersContent() {
 
         <div className='-mx-4 flex-1 overflow-auto px-4 py-1'>
           {isLoading ? (
-            <div className="text-center p-4">Carregando usuários...</div>
+            <div className="text-center p-4">Carregando utilizadores...</div>
           ) : error ? (
-            <div className="text-center p-4 text-red-500">Erro ao carregar usuários: {error instanceof Error ? error.message : 'Erro desconhecido'}</div>
+            <div className="text-center p-4 text-red-500">Erro ao carregar utilizadores: {error instanceof Error ? error.message : 'Erro desconhecido'}</div>
           ) : (
             <UsersTable data={users} columns={columns} />
           )}

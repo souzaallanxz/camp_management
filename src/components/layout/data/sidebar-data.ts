@@ -28,14 +28,14 @@ export const sidebarData: SidebarData = {
   },
   teams: [
     {
-      name: 'Palavra da Vida',
+      name: 'Equipa',
       logo: Command,
       plan: 'Standard Plan',
     },
   ],
   navGroups: [
     {
-      title: 'General',
+      title: 'Geral',
       items: [
         {
           title: 'Dashboard',
@@ -75,24 +75,24 @@ export const sidebarData: SidebarData = {
       ],
     },
     {
-      title: 'Other',
+      title: 'Outros',
       items: [
         {
-          title: 'Settings',
+          title: 'Definições',
           icon: IconSettings,
           items: [
             {
-              title: 'Profile',
+              title: 'Perfil',
               url: '/settings',
               icon: IconUserCog,
             },
             {
-              title: 'Account',
+              title: 'Conta',
               url: '/settings/account',
               icon: IconTool,
             },
             {
-              title: 'Appearance',
+              title: 'Aparência',
               url: '/settings/appearance',
               icon: IconPalette,
             },
@@ -136,7 +136,7 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
   // Only show Users menu item for superadmin and admin roles
   if (user?.role === 'superadmin' || user?.role === 'admin') {
     generalItems.push({
-      title: 'Usuários',
+      title: 'Utilizadores',
       url: '/users',
       icon: IconUsers,
     })
@@ -173,41 +173,31 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
     isLoading,
     navGroups: [
       {
-        title: 'General',
+        title: 'Geral',
         items: generalItems,
       },
       {
-        title: 'Other',
+        title: 'Outros',
         items: [
           {
-            title: 'Settings',
+            title: 'Definições',
             icon: IconSettings,
             items: [
               {
-                title: 'Profile',
+                title: 'Perfil',
                 url: '/settings',
                 icon: IconUserCog,
               },
               {
-                title: 'Account',
+                title: 'Conta',
                 url: '/settings/account',
                 icon: IconTool,
               },
               {
-                title: 'Appearance',
+                title: 'Aparência',
                 url: '/settings/appearance',
                 icon: IconPalette,
-              },
-              {
-                title: 'Notifications',
-                url: '/settings/notifications',
-                icon: IconNotification,
-              },
-              {
-                title: 'Display',
-                url: '/settings/display',
-                icon: IconBrowserCheck,
-              },
+              }
             ],
           },
         ],

@@ -215,7 +215,7 @@ export default function SnackBarPage() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Snack Bar</h2>
             <p className="text-muted-foreground">
-              Gerencie as compras do snack bar dos campistas.
+              Gere as compras do snack bar dos campistas.
             </p>
           </div>
         </div>
@@ -378,7 +378,7 @@ export default function SnackBarPage() {
                     Histórico de Transações
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Últimas transações realizadas{' '}
+                    Últimas transações realizadas
                     {selectedCamperId ? 'pelo campista' : ''}.
                   </p>
                 </div>
