@@ -1675,8 +1675,8 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
 
     // Create transaction
     const result = await sql`
-      INSERT INTO snack_bar_transactions (camper_id, amount, created_at, updated_at)
-      VALUES (${camper_id}, ${amount}, NOW(), NOW())
+      INSERT INTO snack_bar_transactions (camper_id, amount, created_at)
+      VALUES (${camper_id}, ${amount}, NOW())
       RETURNING id, camper_id, amount, created_at
     `
 
