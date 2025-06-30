@@ -734,27 +734,38 @@ app.put('/api/camps/:id', (async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { name, start_date, end_date, price } = req.body;
-    const now = new Date().toISOString();
-    const fields = [];
-    const values = [];
-    if (name !== undefined) { fields.push(sql`name = ${name}`); }
-    if (start_date !== undefined) { fields.push(sql`start_date = ${start_date}`); }
-    if (end_date !== undefined) { fields.push(sql`end_date = ${end_date}`); }
-    if (price !== undefined) { fields.push(sql`price = ${price}`); }
-    fields.push(sql`updated_at = ${now}`);
-    if (fields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-    const setClause = sql.join(fields, sql`, `);
-    const result = await sql.unsafe(
-      `UPDATE camps SET ${setClause.sql} WHERE id = $1 AND team_id = $2 RETURNING *`,
-      [id, teamId, ...setClause.values]
-    );
-    if (!result[0]) {
+    
+    // Validate that the camp exists and belongs to the team
+    const existingCamp = await sql`
+      SELECT id FROM camps 
+      WHERE id = ${id} AND team_id = ${teamId}
+      LIMIT 1
+    `;
+    
+    if (existingCamp.length === 0) {
       return res.status(404).json({ error: 'Camp not found or you do not have permission to update it' });
     }
+    
+    // Update the camp with the provided fields
+    const result = await sql`
+      UPDATE camps 
+      SET 
+        name = COALESCE(${name}, name),
+        start_date = COALESCE(${start_date}, start_date),
+        end_date = COALESCE(${end_date}, end_date),
+        price = COALESCE(${price}, price),
+        updated_at = NOW()
+      WHERE id = ${id} AND team_id = ${teamId}
+      RETURNING *
+    `;
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Camp not found or you do not have permission to update it' });
+    }
+    
     res.json(result[0]);
-  } catch {
+  } catch (error) {
+    console.error('Error updating camp:', error);
     res.status(500).json({ error: 'Erro ao atualizar acampamento.' });
   }
 }) as any);
@@ -1983,73 +1994,6 @@ app.get('/api/camps/current', (async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching current camp:', error);
     return res.status(500).json({ error: 'Erro ao buscar acampamento atual.' });
-  }
-}) as any);
-
-// Debug endpoint for current camp logic
-app.get('/api/debug/camps/current', (async (req: Request, res: Response) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  try {
-    const today = new Date();
-    const todayDateOnly = today.toISOString().split('T')[0];
-    
-    // Get all camps for this team
-    const allCamps = await sql`
-      SELECT id, name, start_date, end_date, 
-             start_date::date as start_date_only,
-             end_date::date as end_date_only
-      FROM camps 
-      WHERE team_id = ${teamId}
-      ORDER BY start_date ASC
-    `;
-    
-    // Check current active camp
-    const currentCamp = await sql`
-      SELECT id, name, start_date, end_date,
-             start_date::date as start_date_only,
-             end_date::date as end_date_only
-      FROM camps 
-      WHERE team_id = ${teamId} 
-        AND start_date::date <= ${todayDateOnly}::date
-        AND end_date::date >= ${todayDateOnly}::date
-      ORDER BY start_date ASC
-      LIMIT 1
-    `;
-    
-    // Check upcoming camp
-    const upcomingCamp = await sql`
-      SELECT id, name, start_date, end_date,
-             start_date::date as start_date_only,
-             end_date::date as end_date_only
-      FROM camps 
-      WHERE team_id = ${teamId} 
-        AND start_date::date > ${todayDateOnly}::date
-      ORDER BY start_date ASC
-      LIMIT 1
-    `;
-    
-    return res.status(200).json({
-      debug: {
-        today: today.toISOString(),
-        todayDateOnly,
-        teamId
-      },
-      allCamps,
-      currentCamp: currentCamp.length > 0 ? currentCamp[0] : null,
-      upcomingCamp: upcomingCamp.length > 0 ? upcomingCamp[0] : null,
-      logic: {
-        hasCurrentCamp: currentCamp.length > 0,
-        hasUpcomingCamp: upcomingCamp.length > 0,
-        shouldReturnCurrent: currentCamp.length > 0,
-        shouldReturnUpcoming: currentCamp.length === 0 && upcomingCamp.length > 0
-      }
-    });
-  } catch (error) {
-    console.error('Error in debug endpoint:', error);
-    return res.status(500).json({ error: 'Internal server error' });
   }
 }) as any);
 
