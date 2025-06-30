@@ -17,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import { buildApiUrl } from '@/services/api'
 
 type SetupPasswordFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -29,9 +30,6 @@ const formSchema = z.object({
   message: 'As senhas não coincidem',
   path: ['confirmPassword'],
 })
-
-// For production, directly use the correct API URL
-const API_BASE_URL = 'https://campmanagement.vercel.app/api';
 
 export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -58,7 +56,7 @@ export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProp
     setError(null)
     try {
       // Chama o backend para definir a senha usando o userId
-      const response = await fetch(`${API_BASE_URL}/auth/setup-password`, {
+      const response = await fetch(buildApiUrl('/auth/setup-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, password }),
