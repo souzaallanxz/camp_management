@@ -1022,14 +1022,13 @@ app.post('/api/users', (async (req: Request, res: Response) => {
   }
   try {
     const { firstName, lastName, email, role } = req.body;
-    const fullName = (firstName && lastName) ? `${firstName} ${lastName}` : null;
-    if (!firstName || !lastName || !fullName || !email || !role) {
+    if (!firstName || !lastName || !email || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const now = new Date().toISOString();
     const result = await sql`
-      INSERT INTO users (name, first_name, last_name, email, role, team_id, created_at, updated_at)
-      VALUES (${fullName}, ${firstName}, ${lastName}, ${email}, ${role}, ${teamId}, ${now}, ${now})
+      INSERT INTO users (first_name, last_name, email, role, team_id, created_at, updated_at)
+      VALUES (${firstName}, ${lastName}, ${email}, ${role}, ${teamId}, ${now}, ${now})
       RETURNING *
     `;
     res.status(201).json(result[0]);
@@ -1065,10 +1064,11 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
   }
   try {
     const { id } = req.params;
-    const { name, email, role } = req.body;
+    const { firstName, lastName, email, role } = req.body;
     const now = new Date().toISOString();
     const fields = [];
-    if (name !== undefined) fields.push(`name = '${name}'`);
+    if (firstName !== undefined) fields.push(`first_name = '${firstName}'`);
+    if (lastName !== undefined) fields.push(`last_name = '${lastName}'`);
     if (email !== undefined) fields.push(`email = '${email}'`);
     if (role !== undefined) fields.push(`role = '${role}'`);
     fields.push(`updated_at = '${now}'`);
