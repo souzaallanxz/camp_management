@@ -1986,6 +1986,73 @@ app.get('/api/camps/current', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// Debug endpoint for current camp logic
+app.get('/api/debug/camps/current', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const today = new Date();
+    const todayDateOnly = today.toISOString().split('T')[0];
+    
+    // Get all camps for this team
+    const allCamps = await sql`
+      SELECT id, name, start_date, end_date, 
+             start_date::date as start_date_only,
+             end_date::date as end_date_only
+      FROM camps 
+      WHERE team_id = ${teamId}
+      ORDER BY start_date ASC
+    `;
+    
+    // Check current active camp
+    const currentCamp = await sql`
+      SELECT id, name, start_date, end_date,
+             start_date::date as start_date_only,
+             end_date::date as end_date_only
+      FROM camps 
+      WHERE team_id = ${teamId} 
+        AND start_date::date <= ${todayDateOnly}::date
+        AND end_date::date >= ${todayDateOnly}::date
+      ORDER BY start_date ASC
+      LIMIT 1
+    `;
+    
+    // Check upcoming camp
+    const upcomingCamp = await sql`
+      SELECT id, name, start_date, end_date,
+             start_date::date as start_date_only,
+             end_date::date as end_date_only
+      FROM camps 
+      WHERE team_id = ${teamId} 
+        AND start_date::date > ${todayDateOnly}::date
+      ORDER BY start_date ASC
+      LIMIT 1
+    `;
+    
+    return res.status(200).json({
+      debug: {
+        today: today.toISOString(),
+        todayDateOnly,
+        teamId
+      },
+      allCamps,
+      currentCamp: currentCamp.length > 0 ? currentCamp[0] : null,
+      upcomingCamp: upcomingCamp.length > 0 ? upcomingCamp[0] : null,
+      logic: {
+        hasCurrentCamp: currentCamp.length > 0,
+        hasUpcomingCamp: upcomingCamp.length > 0,
+        shouldReturnCurrent: currentCamp.length > 0,
+        shouldReturnUpcoming: currentCamp.length === 0 && upcomingCamp.length > 0
+      }
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}) as any);
+
 // Start the server
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
