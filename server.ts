@@ -92,32 +92,39 @@ app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
 // Sign up route
 app.post('/api/auth/sign-up', (async (req: Request, res: Response) => {
   try {
-    const { email, password, name } = req.body
+    console.log('Sign-up endpoint hit');
+    const { email, password, name } = req.body;
+    console.log('Request body:', req.body);
 
     // Check if user already exists
     const existingUserResult = await sql`
       SELECT id FROM public.users WHERE email = ${email}
-    `
+    `;
+    console.log('Existing user result:', existingUserResult);
 
     if (existingUserResult.length > 0) {
-      return res.status(400).json({ error: 'User with this email already exists' })
+      console.log('User already exists');
+      return res.status(400).json({ error: 'User with this email already exists' });
     }
 
     // Hash password
-    const salt = await bcrypt.genSalt(10)
-    const hashedPassword = await bcrypt.hash(password, salt)
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    console.log('Password hashed');
 
     // Create user
     const result = await sql`
       INSERT INTO public.users (id, email, name, password_hash, role)
       VALUES (gen_random_uuid(), ${email}, ${name}, ${hashedPassword}, 'contributor')
       RETURNING id, email, name, team_id
-    `
+    `;
+    console.log('Insert result:', result);
 
-    const user = result[0]
+    const user = result[0];
 
     if (!user) {
-      return res.status(500).json({ error: 'Failed to create user' })
+      console.log('Failed to create user');
+      return res.status(500).json({ error: 'Failed to create user' });
     }
 
     return res.status(200).json({
@@ -126,9 +133,10 @@ app.post('/api/auth/sign-up', (async (req: Request, res: Response) => {
         user,
         token: user.id // Using user ID as token for now
       }
-    })
-  } catch {
-    return res.status(500).json({ error: 'Internal server error' })
+    });
+  } catch (error) {
+    console.error('Error in sign-up:', error);
+    return res.status(500).json({ error: 'Internal server error', details: error instanceof Error ? error.message : error });
   }
 }) as any)
 
