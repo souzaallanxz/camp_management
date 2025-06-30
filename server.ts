@@ -1034,7 +1034,7 @@ app.post('/api/users', (async (req: Request, res: Response) => {
       RETURNING *
     `;
     // Enviar email de convite
-    const setupLink = `${process.env.NEXT_PUBLIC_APP_URL}/setup-password?token=${inviteToken}&email=${encodeURIComponent(email)}`;
+    const setupLink = `${process.env.NEXT_PUBLIC_APP_URL}/setup-password?userId=${result[0].id}&token=${inviteToken}&email=${encodeURIComponent(email)}`;
     await resend.emails.send({
       from: 'Campy <noreply@infolio.pt>',
       to: email,
