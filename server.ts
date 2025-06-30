@@ -1915,40 +1915,56 @@ app.get('/api/camps/current', (async (req: Request, res: Response) => {
   }
   try {
     const today = new Date();
-    // 1. Try to get current active camp
+    const todayDateOnly = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    console.log('Current camp search:', { teamId, todayDateOnly });
+    
+    // 1. Try to get current active camp (today is between start_date and end_date)
     const currentCamp = await sql`
       SELECT * FROM camps 
       WHERE team_id = ${teamId} 
-        AND start_date <= ${today.toISOString()} 
-        AND end_date >= ${today.toISOString()}
+        AND start_date::date <= ${todayDateOnly}::date
+        AND end_date::date >= ${todayDateOnly}::date
       ORDER BY start_date ASC
       LIMIT 1
     `;
+    
+    console.log('Current camp result:', currentCamp.length > 0 ? currentCamp[0] : 'No current camp found');
+    
     if (currentCamp.length > 0) {
       return res.status(200).json(currentCamp[0]);
     }
+    
     // 2. Try to get the next upcoming camp
     const upcomingCamp = await sql`
       SELECT * FROM camps 
       WHERE team_id = ${teamId} 
-        AND start_date > ${today.toISOString()}
+        AND start_date::date > ${todayDateOnly}::date
       ORDER BY start_date ASC
       LIMIT 1
     `;
+    
+    console.log('Upcoming camp result:', upcomingCamp.length > 0 ? upcomingCamp[0] : 'No upcoming camp found');
+    
     if (upcomingCamp.length > 0) {
       return res.status(200).json(upcomingCamp[0]);
     }
+    
     // 3. Try to get the most recently ended camp
     const pastCamp = await sql`
       SELECT * FROM camps 
       WHERE team_id = ${teamId} 
-        AND end_date < ${today.toISOString()}
+        AND end_date::date < ${todayDateOnly}::date
       ORDER BY end_date DESC
       LIMIT 1
     `;
+    
+    console.log('Past camp result:', pastCamp.length > 0 ? pastCamp[0] : 'No past camp found');
+    
     if (pastCamp.length > 0) {
       return res.status(200).json(pastCamp[0]);
     }
+    
     // 4. If all else fails, return the first camp (if any)
     const anyCamp = await sql`
       SELECT * FROM camps 
@@ -1956,9 +1972,13 @@ app.get('/api/camps/current', (async (req: Request, res: Response) => {
       ORDER BY created_at DESC
       LIMIT 1
     `;
+    
+    console.log('Any camp result:', anyCamp.length > 0 ? anyCamp[0] : 'No camps found');
+    
     if (anyCamp.length > 0) {
       return res.status(200).json(anyCamp[0]);
     }
+    
     return res.status(404).json({ error: 'No camps found' });
   } catch (error) {
     console.error('Error fetching current camp:', error);
