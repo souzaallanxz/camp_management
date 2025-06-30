@@ -74,8 +74,6 @@ export function RegistrationDialog({
   const queryClient = useQueryClient()
   const { data: camps = [] } = useCamps()
   
-  // eslint-disable-next-line no-console
-  console.log('Camps data:', camps);
   
   const form = useForm<CreateRegistrationFormData>({
     resolver: zodResolver(createRegistrationSchema),
@@ -94,8 +92,6 @@ export function RegistrationDialog({
   const { mutateAsync: createRegistration, isPending: isCreating } = useMutation({
     mutationFn: async (data: CreateRegistrationFormData) => {
       try {
-        // eslint-disable-next-line no-console
-        console.log('Starting registration creation with data:', data);
         
         // Ensure camp_id is a string before sending
         const camp_id = typeof data.camp_id === 'string' 
@@ -106,9 +102,6 @@ export function RegistrationDialog({
           throw new Error('Invalid camp_id format');
         }
 
-        // eslint-disable-next-line no-console
-        console.log('Creating registration with camp_id:', camp_id);
-
         // Cria a inscrição com os dados do futuro camper
         const registration = await registrationService.createRegistration({
           camp_id,
@@ -118,14 +111,10 @@ export function RegistrationDialog({
           form_id: data.form_id,
         })
 
-        // eslint-disable-next-line no-console
-        console.log('Registration created successfully:', registration);
 
         // Cria o pagamento associado à inscrição apenas se o valor for maior que 0
         if (registration && data.amount > 0 && data.payment_method) {
           try {
-            // eslint-disable-next-line no-console
-            console.log('Creating payment with amount:', data.amount);
             
             // Garantir que o método de pagamento seja um dos tipos válidos
             const paymentMethod = data.payment_method === 'MB Way' || 
@@ -142,9 +131,6 @@ export function RegistrationDialog({
               phone_number: data.phone_number || null,
               payment_link: null,
             });
-
-            // eslint-disable-next-line no-console
-            console.log('Payment created successfully:', payment);
 
             // Se o método de pagamento for MB Way, faz o pedido de pagamento
             if (payment && paymentMethod === 'MB Way' && data.phone_number) {
@@ -222,12 +208,6 @@ export function RegistrationDialog({
           <form 
             onSubmit={form.handleSubmit(async (data) => {
               try {
-                // eslint-disable-next-line no-console
-                console.log('Form submitted with data:', data);
-                // eslint-disable-next-line no-console
-                console.log('Form is valid:', form.formState.isValid);
-                // eslint-disable-next-line no-console
-                console.log('Form errors:', form.formState.errors);
                 
                 // Verificar se o valor é maior que zero e definir o método de pagamento adequadamente
                 if (data.amount <= 0) {
