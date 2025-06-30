@@ -39,24 +39,13 @@ const createRegistrationSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
   contact: z.string().min(1, 'Contacto é obrigatório'),
-  camp_id: z.string().uuid('Selecione um acampamento'),
+  camp_id: z.string().min(1, 'Selecione um acampamento'),
   form_id: z.string().optional().nullable(),
   
   // Payment fields
-  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro'], {
-    required_error: 'Selecione um método de pagamento',
-  }).optional(),
+  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro']).optional(),
   amount: z.coerce.number().min(0, 'Valor deve ser maior que 0'),
-  phone_number: z.string()
-    .nullable()
-    .optional()
-    .refine((val) => {
-      if (!val) return true
-      // Remove any non-digit characters
-      const digits = val.replace(/\D/g, '')
-      // Check if it's a valid Portuguese phone number (9 digits, starting with 9)
-      return /^9\d{8}$/.test(digits)
-    }, 'Número de telefone inválido. Deve começar com 9 e ter 9 dígitos'),
+  phone_number: z.string().nullable().optional(),
 })
 .refine(
   (data) => {
@@ -85,6 +74,9 @@ export function RegistrationDialog({
   const queryClient = useQueryClient()
   const { data: camps = [] } = useCamps()
   
+  // eslint-disable-next-line no-console
+  console.log('Camps data:', camps);
+  
   const form = useForm<CreateRegistrationFormData>({
     resolver: zodResolver(createRegistrationSchema),
     defaultValues: {
@@ -102,6 +94,9 @@ export function RegistrationDialog({
   const { mutateAsync: createRegistration, isPending: isCreating } = useMutation({
     mutationFn: async (data: CreateRegistrationFormData) => {
       try {
+        // eslint-disable-next-line no-console
+        console.log('Starting registration creation with data:', data);
+        
         // Ensure camp_id is a string before sending
         const camp_id = typeof data.camp_id === 'string' 
           ? data.camp_id
@@ -111,8 +106,11 @@ export function RegistrationDialog({
           throw new Error('Invalid camp_id format');
         }
 
+        // eslint-disable-next-line no-console
+        console.log('Creating registration with camp_id:', camp_id);
+
         // Cria a inscrição com os dados do futuro camper
-        const registration = await registrationService.create({
+        const registration = await registrationService.createRegistration({
           camp_id,
           name: data.name,
           email: data.email,
@@ -120,9 +118,15 @@ export function RegistrationDialog({
           form_id: data.form_id,
         })
 
+        // eslint-disable-next-line no-console
+        console.log('Registration created successfully:', registration);
+
         // Cria o pagamento associado à inscrição apenas se o valor for maior que 0
         if (registration && data.amount > 0 && data.payment_method) {
           try {
+            // eslint-disable-next-line no-console
+            console.log('Creating payment with amount:', data.amount);
+            
             // Garantir que o método de pagamento seja um dos tipos válidos
             const paymentMethod = data.payment_method === 'MB Way' || 
                                  data.payment_method === 'Transferência Bancária' || 
@@ -138,6 +142,9 @@ export function RegistrationDialog({
               phone_number: data.phone_number || null,
               payment_link: null,
             });
+
+            // eslint-disable-next-line no-console
+            console.log('Payment created successfully:', payment);
 
             // Se o método de pagamento for MB Way, faz o pedido de pagamento
             if (payment && paymentMethod === 'MB Way' && data.phone_number) {
@@ -169,6 +176,8 @@ export function RegistrationDialog({
 
         return registration
       } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error in registration creation:', error);
         const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
         throw new Error(message)
       }
@@ -213,13 +222,20 @@ export function RegistrationDialog({
           <form 
             onSubmit={form.handleSubmit(async (data) => {
               try {
+                // eslint-disable-next-line no-console
+                console.log('Form submitted with data:', data);
+                // eslint-disable-next-line no-console
+                console.log('Form is valid:', form.formState.isValid);
+                // eslint-disable-next-line no-console
+                console.log('Form errors:', form.formState.errors);
+                
                 // Verificar se o valor é maior que zero e definir o método de pagamento adequadamente
                 if (data.amount <= 0) {
                   // Se o valor for 0 ou negativo, não criar pagamento
                   data = {
                     ...data,
                     amount: 0,
-                    payment_method: undefined as any // Tipo necessário para satisfazer o TypeScript
+                    payment_method: undefined
                   };
                 }
                 
@@ -425,7 +441,7 @@ export function RegistrationDialog({
                 Cancelar
               </Button>
               <Button type="submit" disabled={isPending}>
-                Criar
+                {isPending ? 'Criando...' : 'Criar'}
               </Button>
             </div>
           </form>
