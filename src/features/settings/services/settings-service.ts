@@ -1,4 +1,4 @@
-import { api, API_PATHS } from '@/services/api';
+import { api } from '@/lib/api-client';
 
 interface UserProfile {
   id: string;
@@ -22,7 +22,8 @@ interface OrganizationSettings {
 export const settingsService = {
   async getProfile(): Promise<UserProfile> {
     try {
-      return await api.get<UserProfile>(API_PATHS.SETTINGS_PROFILE);
+      const response = await api.get('/settings/profile');
+      return response.data;
     } catch (error) {
       if (error instanceof Error && error.message.includes('401')) {
         throw new Error('Unauthorized - Please log in again');
@@ -33,7 +34,8 @@ export const settingsService = {
   
   async getOrganization(): Promise<OrganizationSettings> {
     try {
-      return await api.get<OrganizationSettings>(API_PATHS.SETTINGS_ORGANIZATION);
+      const response = await api.get('/settings/organization');
+      return response.data;
     } catch (error) {
       if (error instanceof Error && error.message.includes('401')) {
         throw new Error('Unauthorized - Please log in again');
