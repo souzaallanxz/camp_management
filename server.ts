@@ -1010,19 +1010,20 @@ app.post('/api/users', (async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { name, firstName, lastName, email, role } = req.body;
-    const fullName = name || ((firstName && lastName) ? `${firstName} ${lastName}` : null);
-    if (!fullName || !email || !role) {
+    const { firstName, lastName, email, role } = req.body;
+    const fullName = (firstName && lastName) ? `${firstName} ${lastName}` : null;
+    if (!firstName || !lastName || !fullName || !email || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const now = new Date().toISOString();
     const result = await sql`
-      INSERT INTO users (name, email, role, team_id, created_at, updated_at)
-      VALUES (${fullName}, ${email}, ${role}, ${teamId}, ${now}, ${now})
+      INSERT INTO users (name, first_name, last_name, email, role, team_id, created_at, updated_at)
+      VALUES (${fullName}, ${firstName}, ${lastName}, ${email}, ${role}, ${teamId}, ${now}, ${now})
       RETURNING *
     `;
     res.status(201).json(result[0]);
-  } catch {
+  } catch (error) {
+    console.error('Error creating user:', error);
     res.status(500).json({ error: 'Erro ao criar usuário.' });
   }
 }) as any);
