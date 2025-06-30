@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { DataTable } from '@/components/ui/data-table'
 import { columns } from './payments-columns'
-import { Registration, Payment } from '../data/schema'
-import { getRegistrationById } from '../services/registration-service'
-import { getPaymentsByRegistrationId } from '../services/payment-service'
+import { Payment } from '../data/schema'
+import { registrationService, type ApiRegistration } from '../services/registration-service'
+import { paymentService } from '../services/payment-service'
 import { formatCurrency } from '@/lib/utils'
 import { useToast } from '@/components/ui/use-toast'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +26,7 @@ interface RegistrationDetailsProps {
 }
 
 export function RegistrationDetails({ registrationId, onOpenChange }: RegistrationDetailsProps) {
-  const [registration, setRegistration] = useState<Registration | null>(null)
+  const [registration, setRegistration] = useState<ApiRegistration | null>(null)
   const [payments, setPayments] = useState<Payment[]>([])
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
@@ -35,7 +35,7 @@ export function RegistrationDetails({ registrationId, onOpenChange }: Registrati
   const loadPayments = async () => {
     if (!registrationId) return
     try {
-      const paymentsData = await getPaymentsByRegistrationId(registrationId)
+      const paymentsData = await paymentService.getPaymentsByRegistrationId(registrationId)
       setPayments(paymentsData)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load payments'
@@ -56,8 +56,8 @@ export function RegistrationDetails({ registrationId, onOpenChange }: Registrati
 
       try {
         const [registrationData, paymentsData] = await Promise.all([
-          getRegistrationById(registrationId),
-          getPaymentsByRegistrationId(registrationId)
+          registrationService.getRegistrationById(registrationId),
+          paymentService.getPaymentsByRegistrationId(registrationId)
         ])
         
         setRegistration(registrationData)
@@ -77,7 +77,9 @@ export function RegistrationDetails({ registrationId, onOpenChange }: Registrati
     loadData()
   }, [registrationId, toast])
 
-  const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
+  const totalPaid = payments
+    .filter(payment => payment.payment_status === 'confirmed')
+    .reduce((sum, payment) => sum + Number(payment.amount), 0)
 
   const handlePaymentSuccess = async () => {
     setShowPaymentForm(false)
@@ -112,27 +114,27 @@ export function RegistrationDetails({ registrationId, onOpenChange }: Registrati
             <div className="grid gap-4 text-sm">
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Name</span>
-                <span className="col-span-3">{registration.name}</span>
+                <span className="col-span-3">{registration.name || '-'}</span>
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Email</span>
-                <span className="col-span-3">{registration.email}</span>
+                <span className="col-span-3">{registration.email || '-'}</span>
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Contact</span>
-                <span className="col-span-3">{registration.contact}</span>
+                <span className="col-span-3">{registration.contact || '-'}</span>
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">ID Number</span>
-                <span className="col-span-3">{registration.id_number}</span>
+                <span className="col-span-3">{registration.id_number || '-'}</span>
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">SNS Number</span>
-                <span className="col-span-3">{registration.sns_number}</span>
+                <span className="col-span-3">{registration.sns_number || '-'}</span>
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Date of Birth</span>
-                <span className="col-span-3">{registration.date_of_birth ? new Date(registration.date_of_birth).toLocaleDateString() : 'Not provided'}</span>
+                <span className="col-span-3">{registration.date_of_birth ? new Date(registration.date_of_birth as string).toLocaleDateString() : 'Not provided'}</span>
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Dietary Restrictions</span>
@@ -140,20 +142,20 @@ export function RegistrationDetails({ registrationId, onOpenChange }: Registrati
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Camp</span>
-                <span className="col-span-3">{registration.camp?.name}</span>
+                <span className="col-span-3">{registration.camp_name || '-'}</span>
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Status</span>
                 <span className="col-span-3">
-                  <Badge className={cn(statusStyles[registration.status])}>
-                    {registration.status.charAt(0).toUpperCase() + registration.status.slice(1)}
+                  <Badge className={cn(statusStyles[registration.status as keyof typeof statusStyles] || statusStyles.unpaid)}>
+                    {(registration.status as string)?.charAt(0).toUpperCase() + (registration.status as string)?.slice(1) || 'Unknown'}
                   </Badge>
                 </span>
               </div>
               <div className="grid grid-cols-4 items-center">
                 <span className="font-medium">Created At</span>
                 <span className="col-span-3">
-                  {new Date(registration.created_at).toLocaleString()}
+                  {new Date(registration.created_at as string).toLocaleString()}
                 </span>
               </div>
             </div>

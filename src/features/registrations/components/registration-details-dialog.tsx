@@ -95,7 +95,9 @@ export function RegistrationDetailsSheet({
     loadData()
   }, [registration, toast])
 
-  const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.amount), 0)
+  const totalPaid = payments
+    .filter(payment => payment.payment_status === 'confirmed')
+    .reduce((sum, payment) => sum + Number(payment.amount), 0)
 
   const handlePaymentSuccess = async () => {
     setShowPaymentForm(false)

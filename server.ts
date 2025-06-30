@@ -592,7 +592,7 @@ app.get('/api/dashboard/recent-registrations', (async (req: Request, res: Respon
         r.email, 
         r.created_at,
         c.name as camp_name,
-        COALESCE(SUM(p.amount), 0) as total_paid
+        COALESCE(SUM(CASE WHEN p.payment_status = 'confirmed' THEN p.amount ELSE 0 END), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
       LEFT JOIN payments p ON r.id = p.registration_id
@@ -648,7 +648,7 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
         c.start_date as camp_start_date,
         c.end_date as camp_end_date,
         c.price as camp_price,
-        COALESCE(SUM(p.amount), 0) as total_paid
+        COALESCE(SUM(CASE WHEN p.payment_status = 'confirmed' THEN p.amount ELSE 0 END), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
       LEFT JOIN payments p ON r.id = p.registration_id
@@ -1293,9 +1293,10 @@ app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res:
 
 // Helper to update registration status after payment changes
 async function updateRegistrationStatus(registrationId: string) {
-  // Get total paid amount
+  // Get total paid amount - only confirmed payments (exclude pending)
   const totalPaid = await sql`
-    SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE registration_id = ${registrationId}
+    SELECT COALESCE(SUM(amount), 0) as total FROM payments 
+    WHERE registration_id = ${registrationId} AND payment_status = 'confirmed'
   `;
   // Get the registration with its camp
   const registration = await sql`
@@ -1397,7 +1398,7 @@ app.post('/api/payments', (async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Registration does not belong to your team' });
     }
     const now = new Date().toISOString();
-    const paymentStatus = payment_method === 'MB Way' ? 'pending' : 'confirmed';
+    const paymentStatus = payment_method === 'MB Way' ? 'not confirmed' : 'confirmed';
     const result = await sql`
       INSERT INTO payments (
         registration_id, payment_method, amount, payment_date, phone_number, payment_link, payment_status, created_at, updated_at

@@ -1,7 +1,7 @@
 import { api } from '@/lib/api-client'
 
 // Interface para a resposta da API
-interface ApiRegistration {
+export interface ApiRegistration {
   id: string
   form_id?: string
   name?: string
@@ -16,6 +16,13 @@ interface ApiRegistration {
   camper_email?: string
   total_paid?: number | string
   onboarding_status?: string
+  id_number?: string
+  sns_number?: string
+  date_of_birth?: string
+  dietary_restrictions?: string
+  guardian_name?: string
+  guardian_email?: string
+  guardian_phone?: string
   // For other fields that might exist
   [key: string]: unknown
 }
