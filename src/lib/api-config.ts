@@ -3,9 +3,15 @@ import { env } from '@/env'
 // API Configuration
 export const API_CONFIG = {
   // Base URL for API calls
-  baseUrl: env.MODE === 'development' 
-    ? env.VITE_API_URL || 'http://localhost:3001/api'
-    : 'https://camp-management-1.onrender.com/api',
+  baseUrl: (() => {
+    // If we're not on localhost, use production URL
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+      return 'https://camp-management-1.onrender.com/api'
+    }
+    
+    // Development mode (localhost)
+    return env.VITE_API_URL || 'http://localhost:3001/api'
+  })(),
 
   // Default headers for all API calls
   defaultHeaders: {
