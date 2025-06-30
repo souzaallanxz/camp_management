@@ -92,38 +92,31 @@ app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
 // Sign up route
 app.post('/api/auth/sign-up', (async (req: Request, res: Response) => {
   try {
-    console.log('Sign-up endpoint hit');
     const { email, password, name } = req.body;
-    console.log('Request body:', req.body);
 
     // Check if user already exists
     const existingUserResult = await sql`
       SELECT id FROM public.users WHERE email = ${email}
     `;
-    console.log('Existing user result:', existingUserResult);
 
     if (existingUserResult.length > 0) {
-      console.log('User already exists');
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    console.log('Password hashed');
 
     // Create user
     const result = await sql`
-      INSERT INTO public.users (id, email, name, password_hash, role)
+      INSERT INTO public.users (id, email, first_name, password_hash, role)
       VALUES (gen_random_uuid(), ${email}, ${name}, ${hashedPassword}, 'contributor')
-      RETURNING id, email, name, team_id
+      RETURNING id, email, first_name, team_id
     `;
-    console.log('Insert result:', result);
 
     const user = result[0];
 
     if (!user) {
-      console.log('Failed to create user');
       return res.status(500).json({ error: 'Failed to create user' });
     }
 
