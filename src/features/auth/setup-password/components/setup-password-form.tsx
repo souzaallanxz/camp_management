@@ -38,7 +38,7 @@ export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProp
   const [passwordSet, setPasswordSet] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const search = useSearch({ from: '/(auth)/setup-password' })
-  const { token } = search
+  const { token, userId } = search
   const navigate = useNavigate()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -50,26 +50,23 @@ export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProp
   })
 
   async function onSubmit({ password }: z.infer<typeof formSchema>) {
-    if (!token) {
-      setError('Token de convite não encontrado')
+    if (!userId) {
+      setError('ID do utilizador não encontrado')
       return
     }
-
     setIsLoading(true)
     setError(null)
     try {
-      // Chama o backend para definir a senha usando o token
-      const response = await fetch(`${API_BASE_URL}/users/setup-account`, {
+      // Chama o backend para definir a senha usando o userId
+      const response = await fetch(`${API_BASE_URL}/auth/setup-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ userId, password }),
       });
-
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Erro ao definir senha');
       }
-
       toast.success('Senha definida com sucesso!')
       setPasswordSet(true)
       // Redirect to sign in after 2 seconds
