@@ -1428,4 +1428,16 @@ app.post('/api/payments', (async (req: Request, res: Response) => {
       ) VALUES (
         ${registration_id}, ${payment_method}, ${amount}, ${payment_date}, ${phone_number}, ${payment_link}, ${paymentStatus}, ${now}, ${now}
       ) RETURNING *
-    `
+    `;
+    res.json(result[0]);
+  } catch (error) {
+    console.error('Error creating payment:', error);
+    res.status(500).json({ error: 'Error creating payment' });
+  }
+}) as any);
+
+// Start the server
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
