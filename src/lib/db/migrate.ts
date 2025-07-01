@@ -22,7 +22,7 @@ async function main() {
     // Create enums
     await db.execute(sql`
       CREATE TYPE payment_status_enum AS ENUM ('not confirmed', 'confirmed');
-      CREATE TYPE payment_method_enum AS ENUM ('mbway', 'card', 'transfer');
+      CREATE TYPE payment_method_enum AS ENUM ('MB Way', 'Transferência Bancária', 'Dinheiro', 'Desconto', 'Multibanco');
       CREATE TYPE registration_status AS ENUM ('unpaid', 'paid', 'cancelled');
       CREATE TYPE onboarding_status_type AS ENUM ('Pendente', 'Completo');
     `);

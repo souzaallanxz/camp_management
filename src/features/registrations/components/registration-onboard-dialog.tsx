@@ -40,7 +40,7 @@ export function RegistrationOnboardDialog({
   onSuccess,
 }: RegistrationOnboardDialogProps) {
   const [loading, setLoading] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<'MB Way' | 'Transferência Bancária' | 'Dinheiro'>('MB Way')
+  const [paymentMethod, setPaymentMethod] = useState<'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Multibanco'>('MB Way')
   const [phoneNumber, setPhoneNumber] = useState('')
   const queryClient = useQueryClient()
 
@@ -199,6 +199,7 @@ export function RegistrationOnboardDialog({
                     <SelectItem value="MB Way">MB Way</SelectItem>
                     <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                     <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="Multibanco">Multibanco</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

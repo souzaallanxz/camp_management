@@ -131,6 +131,7 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
             <SelectItem value="MB Way">MB Way</SelectItem>
             <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
             <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+            <SelectItem value="Multibanco">Multibanco</SelectItem>
           </SelectContent>
         </Select>
       </div>

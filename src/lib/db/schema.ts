@@ -2,7 +2,7 @@ import { pgTable, pgEnum, uuid, text, varchar, timestamp, numeric, date, bigint,
 
 // Enums
 export const paymentStatusEnum = pgEnum('payment_status_enum', ['not confirmed', 'confirmed']);
-export const paymentMethodEnum = pgEnum('payment_method_enum', ['mbway', 'card', 'transfer']);
+export const paymentMethodEnum = pgEnum('payment_method_enum', ['MB Way', 'Transferência Bancária', 'Dinheiro', 'Desconto', 'Multibanco']);
 export const registrationStatusEnum = pgEnum('registration_status', ['unpaid', 'paid', 'partial', 'cancelled']);
 export const onboardingStatusTypeEnum = pgEnum('onboarding_status_type', ['Pendente', 'Completo']);
 

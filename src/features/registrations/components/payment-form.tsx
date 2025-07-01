@@ -160,6 +160,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
                 <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                 <SelectItem value="Dinheiro">Dinheiro</SelectItem>
                 <SelectItem value="Desconto">Desconto</SelectItem>
+                <SelectItem value="Multibanco">Multibanco</SelectItem>
               </SelectContent>
             </Select>
           </div>

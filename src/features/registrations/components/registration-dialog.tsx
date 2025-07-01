@@ -43,7 +43,7 @@ const createRegistrationSchema = z.object({
   form_id: z.string().optional().nullable(),
   
   // Payment fields
-  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro']).optional(),
+  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro', 'Multibanco']).optional(),
   amount: z.coerce.number().min(0, 'Valor deve ser maior que 0'),
   phone_number: z.string().nullable().optional(),
 })
@@ -119,7 +119,8 @@ export function RegistrationDialog({
             // Garantir que o método de pagamento seja um dos tipos válidos
             const paymentMethod = data.payment_method === 'MB Way' || 
                                  data.payment_method === 'Transferência Bancária' || 
-                                 data.payment_method === 'Dinheiro' 
+                                 data.payment_method === 'Dinheiro' ||
+                                 data.payment_method === 'Multibanco'
                                  ? data.payment_method 
                                  : 'Dinheiro'; // Valor padrão seguro
             
@@ -364,6 +365,8 @@ export function RegistrationDialog({
                               <SelectItem value="MB Way">MB Way</SelectItem>
                               <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                               <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                              <SelectItem value="Desconto">Desconto</SelectItem>
+                              <SelectItem value="Multibanco">Multibanco</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormControl>
