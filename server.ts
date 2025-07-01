@@ -1717,7 +1717,7 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { camper_id, amount, type = 'deduction', description } = req.body;
+    const { camper_id, amount } = req.body;
     
     if (!camper_id || !amount) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -1739,9 +1739,9 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     
     const result = await sql`
       INSERT INTO snack_bar_transactions (
-        camper_id, amount, type, description, created_at, updated_at
+        camper_id, amount, created_at
       ) VALUES (
-        ${camper_id}::uuid, ${amount}, ${type}, ${description}, ${now}, ${now}
+        ${camper_id}::uuid, ${amount}, ${now}
       ) RETURNING *
     `;
     
