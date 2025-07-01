@@ -1600,6 +1600,47 @@ app.post('/api/payments', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// Create a new snackbar balance entry
+app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { registration_id, amount, payment_method, phone_number } = req.body;
+    
+    if (!registration_id || !amount || !payment_method) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Check if registration belongs to the team
+    const reg = await sql`
+      SELECT r.id FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
+    `;
+    
+    if (!reg[0]) {
+      return res.status(400).json({ error: 'Registration does not belong to your team' });
+    }
+    
+    const now = new Date().toISOString();
+    
+    const result = await sql`
+      INSERT INTO snackbar_balance (
+        registration_id, amount, payment_method, phone_number, created_at, updated_at
+      ) VALUES (
+        ${registration_id}, ${amount}, ${payment_method}, ${phone_number}, ${now}, ${now}
+      ) RETURNING *
+    `;
+    
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error('Error creating snackbar balance entry:', error);
+    res.status(500).json({ error: 'Error creating snackbar balance entry' });
+  }
+}) as any);
+
 // Start the server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
