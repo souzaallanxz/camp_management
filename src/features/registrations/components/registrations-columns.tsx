@@ -170,7 +170,10 @@ export const columns: ColumnDef<RegistrationWithActions>[] = [
     ),
     cell: ({ row }) => {
       return <div>{row.original.camp_name || '-'}</div>
-    }
+    },
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id))
+    },
   },
   {
     accessorKey: 'status',

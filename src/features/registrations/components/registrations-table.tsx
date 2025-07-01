@@ -24,6 +24,7 @@ import {
 import { DataTablePagination } from '@/components/data-table/data-table-pagination'
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar'
 import { type RegistrationWithActions } from './registrations-columns'
+import { useMemo } from 'react'
 
 interface DataTableProps {
   columns: ColumnDef<RegistrationWithActions>[]
@@ -36,6 +37,15 @@ export function RegistrationsTable({ columns, data }: DataTableProps) {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
+
+  // Extrair acampamentos únicos dos dados
+  const campFilters = useMemo(() => {
+    const uniqueCamps = Array.from(new Set(data.map(item => item.camp_name).filter(Boolean)))
+    return uniqueCamps.map(campName => ({
+      label: campName,
+      value: campName
+    }))
+  }, [data])
 
   const table = useReactTable({
     data,
@@ -74,9 +84,15 @@ export function RegistrationsTable({ columns, data }: DataTableProps) {
     <div className='space-y-4'>
       <DataTableToolbar 
         table={table} 
-        searchField="camper_name"
         globalFilter={globalFilter}
         onGlobalFilterChange={setGlobalFilter}
+        filters={[
+          {
+            column: 'camp_name',
+            title: 'Acampamento',
+            options: campFilters
+          }
+        ]}
       />
       <div className='rounded-md border'>
         <Table>
