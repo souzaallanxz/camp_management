@@ -12,6 +12,8 @@ import {
   IconIceCream,
   IconUsers,
   IconWebhook,
+  IconBuildingCommunity,
+  IconCreditCard,
 } from '@tabler/icons-react'
 import { Command } from 'lucide-react'
 import { type SidebarData, type NavItem } from '../types'
@@ -87,9 +89,14 @@ export const sidebarData: SidebarData = {
               icon: IconUserCog,
             },
             {
-              title: 'Conta',
-              url: '/settings/account',
-              icon: IconTool,
+              title: 'Organização',
+              url: '/settings/organization',
+              icon: IconBuildingCommunity,
+            },
+            {
+              title: 'Faturação',
+              url: '/settings/billing',
+              icon: IconCreditCard,
             },
             {
               title: 'Aparência',
