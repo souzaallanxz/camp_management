@@ -1206,7 +1206,7 @@ app.post('/api/users', (async (req: Request, res: Response) => {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">Bem-vindo à plataforma Campy!</h2>
-          <p>Você foi convidado para fazer parte da nossa plataforma.</p>
+          <p>Foi convidado para fazer parte da nossa plataforma.</p>
           <p>Clique no botão abaixo para definir sua palavra-passe e começar a usar:</p>
           <div style="text-align: center; margin: 30px 0;">
             <a href="${setupLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Definir Palavra-passe</a>
@@ -1214,7 +1214,7 @@ app.post('/api/users', (async (req: Request, res: Response) => {
           <p>Se você não solicitou este convite, ignore este email.</p>
           <p>Este link expira em 24 horas por motivos de segurança.</p>
           <hr style="border: 1px solid #eee; margin: 30px 0;" />
-          <p style="color: #666; font-size: 12px;">© 2024 Campy. Todos os direitos reservados.</p>
+          <p style="color: #666; font-size: 12px;">© 2025 Campy. Todos os direitos reservados.</p>
         </div>
       `
     });
