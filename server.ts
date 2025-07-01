@@ -283,6 +283,113 @@ app.get('/api/auth/me', (async (req: Request, res: Response) => {
   }
 }) as any)
 
+// Get current user profile route
+app.get('/api/auth/profile', (async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const token = authHeader.split(' ')[1]
+
+    // Find user by token (which is the user ID)
+    const userResult = await sql`
+      SELECT id, email, first_name, last_name, team_id, role, created_at, updated_at
+      FROM public.users
+      WHERE id = ${token}::uuid
+    `
+
+    const user = userResult[0]
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' })
+    }
+
+    // Combine first_name and last_name to create the full name
+    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
+
+    return res.status(200).json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: fullName || null,
+        team_id: user.team_id,
+        role: user.role
+      }
+    })
+  } catch (error) {
+    console.error('Error in get current user profile:', error)
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message,
+      database_url_set: !!process.env.DATABASE_URL
+    })
+  }
+}) as any)
+
+// Update current user profile route
+app.put('/api/auth/profile', (async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const token = authHeader.split(' ')[1]
+    const { name, language, theme } = req.body
+
+    // Find user by token (which is the user ID)
+    const userResult = await sql`
+      SELECT id, first_name, last_name
+      FROM public.users
+      WHERE id = ${token}::uuid
+    `
+
+    const user = userResult[0]
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' })
+    }
+
+    // Update user profile
+    // For now, we'll update the first_name field with the full name
+    // In the future, you might want to add separate fields for language and theme preferences
+    const updateResult = await sql`
+      UPDATE public.users
+      SET first_name = ${name}, updated_at = NOW()
+      WHERE id = ${token}::uuid
+      RETURNING id, email, first_name, last_name, team_id, role
+    `
+
+    const updatedUser = updateResult[0]
+
+    if (!updatedUser) {
+      return res.status(500).json({ error: 'Failed to update user profile' })
+    }
+
+    // Combine first_name and last_name to create the full name
+    const fullName = `${updatedUser.first_name || ''} ${updatedUser.last_name || ''}`.trim()
+
+    return res.status(200).json({
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: fullName || null,
+        team_id: updatedUser.team_id,
+        role: updatedUser.role
+      }
+    })
+  } catch (error) {
+    console.error('Error in update current user profile:', error)
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message,
+      database_url_set: !!process.env.DATABASE_URL
+    })
+  }
+}) as any)
+
 // Existing email route
 app.post('/api/send-email', (async (req: Request, res: Response) => {
   try {

@@ -48,7 +48,7 @@ export function CreateTeamDialog({ open, onOpenChange, onSuccess, isOnboarding =
   const onSubmit = async (data: FormValues) => {
     try {
       setIsLoading(true)
-      const team = await teamService.createTeam(data)
+      const team = await teamService.createTeam({ name: data.name })
       
       // Salvar team_id no localStorage em ambos os formatos para compatibilidade
       if (team && team.id) {
@@ -65,7 +65,7 @@ export function CreateTeamDialog({ open, onOpenChange, onSuccess, isOnboarding =
       onSuccess?.()
       
       // Forçar refresh da página para garantir que todos os componentes reconheçam a nova equipe
-      window.location.href = '/dashboard'
+      window.location.href = '/'
     } catch {
       toast({
         variant: 'destructive',
