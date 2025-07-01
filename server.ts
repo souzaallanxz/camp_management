@@ -1810,18 +1810,16 @@ app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     
     const transactions = await sql`
       SELECT 
-        t.id,
-        t.camper_id,
-        t.amount,
-        t.type,
-        t.description,
-        t.created_at,
+        sbt.id,
+        sbt.camper_id,
+        sbt.amount,
+        sbt.created_at,
         ca.name as camper_name
-      FROM snack_bar_transactions t
-      JOIN campers ca ON t.camper_id = ca.id
+      FROM snack_bar_transactions sbt
+      JOIN campers ca ON sbt.camper_id = ca.id
       JOIN registrations r ON ca.registration_id = r.id
       WHERE r.camp_id = ${camp_id}::uuid
-      ORDER BY t.created_at DESC
+      ORDER BY sbt.created_at DESC
     `;
     
     res.json(transactions);
