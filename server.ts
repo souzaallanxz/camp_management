@@ -398,6 +398,62 @@ app.get('/api/teams/current', (async (req: Request, res: Response) => {
   }
 }) as any)
 
+// === CREATE NEW TEAM ===
+app.post('/api/teams', (async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Team name is required' });
+    }
+
+    // Buscar o usuário pelo token (id)
+    const userResult = await sql`
+      SELECT id, team_id FROM public.users WHERE id = ${token}::uuid
+    `;
+    
+    const user = userResult[0];
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Verificar se o usuário já tem uma equipe
+    if (user.team_id) {
+      return res.status(400).json({ error: 'User already belongs to a team' });
+    }
+
+    // Criar a nova equipe
+    const teamResult = await sql`
+      INSERT INTO public.teams (id, name, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${name}, NOW(), NOW())
+      RETURNING *
+    `;
+
+    const team = teamResult[0];
+    if (!team) {
+      return res.status(500).json({ error: 'Failed to create team' });
+    }
+
+    // Associar o usuário à equipe
+    await sql`
+      UPDATE public.users 
+      SET team_id = ${team.id}::uuid, updated_at = NOW()
+      WHERE id = ${user.id}::uuid
+    `;
+
+    return res.status(200).json(team);
+  } catch (error) {
+    console.error('Error creating team:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}) as any)
+
 // ===== DASHBOARD ENDPOINTS =====
 
 // Helper para obter o teamId do header (produção)
