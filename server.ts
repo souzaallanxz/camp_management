@@ -957,6 +957,34 @@ app.delete('/api/camps/:id', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// Get current camp (active camp where current date is between start_date and end_date)
+app.get('/api/camps/current', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const currentDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+    
+    const currentCamp = await sql`
+      SELECT * FROM camps 
+      WHERE team_id = ${teamId} 
+      AND ${currentDate}::date BETWEEN start_date AND end_date
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `;
+    
+    if (currentCamp.length === 0) {
+      return res.status(404).json({ error: 'No active camps found for this team' });
+    }
+    
+    res.json(currentCamp[0]);
+  } catch (error) {
+    console.error('Error fetching current camp:', error);
+    res.status(500).json({ error: 'Erro ao buscar acampamento atual.' });
+  }
+}) as any);
+
 // List all campers for the current team
 app.get('/api/campers', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
@@ -1638,6 +1666,168 @@ app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error creating snackbar balance entry:', error);
     res.status(500).json({ error: 'Error creating snackbar balance entry' });
+  }
+}) as any);
+
+// Get snackbar balance for a camper
+app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camperId } = req.params;
+    
+    // Get total deposit for this camper's registration
+    const depositResult = await sql`
+      SELECT COALESCE(SUM(sb.amount), 0) as total_deposit
+      FROM snackbar_balance sb
+      JOIN registrations r ON sb.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      JOIN campers ca ON r.id = ca.registration_id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    // Get total spent for this camper
+    const spentResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}::uuid
+    `;
+    
+    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+    const balance = totalDeposit - totalSpent;
+    
+    res.json({
+      balance,
+      total_deposit: totalDeposit,
+      total_spent: totalSpent
+    });
+  } catch (error) {
+    console.error('Error fetching snackbar balance:', error);
+    res.status(500).json({ error: 'Error fetching snackbar balance' });
+  }
+}) as any);
+
+// Create a new snackbar transaction
+app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camper_id, amount, type = 'deduction', description } = req.body;
+    
+    if (!camper_id || !amount) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Check if camper belongs to the team
+    const camperCheck = await sql`
+      SELECT ca.id FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${camper_id}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!camperCheck[0]) {
+      return res.status(400).json({ error: 'Camper does not belong to your team' });
+    }
+    
+    const now = new Date().toISOString();
+    
+    const result = await sql`
+      INSERT INTO snack_bar_transactions (
+        camper_id, amount, type, description, created_at, updated_at
+      ) VALUES (
+        ${camper_id}::uuid, ${amount}, ${type}, ${description}, ${now}, ${now}
+      ) RETURNING *
+    `;
+    
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error('Error creating snackbar transaction:', error);
+    res.status(500).json({ error: 'Error creating snackbar transaction' });
+  }
+}) as any);
+
+// Get transactions for a specific camper
+app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camperId } = req.params;
+    
+    // Check if camper belongs to the team
+    const camperCheck = await sql`
+      SELECT ca.id FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!camperCheck[0]) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+    
+    const transactions = await sql`
+      SELECT * FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    res.json(transactions);
+  } catch (error) {
+    console.error('Error fetching snackbar transactions:', error);
+    res.status(500).json({ error: 'Error fetching snackbar transactions' });
+  }
+}) as any);
+
+// Get all transactions for a camp
+app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camp_id } = req.query;
+    
+    if (!camp_id) {
+      return res.status(400).json({ error: 'Camp ID is required' });
+    }
+    
+    // Check if camp belongs to the team
+    const campCheck = await sql`
+      SELECT id FROM camps WHERE id = ${camp_id}::uuid AND team_id = ${teamId}::uuid
+    `;
+    
+    if (!campCheck[0]) {
+      return res.status(404).json({ error: 'Camp not found or does not belong to your team' });
+    }
+    
+    const transactions = await sql`
+      SELECT 
+        t.id,
+        t.camper_id,
+        t.amount,
+        t.type,
+        t.description,
+        t.created_at,
+        ca.name as camper_name
+      FROM snack_bar_transactions t
+      JOIN campers ca ON t.camper_id = ca.id
+      JOIN registrations r ON ca.registration_id = r.id
+      WHERE r.camp_id = ${camp_id}::uuid
+      ORDER BY t.created_at DESC
+    `;
+    
+    res.json(transactions);
+  } catch (error) {
+    console.error('Error fetching snackbar transactions:', error);
+    res.status(500).json({ error: 'Error fetching snackbar transactions' });
   }
 }) as any);
 

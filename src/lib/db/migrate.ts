@@ -117,6 +117,16 @@ async function main() {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE snack_bar_transactions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        camper_id UUID NOT NULL REFERENCES campers(id),
+        amount NUMERIC NOT NULL,
+        type VARCHAR(20) NOT NULL DEFAULT 'deduction',
+        description TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE webhook_events (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         event_type TEXT NOT NULL,

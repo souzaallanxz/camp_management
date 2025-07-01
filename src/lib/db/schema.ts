@@ -95,6 +95,16 @@ export const snackbar_balance = pgTable('snackbar_balance', {
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
+export const snack_bar_transactions = pgTable('snack_bar_transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  camper_id: uuid('camper_id').notNull().references(() => campers.id),
+  amount: numeric('amount').notNull(),
+  type: varchar('type', { length: 20 }).notNull().default('deduction'), // 'deduction' or 'refund'
+  description: text('description'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
 export const webhook_events = pgTable('webhook_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   event_type: text('event_type').notNull(),

@@ -7,6 +7,82 @@ alwaysApply: false
 
 ## 🏗️ Backend Development (server.ts)
 
+### ⚠️ CRITICAL: Endpoint Protection Rules
+
+#### 1. NEVER Delete Existing Endpoints
+- **ABSOLUTELY FORBIDDEN**: Never delete, remove, or comment out any existing endpoints in `server.ts`
+- All existing endpoints are production-critical and must be preserved
+- When refactoring, only ADD new endpoints or MODIFY existing ones
+- If you need to replace an endpoint, create a new one with a different path first
+- Always test thoroughly before making any changes to existing endpoints
+
+#### 2. Endpoint Modification Guidelines
+- When modifying existing endpoints, preserve the original functionality
+- Only add new features or improve error handling
+- Never change the response format of existing endpoints without careful consideration
+- Always maintain backward compatibility
+
+#### 3. Adding New Endpoints
+- Create new endpoints with unique paths that don't conflict with existing ones
+- Follow the established patterns and conventions
+- Test new endpoints thoroughly before deployment
+- Document any new endpoints in comments
+
+#### 4. Protected Endpoints List
+The following endpoints are CRITICAL and must NEVER be deleted or modified without extreme caution:
+
+**Authentication Endpoints:**
+- `POST /api/auth/sign-in`
+- `POST /api/auth/sign-up`
+- `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
+- `GET /api/auth/me`
+- `GET /api/auth/profile`
+- `PUT /api/auth/profile`
+- `POST /api/auth/setup-password`
+
+**Team Management:**
+- `GET /api/teams/current`
+- `POST /api/teams`
+
+**Dashboard Endpoints:**
+- `GET /api/dashboard/monthly-payments`
+- `GET /api/dashboard/monthly-registrations`
+- `GET /api/dashboard/monthly-snackbar`
+- `GET /api/dashboard/yearly-campers`
+- `GET /api/dashboard/camp-payments`
+- `GET /api/dashboard/recent-registrations`
+
+**Core CRUD Endpoints:**
+- `GET /api/registrations`
+- `GET /api/camps`
+- `POST /api/camps`
+- `PUT /api/camps/:id`
+- `DELETE /api/camps/:id`
+- `GET /api/campers`
+- `GET /api/campers/:id`
+- `POST /api/campers`
+- `PUT /api/campers/:id`
+- `DELETE /api/campers/:id`
+- `GET /api/users`
+- `POST /api/users`
+- `GET /api/users/:id`
+- `PUT /api/users/:id`
+- `DELETE /api/users/:id`
+- `POST /api/registrations`
+- `PUT /api/registrations/:id`
+- `DELETE /api/registrations/:id`
+- `PATCH /api/registrations/:id/onboarding-status`
+- `GET /api/payments`
+- `POST /api/payments`
+- `POST /api/snackbar-balance`
+
+**Utility Endpoints:**
+- `GET /api/health`
+- `POST /api/send-email`
+
+### Endpoint Structure & Best Practices
+
 ### Endpoint Structure & Best Practices
 
 #### 1. Authentication & Authorization
