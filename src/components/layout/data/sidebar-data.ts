@@ -196,9 +196,14 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
                 icon: IconUserCog,
               },
               {
-                title: 'Conta',
-                url: '/settings/account',
-                icon: IconTool,
+                title: 'Organização',
+                url: '/settings/organization',
+                icon: IconBuildingCommunity,
+              },
+              {
+                title: 'Faturação',
+                url: '/settings/billing',
+                icon: IconCreditCard,
               },
               {
                 title: 'Aparência',
