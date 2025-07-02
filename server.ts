@@ -1829,6 +1829,112 @@ app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// WEBHOOKS ENDPOINTS
+
+// Utilitário para simular integração com Hookdeck
+function mockHookdeckSetup(type: 'registrations' | 'payments') {
+  // Gera IDs simulados
+  return {
+    connection: { id: `conn_${Math.random().toString(36).slice(2, 10)}` },
+    source: { id: `src_${Math.random().toString(36).slice(2, 10)}` },
+    destination: { id: `dst_${Math.random().toString(36).slice(2, 10)}` },
+    webhookUrl: `https://mock.hookdeck.io/webhooks/${type}/${Math.random().toString(36).slice(2, 10)}`
+  }
+}
+
+// 1. GET /api/webhooks/config
+app.get('/api/webhooks/config', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+    const result = await sql`
+      SELECT * FROM webhook_configs WHERE team_id = ${teamId}::uuid
+    `
+    return res.status(200).json(result)
+  } catch (error) {
+    console.error('Error fetching webhook config:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// 2. POST /api/webhooks/config
+app.post('/api/webhooks/config', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+    const {
+      apiKey,
+      registrationWebhook,
+      paymentWebhook,
+      isConnected,
+      registrationWebhookUrl,
+      paymentWebhookUrl,
+      hookdeckData
+    } = req.body
+
+    // Upsert config (um por time)
+    const result = await sql`
+      INSERT INTO webhook_configs (
+        team_id, api_key, registration_webhook, payment_webhook, is_connected,
+        registration_webhook_url, payment_webhook_url, hookdeck_data, updated_at
+      ) VALUES (
+        ${teamId}::uuid, ${apiKey}, ${registrationWebhook}, ${paymentWebhook}, ${isConnected},
+        ${registrationWebhookUrl}, ${paymentWebhookUrl}, ${JSON.stringify(hookdeckData)}, NOW()
+      )
+      ON CONFLICT (team_id) DO UPDATE SET
+        api_key = EXCLUDED.api_key,
+        registration_webhook = EXCLUDED.registration_webhook,
+        payment_webhook = EXCLUDED.payment_webhook,
+        is_connected = EXCLUDED.is_connected,
+        registration_webhook_url = EXCLUDED.registration_webhook_url,
+        payment_webhook_url = EXCLUDED.payment_webhook_url,
+        hookdeck_data = EXCLUDED.hookdeck_data,
+        updated_at = NOW()
+      RETURNING *
+    `
+    return res.status(200).json(result[0])
+  } catch (error) {
+    console.error('Error saving webhook config:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// 3. POST /api/webhooks/setup
+app.post('/api/webhooks/setup', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+    const { webhookType } = req.body
+    if (!['registrations', 'payments'].includes(webhookType)) {
+      return res.status(400).json({ error: 'Invalid webhook type' })
+    }
+    // Simula criação no Hookdeck
+    const hookdeck = mockHookdeckSetup(webhookType)
+    return res.status(200).json(hookdeck)
+  } catch (error) {
+    console.error('Error setting up webhook:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// 4. DELETE /api/webhooks/cleanup
+app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
+  try {
+    // No backend real, aqui removeria do Hookdeck
+    // Como é mock, só retorna sucesso
+    return res.status(200).json({ success: true })
+  } catch (error) {
+    console.error('Error cleaning up webhook:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
 // Start the server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
