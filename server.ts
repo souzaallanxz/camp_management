@@ -1935,6 +1935,165 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
   }
 }) as any)
 
+// Recebe webhooks de inscrições
+app.post('/api/webhooks/registrations/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const {
+      name,
+      email,
+      contact,
+      form_id,
+      camp_id,
+      status,
+      id_number,
+      sns_number,
+      date_of_birth,
+      dietary_restrictions,
+      guardian_name,
+      guardian_email,
+      guardian_phone
+    } = req.body;
+
+    // Validação dos campos obrigatórios
+    const errors = [];
+    if (!name) errors.push('name is required');
+    if (!email) errors.push('email is required');
+    if (!contact) errors.push('contact is required');
+    if (errors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: errors });
+    }
+
+    // Buscar o team_id do userId
+    const userResult = await sql`SELECT team_id FROM users WHERE id = ${userId}::uuid`;
+    const teamId = userResult[0]?.team_id;
+    if (!teamId) {
+      return res.status(404).json({ error: 'User/team not found' });
+    }
+
+    // Se camp_id for enviado, validar se pertence ao time
+    if (camp_id) {
+      const camp = await sql`SELECT id FROM camps WHERE id = ${camp_id} AND team_id = ${teamId}`;
+      if (!camp[0]) {
+        return res.status(400).json({ error: 'Camp does not belong to your team' });
+      }
+    }
+
+    // Criar registration
+    const now = new Date().toISOString();
+    const result = await sql`
+      INSERT INTO registrations (
+        camp_id, name, email, contact, status, form_id, id_number, sns_number, date_of_birth, dietary_restrictions, guardian_name, guardian_email, guardian_phone, created_at, updated_at
+      ) VALUES (
+        ${camp_id || null}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${form_id || null}, ${id_number || null}, ${sns_number || null}, ${date_of_birth || null}, ${dietary_restrictions || null}, ${guardian_name || null}, ${guardian_email || null}, ${guardian_phone || null}, ${now}, ${now}
+      ) RETURNING *
+    `;
+
+    return res.status(200).json({
+      success: true,
+      message: 'Registration created successfully',
+      registration: result[0]
+    });
+  } catch (error) {
+    console.error('Error processing registration webhook:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Recebe webhooks de pagamentos
+app.post('/api/webhooks/payments/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const {
+      registration_id,
+      email,
+      amount,
+      status
+    } = req.body;
+
+    // Validação dos campos obrigatórios
+    const errors = [];
+    if (!amount) errors.push('amount is required');
+    if (!registration_id && !email) errors.push('registration_id or email is required');
+    if (errors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: errors });
+    }
+
+    // Buscar o team_id do userId
+    const userResult = await sql`SELECT team_id FROM users WHERE id = ${userId}::uuid`;
+    const teamId = userResult[0]?.team_id;
+    if (!teamId) {
+      return res.status(404).json({ error: 'User/team not found' });
+    }
+
+    // Buscar registration
+    let registration;
+    if (registration_id) {
+      const regResult = await sql`
+        SELECT r.*, c.price as camp_price FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
+      `;
+      registration = regResult[0];
+    } else if (email) {
+      const regResult = await sql`
+        SELECT r.*, c.price as camp_price FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE r.email = ${email} AND c.team_id = ${teamId}
+        ORDER BY r.created_at DESC LIMIT 1
+      `;
+      registration = regResult[0];
+    }
+    if (!registration) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+
+    // Criar pagamento
+    const now = new Date().toISOString();
+    const paymentResult = await sql`
+      INSERT INTO payments (
+        registration_id, amount, payment_date, payment_status, created_at, updated_at
+      ) VALUES (
+        ${registration.id}, ${amount}, ${now}, 'confirmed', ${now}, ${now}
+      ) RETURNING *
+    `;
+
+    // Atualizar status do registro se enviado
+    let updatedRegistration = registration;
+    if (status) {
+      const regUpdate = await sql`
+        UPDATE registrations SET status = ${status}, updated_at = ${now} WHERE id = ${registration.id} RETURNING *
+      `;
+      updatedRegistration = regUpdate[0] || registration;
+    }
+
+    // Calcular total pago
+    const totalPaidResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_paid FROM payments WHERE registration_id = ${registration.id}
+    `;
+    const totalPaid = Number(totalPaidResult[0]?.total_paid || 0);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Payment processed successfully',
+      registration: {
+        id: updatedRegistration.id,
+        total_amount_paid: totalPaid,
+        status: updatedRegistration.status,
+        // ... outros campos se necessário
+      },
+      payment: {
+        amount: Number(amount),
+        total_paid: totalPaid,
+        status: updatedRegistration.status
+      }
+    });
+  } catch (error) {
+    console.error('Error processing payment webhook:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Start the server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
