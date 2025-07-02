@@ -2315,18 +2315,30 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
 app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
   try {
     const { teamId } = req.params;
+    
+    // Debug: Log the incoming request
+    console.log('=== PAYMENT WEBHOOK DEBUG ===');
+    console.log('Team ID:', teamId);
+    console.log('Request body:', req.body);
+    console.log('Request headers:', req.headers);
+    console.log('=============================');
+    
     const {
-      registration_id,
       email,
       request_id,
       amount,
+      payment_method,
+      payment_date,
+      payment_status,
+      payment_link,
+      phone_number,
       status
     } = req.body;
 
     // Validação dos campos obrigatórios
     const errors: string[] = [];
     if (!amount) errors.push('amount is required');
-    if (!registration_id && !email && !request_id) errors.push('registration_id, email, or request_id is required');
+    if (!email && !request_id) errors.push('email or request_id is required');
     if (errors.length > 0) {
       return res.status(400).json({ error: 'Validation failed', details: errors });
     }
@@ -2339,14 +2351,7 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
 
     // Buscar registration
     let registration;
-    if (registration_id) {
-      const regResult = await sql`
-        SELECT r.*, c.price as camp_price FROM registrations r
-        LEFT JOIN camps c ON r.camp_id = c.id
-        WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
-      `;
-      registration = regResult[0];
-    } else if (request_id) {
+    if (request_id) {
       const regResult = await sql`
         SELECT r.*, c.price as camp_price FROM registrations r
         LEFT JOIN camps c ON r.camp_id = c.id
@@ -2371,9 +2376,9 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
     const now = new Date().toISOString();
     await sql`
       INSERT INTO payments (
-        registration_id, amount, payment_date, payment_status, created_at, updated_at
+        registration_id, payment_method, amount, payment_date, payment_status, payment_link, phone_number, request_id, created_at, updated_at
       ) VALUES (
-        ${registration.id}, ${amount}, ${now}, 'confirmed', ${now}, ${now}
+        ${registration.id}, ${payment_method || 'webhook'}, ${amount}, ${payment_date || now}, ${payment_status || 'confirmed'}, ${payment_link || null}, ${phone_number || null}, ${request_id || null}, ${now}, ${now}
       )
     `;
 

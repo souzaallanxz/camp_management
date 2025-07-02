@@ -35,7 +35,24 @@ curl -X POST https://hkdk.events/YOUR_PAYMENT_SOURCE_ID \
   -d '{
     "request_id": "req_abc123def456",
     "amount": 150.00,
-    "status": "paid"
+    "payment_method": "MB Way",
+    "payment_status": "confirmed",
+    "payment_date": "2025-01-02T20:30:50.771Z",
+    "payment_link": "https://link-do-pagamento.com",
+    "phone_number": "+351912345678"
+  }'
+```
+
+### Create a payment using email (fallback)
+
+```bash
+curl -X POST https://hkdk.events/YOUR_PAYMENT_SOURCE_ID \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "joao@example.com",
+    "amount": 150.00,
+    "payment_method": "Transferência Bancária",
+    "payment_status": "confirmed"
   }'
 ```
 
@@ -58,10 +75,10 @@ curl -X POST https://hkdk.events/YOUR_PAYMENT_SOURCE_ID \
 ## Alternative Payment Methods
 
 You can also create payments using:
-- `registration_id`: Direct registration ID
 - `email`: Registration email (finds the most recent registration)
 
 The priority order is:
-1. `registration_id`
-2. `request_id` 
-3. `email` 
+1. `request_id` 
+2. `email`
+
+**Note**: `registration_id` is no longer accepted directly in the webhook payload for security reasons. Use `request_id` to associate payments with registrations. 
