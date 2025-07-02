@@ -1906,11 +1906,10 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          status: 'SUCCESS',
-          message: 'Webhook received and processed successfully',
-          request_id: '{{request.id}}'
-        })
+                  body: JSON.stringify({
+            status: 'SUCCESS',
+            message: 'Webhook received and processed successfully'
+          })
       }
     }
   }
