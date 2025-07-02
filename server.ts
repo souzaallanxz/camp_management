@@ -1859,8 +1859,8 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
   const sanitizedName = `webhook-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
   const destinationPayload = {
     name: sanitizedName,
-    url: webhookUrl,
     config: {
+      url: webhookUrl,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
