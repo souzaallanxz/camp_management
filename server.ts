@@ -1838,73 +1838,123 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
     throw new Error('HOOKDECK_API_KEY not configured')
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://campmanagement.vercel.app'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://camp-management-1.onrender.com'
   const webhookUrl = `${baseUrl}/api/webhooks/${type}/${teamId}`
 
+  console.log(`Creating Hookdeck connection for ${type}, team ${teamId}`)
+  console.log(`Destination URL: ${webhookUrl}`)
+
+  // Verificar se a URL é válida
+  try {
+    const urlTest = new URL(webhookUrl)
+    console.log('URL validation passed:', urlTest.toString())
+  } catch (error) {
+    console.error('Invalid URL:', webhookUrl, error)
+    throw new Error(`Invalid webhook URL: ${webhookUrl}`)
+  }
+
   // 1. Criar Destination
+  const timestamp = Date.now()
+  const destinationPayload = {
+    name: `Webhook ${type} - Team ${teamId} - ${timestamp}`,
+    url: webhookUrl
+  }
+  
+  console.log('Creating destination with payload:', destinationPayload)
+  
   const destinationResponse = await fetch('https://api.hookdeck.com/2025-01-01/destinations', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${hookdeckApiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      name: `Webhook ${type} - Team ${teamId}`,
-      url: webhookUrl
-    })
+    body: JSON.stringify(destinationPayload)
   })
 
   if (!destinationResponse.ok) {
-    throw new Error(`Failed to create destination: ${destinationResponse.statusText}`)
+    const errorText = await destinationResponse.text()
+    console.error('Destination creation failed:', {
+      status: destinationResponse.status,
+      statusText: destinationResponse.statusText,
+      error: errorText
+    })
+    throw new Error(`Failed to create destination: ${destinationResponse.statusText} - ${errorText}`)
   }
 
   const destination = await destinationResponse.json()
+  console.log('Destination created successfully:', destination)
 
   // 2. Criar Source
+  const sourceUrl = `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}`
+  const sourcePayload = {
+    name: `Source ${type} - Team ${teamId} - ${timestamp}`,
+    url: sourceUrl
+  }
+  
+  console.log('Creating source with payload:', sourcePayload)
+  
   const sourceResponse = await fetch('https://api.hookdeck.com/2025-01-01/sources', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${hookdeckApiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      name: `Source ${type} - Team ${teamId}`,
-      url: `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}`
-    })
+    body: JSON.stringify(sourcePayload)
   })
 
   if (!sourceResponse.ok) {
-    throw new Error(`Failed to create source: ${sourceResponse.statusText}`)
+    const errorText = await sourceResponse.text()
+    console.error('Source creation failed:', {
+      status: sourceResponse.status,
+      statusText: sourceResponse.statusText,
+      error: errorText
+    })
+    throw new Error(`Failed to create source: ${sourceResponse.statusText} - ${errorText}`)
   }
 
   const source = await sourceResponse.json()
+  console.log('Source created successfully:', source)
 
   // 3. Criar Connection
+  const connectionPayload = {
+    name: `Connection ${type} - Team ${teamId} - ${timestamp}`,
+    source_id: source.id,
+    destination_id: destination.id
+  }
+  
+  console.log('Creating connection with payload:', connectionPayload)
+  
   const connectionResponse = await fetch('https://api.hookdeck.com/2025-01-01/connections', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${hookdeckApiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      name: `Connection ${type} - Team ${teamId}`,
-      source_id: source.id,
-      destination_id: destination.id
-    })
+    body: JSON.stringify(connectionPayload)
   })
 
   if (!connectionResponse.ok) {
-    throw new Error(`Failed to create connection: ${connectionResponse.statusText}`)
+    const errorText = await connectionResponse.text()
+    console.error('Connection creation failed:', {
+      status: connectionResponse.status,
+      statusText: connectionResponse.statusText,
+      error: errorText
+    })
+    throw new Error(`Failed to create connection: ${connectionResponse.statusText} - ${errorText}`)
   }
 
   const connection = await connectionResponse.json()
+  console.log('Connection created successfully:', connection)
 
-  return {
+  const result = {
     connection: { id: connection.id },
     source: { id: source.id, url: source.url },
     destination: { id: destination.id },
     webhookUrl: source.url
   }
+  
+  console.log('Hookdeck connection setup completed:', result)
+  return result
 }
 
 async function deleteHookdeckConnection(connectionId: string) {
