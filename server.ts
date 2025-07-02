@@ -1394,6 +1394,7 @@ app.put('/api/registrations/:id', (async (req: Request, res: Response) => {
     if (guardian_name !== undefined) fields.push(sql`guardian_name = ${guardian_name}`);
     if (guardian_email !== undefined) fields.push(sql`guardian_email = ${guardian_email}`);
     if (guardian_phone !== undefined) fields.push(sql`guardian_phone = ${guardian_phone}`);
+    if (request_id !== undefined) fields.push(sql`request_id = ${request_id}`);
     fields.push(sql`updated_at = ${now}`);
     if (fields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
@@ -1898,16 +1899,18 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
   const sourcePayload = {
     name: sourceSanitizedName,
     url: sourceUrl,
-    response_template: {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        status: 'SUCCESS',
-        message: 'Webhook received and processed successfully',
-        request_id: '{{request.id}}'
-      })
+    config: {
+      custom_response: {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'SUCCESS',
+          message: 'Webhook received and processed successfully',
+          request_id: '{{request.id}}'
+        })
+      }
     }
   }
   
@@ -2232,6 +2235,17 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
 app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Response) => {
   try {
     const { teamId } = req.params;
+    // Lê o request_id do header enviado pelo Hookdeck
+    const request_id = req.headers['x-hookdeck-request-id'] as string | undefined;
+
+    // Debug: Log the incoming request
+    console.log('=== REGISTRATION WEBHOOK DEBUG ===');
+    console.log('Team ID:', teamId);
+    console.log('Request body:', req.body);
+    console.log('Request headers:', req.headers);
+    console.log('Request ID from header:', request_id);
+    console.log('==================================');
+
     const {
       name,
       email,
@@ -2245,8 +2259,7 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
       dietary_restrictions,
       guardian_name,
       guardian_email,
-      guardian_phone,
-      request_id
+      guardian_phone
     } = req.body;
 
     // Validação dos campos obrigatórios
@@ -2272,6 +2285,9 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
       }
     }
 
+    // Debug: Log the request_id before insertion
+    console.log('Request ID to be inserted:', request_id);
+
     // Criar registration (sem team_id)
     const now = new Date().toISOString();
     const result = await sql`
@@ -2281,6 +2297,8 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
         ${camp_id || null}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${form_id || null}, ${id_number || null}, ${sns_number || null}, ${date_of_birth || null}, ${dietary_restrictions || null}, ${guardian_name || null}, ${guardian_email || null}, ${guardian_phone || null}, ${request_id || null}, ${now}, ${now}
       ) RETURNING *
     `;
+
+    console.log('Registration created with result:', result[0]);
 
     return res.status(200).json({
       success: true,
