@@ -2218,9 +2218,9 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
 }) as any)
 
 // Recebe webhooks de inscrições
-app.post('/api/webhooks/registrations/:userId', async (req: Request, res: Response) => {
+app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const { teamId } = req.params;
     const {
       name,
       email,
@@ -2246,11 +2246,10 @@ app.post('/api/webhooks/registrations/:userId', async (req: Request, res: Respon
       return res.status(400).json({ error: 'Validation failed', details: errors });
     }
 
-    // Buscar o team_id do userId
-    const userResult = await sql`SELECT team_id FROM users WHERE id = ${userId}::uuid`;
-    const teamId = userResult[0]?.team_id;
-    if (!teamId) {
-      return res.status(404).json({ error: 'User/team not found' });
+    // Validar se o teamId é válido
+    const teamResult = await sql`SELECT id FROM teams WHERE id = ${teamId}::uuid`;
+    if (!teamResult[0]) {
+      return res.status(404).json({ error: 'Team not found' });
     }
 
     // Se camp_id for enviado, validar se pertence ao time
@@ -2265,9 +2264,9 @@ app.post('/api/webhooks/registrations/:userId', async (req: Request, res: Respon
     const now = new Date().toISOString();
     const result = await sql`
       INSERT INTO registrations (
-        camp_id, name, email, contact, status, form_id, id_number, sns_number, date_of_birth, dietary_restrictions, guardian_name, guardian_email, guardian_phone, created_at, updated_at
+        team_id, camp_id, name, email, contact, status, form_id, id_number, sns_number, date_of_birth, dietary_restrictions, guardian_name, guardian_email, guardian_phone, created_at, updated_at
       ) VALUES (
-        ${camp_id || null}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${form_id || null}, ${id_number || null}, ${sns_number || null}, ${date_of_birth || null}, ${dietary_restrictions || null}, ${guardian_name || null}, ${guardian_email || null}, ${guardian_phone || null}, ${now}, ${now}
+        ${teamId}::uuid, ${camp_id || null}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${form_id || null}, ${id_number || null}, ${sns_number || null}, ${date_of_birth || null}, ${dietary_restrictions || null}, ${guardian_name || null}, ${guardian_email || null}, ${guardian_phone || null}, ${now}, ${now}
       ) RETURNING *
     `;
 
@@ -2283,9 +2282,9 @@ app.post('/api/webhooks/registrations/:userId', async (req: Request, res: Respon
 });
 
 // Recebe webhooks de pagamentos
-app.post('/api/webhooks/payments/:userId', async (req: Request, res: Response) => {
+app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const { teamId } = req.params;
     const {
       registration_id,
       email,
@@ -2301,11 +2300,10 @@ app.post('/api/webhooks/payments/:userId', async (req: Request, res: Response) =
       return res.status(400).json({ error: 'Validation failed', details: errors });
     }
 
-    // Buscar o team_id do userId
-    const userResult = await sql`SELECT team_id FROM users WHERE id = ${userId}::uuid`;
-    const teamId = userResult[0]?.team_id;
-    if (!teamId) {
-      return res.status(404).json({ error: 'User/team not found' });
+    // Validar se o teamId é válido
+    const teamResult = await sql`SELECT id FROM teams WHERE id = ${teamId}::uuid`;
+    if (!teamResult[0]) {
+      return res.status(404).json({ error: 'Team not found' });
     }
 
     // Buscar registration
@@ -2313,15 +2311,15 @@ app.post('/api/webhooks/payments/:userId', async (req: Request, res: Response) =
     if (registration_id) {
       const regResult = await sql`
         SELECT r.*, c.price as camp_price FROM registrations r
-        JOIN camps c ON r.camp_id = c.id
-        WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
+        LEFT JOIN camps c ON r.camp_id = c.id
+        WHERE r.id = ${registration_id} AND r.team_id = ${teamId}
       `;
       registration = regResult[0];
     } else if (email) {
       const regResult = await sql`
         SELECT r.*, c.price as camp_price FROM registrations r
-        JOIN camps c ON r.camp_id = c.id
-        WHERE r.email = ${email} AND c.team_id = ${teamId}
+        LEFT JOIN camps c ON r.camp_id = c.id
+        WHERE r.email = ${email} AND r.team_id = ${teamId}
         ORDER BY r.created_at DESC LIMIT 1
       `;
       registration = regResult[0];
