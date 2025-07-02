@@ -2236,7 +2236,7 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
   try {
     const { teamId } = req.params;
     // Lê o request_id do header enviado pelo Hookdeck
-    const request_id = req.headers['x-hookdeck-request-id'] as string | undefined;
+    const request_id = req.headers['x-hookdeck-requestid'] as string | undefined;
 
     // Debug: Log the incoming request
     console.log('=== REGISTRATION WEBHOOK DEBUG ===');
