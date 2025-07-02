@@ -32,17 +32,21 @@ export function WebhookIntegrationCard() {
     if (config.isConnected) {
       try {
         // Properly disable any active webhooks
+        let updatedConfig = config
         if (config.registrationWebhook) {
-          await webhookService.disableWebhook('registrations')
+          updatedConfig = await webhookService.disableWebhook('registrations')
         }
         if (config.paymentWebhook) {
-          await webhookService.disableWebhook('payments')
+          updatedConfig = await webhookService.disableWebhook('payments')
         }
+        // Update state with the returned config
+        setConfig(updatedConfig)
+        toast.success('Webhooks desconectados com sucesso')
+      } catch {
+        toast.error('Falha ao desconectar webhooks')
         // Reload config to ensure we have the latest state
         const loadedConfig = await webhookService.loadConfig()
         setConfig(loadedConfig)
-      } catch {
-        toast.error('Failed to disconnect webhooks')
       }
     } else {
       setShowConfigDialog(true)

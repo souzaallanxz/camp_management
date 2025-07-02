@@ -151,7 +151,8 @@ class WebhookService {
           data: {
             connectionId: webhookData.connectionId,
             sourceId: webhookData.sourceId,
-            destinationId: webhookData.destinationId
+            destinationId: webhookData.destinationId,
+            webhookType: webhookType
           }
         })
       }
@@ -171,8 +172,12 @@ class WebhookService {
         }
       }
       
+      // Check if any webhooks are still active
+      const hasActiveWebhooks = updatedConfig.registrationWebhook || updatedConfig.paymentWebhook
+      updatedConfig.isConnected = hasActiveWebhooks
+      
       await this.saveConfig(updatedConfig)
-      this.debug('Webhook disabled successfully')
+      this.debug(`Webhook ${webhookType} disabled successfully. isConnected: ${updatedConfig.isConnected}`)
       return updatedConfig
     } catch (error) {
       this.debugError('Error disabling webhook:', error)

@@ -1939,13 +1939,18 @@ async function deleteHookdeckResources(connectionId: string, sourceId?: string, 
     throw new Error('HOOKDECK_API_KEY not configured')
   }
 
+  console.log(`Starting cleanup of Hookdeck resources:`, { connectionId, sourceId, destinationId })
+
   const headers = {
-    'Authorization': `Bearer ${hookdeckApiKey}`
+    'Authorization': `Bearer ${hookdeckApiKey}`,
+    'Content-Type': 'application/json'
   }
 
   // 1. Deletar connection
   try {
+    console.log(`Attempting to delete connection: ${connectionId}`)
     await deleteHookdeckConnection(connectionId)
+    console.log(`Successfully deleted connection: ${connectionId}`)
   } catch (error) {
     console.warn(`Failed to delete connection ${connectionId}:`, error)
   }
@@ -1953,6 +1958,7 @@ async function deleteHookdeckResources(connectionId: string, sourceId?: string, 
   // 2. Deletar source se fornecido
   if (sourceId) {
     try {
+      console.log(`Attempting to delete source: ${sourceId}`)
       const sourceResponse = await fetch(`https://api.hookdeck.com/2025-01-01/sources/${sourceId}`, {
         method: 'DELETE',
         headers
@@ -1960,7 +1966,9 @@ async function deleteHookdeckResources(connectionId: string, sourceId?: string, 
       
       if (sourceResponse.status === 404) {
         console.log(`Source ${sourceId} not found, assuming already deleted`)
-      } else if (!sourceResponse.ok) {
+      } else if (sourceResponse.ok) {
+        console.log(`Successfully deleted source: ${sourceId}`)
+      } else {
         console.warn(`Failed to delete source ${sourceId}: ${sourceResponse.statusText}`)
       }
     } catch (error) {
@@ -1971,6 +1979,7 @@ async function deleteHookdeckResources(connectionId: string, sourceId?: string, 
   // 3. Deletar destination se fornecido
   if (destinationId) {
     try {
+      console.log(`Attempting to delete destination: ${destinationId}`)
       const destinationResponse = await fetch(`https://api.hookdeck.com/2025-01-01/destinations/${destinationId}`, {
         method: 'DELETE',
         headers
@@ -1978,7 +1987,9 @@ async function deleteHookdeckResources(connectionId: string, sourceId?: string, 
       
       if (destinationResponse.status === 404) {
         console.log(`Destination ${destinationId} not found, assuming already deleted`)
-      } else if (!destinationResponse.ok) {
+      } else if (destinationResponse.ok) {
+        console.log(`Successfully deleted destination: ${destinationId}`)
+      } else {
         console.warn(`Failed to delete destination ${destinationId}: ${destinationResponse.statusText}`)
       }
     } catch (error) {
@@ -1986,6 +1997,7 @@ async function deleteHookdeckResources(connectionId: string, sourceId?: string, 
     }
   }
 
+  console.log(`Completed cleanup of Hookdeck resources`)
   return true
 }
 
@@ -2074,8 +2086,16 @@ app.post('/api/webhooks/setup', (async (req: Request, res: Response) => {
 // 4. DELETE /api/webhooks/cleanup
 app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
   try {
-    const { connectionId, sourceId, destinationId } = req.body
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    const { connectionId, sourceId, destinationId, webhookType } = req.body
+    console.log('Cleanup request received:', { teamId, connectionId, sourceId, destinationId, webhookType })
+    
     if (!connectionId) {
+      console.error('Cleanup failed: Connection ID is required')
       return res.status(400).json({ error: 'Connection ID is required' })
     }
     
@@ -2086,6 +2106,48 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
     } catch (hookdeckError) {
       console.warn(`Hookdeck cleanup failed for connection ${connectionId}:`, hookdeckError)
       // Continuamos mesmo se falhar no Hookdeck, pois pode já ter sido deletado
+    }
+    
+    // Atualizar estado na base de dados
+    try {
+      if (webhookType) {
+        const webhookPropName = webhookType === 'registrations' ? 'registration_webhook' : 'payment_webhook'
+        const webhookUrlPropName = webhookType === 'registrations' ? 'registration_webhook_url' : 'payment_webhook_url'
+        
+        // Buscar configuração atual
+        const currentConfig = await sql`
+          SELECT * FROM webhook_configs WHERE team_id = ${teamId}::uuid
+        `
+        
+        if (currentConfig.length > 0) {
+          const config = currentConfig[0]
+          const hookdeckData = config.hookdeck_data || {}
+          
+          // Remover dados do webhook específico
+          delete hookdeckData[webhookType]
+          
+          // Verificar se ainda há webhooks ativos
+          const hasActiveWebhooks = (webhookType === 'registrations' ? false : config.registration_webhook) || 
+                                   (webhookType === 'payments' ? false : config.payment_webhook)
+          
+          // Atualizar configuração
+          await sql`
+            UPDATE webhook_configs 
+            SET 
+              ${webhookPropName} = false,
+              ${webhookUrlPropName} = '',
+              hookdeck_data = ${JSON.stringify(hookdeckData)},
+              is_connected = ${hasActiveWebhooks},
+              updated_at = NOW()
+            WHERE team_id = ${teamId}::uuid
+          `
+          
+          console.log(`Updated database state for team ${teamId}, webhook ${webhookType} disabled`)
+        }
+      }
+    } catch (dbError) {
+      console.error('Error updating database state:', dbError)
+      // Não falhamos a operação se a atualização do DB falhar
     }
     
     return res.status(200).json({ success: true })
