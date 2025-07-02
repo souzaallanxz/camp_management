@@ -1831,15 +1831,100 @@ app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
 
 // WEBHOOKS ENDPOINTS
 
-// Utilitário para simular integração com Hookdeck
-function mockHookdeckSetup(type: 'registrations' | 'payments') {
-  // Gera IDs simulados
-  return {
-    connection: { id: `conn_${Math.random().toString(36).slice(2, 10)}` },
-    source: { id: `src_${Math.random().toString(36).slice(2, 10)}` },
-    destination: { id: `dst_${Math.random().toString(36).slice(2, 10)}` },
-    webhookUrl: `https://mock.hookdeck.io/webhooks/${type}/${Math.random().toString(36).slice(2, 10)}`
+// Utilitário para integração real com Hookdeck
+async function createHookdeckConnection(type: 'registrations' | 'payments', teamId: string) {
+  const hookdeckApiKey = process.env.HOOKDECK_API_KEY
+  if (!hookdeckApiKey) {
+    throw new Error('HOOKDECK_API_KEY not configured')
   }
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://campmanagement.vercel.app'
+  const webhookUrl = `${baseUrl}/api/webhooks/${type}/${teamId}`
+
+  // 1. Criar Destination
+  const destinationResponse = await fetch('https://api.hookdeck.com/2025-01-01/destinations', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${hookdeckApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: `Webhook ${type} - Team ${teamId}`,
+      url: webhookUrl
+    })
+  })
+
+  if (!destinationResponse.ok) {
+    throw new Error(`Failed to create destination: ${destinationResponse.statusText}`)
+  }
+
+  const destination = await destinationResponse.json()
+
+  // 2. Criar Source
+  const sourceResponse = await fetch('https://api.hookdeck.com/2025-01-01/sources', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${hookdeckApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: `Source ${type} - Team ${teamId}`,
+      url: `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}`
+    })
+  })
+
+  if (!sourceResponse.ok) {
+    throw new Error(`Failed to create source: ${sourceResponse.statusText}`)
+  }
+
+  const source = await sourceResponse.json()
+
+  // 3. Criar Connection
+  const connectionResponse = await fetch('https://api.hookdeck.com/2025-01-01/connections', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${hookdeckApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: `Connection ${type} - Team ${teamId}`,
+      source_id: source.id,
+      destination_id: destination.id
+    })
+  })
+
+  if (!connectionResponse.ok) {
+    throw new Error(`Failed to create connection: ${connectionResponse.statusText}`)
+  }
+
+  const connection = await connectionResponse.json()
+
+  return {
+    connection: { id: connection.id },
+    source: { id: source.id, url: source.url },
+    destination: { id: destination.id },
+    webhookUrl: source.url
+  }
+}
+
+async function deleteHookdeckConnection(connectionId: string) {
+  const hookdeckApiKey = process.env.HOOKDECK_API_KEY
+  if (!hookdeckApiKey) {
+    throw new Error('HOOKDECK_API_KEY not configured')
+  }
+
+  const response = await fetch(`https://api.hookdeck.com/2025-01-01/connections/${connectionId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${hookdeckApiKey}`
+    }
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete connection: ${response.statusText}`)
+  }
+
+  return true
 }
 
 // 1. GET /api/webhooks/config
@@ -1914,8 +1999,9 @@ app.post('/api/webhooks/setup', (async (req: Request, res: Response) => {
     if (!['registrations', 'payments'].includes(webhookType)) {
       return res.status(400).json({ error: 'Invalid webhook type' })
     }
-    // Simula criação no Hookdeck
-    const hookdeck = mockHookdeckSetup(webhookType)
+    
+    // Criar connection real no Hookdeck
+    const hookdeck = await createHookdeckConnection(webhookType, teamId)
     return res.status(200).json(hookdeck)
   } catch (error) {
     console.error('Error setting up webhook:', error)
@@ -1926,8 +2012,13 @@ app.post('/api/webhooks/setup', (async (req: Request, res: Response) => {
 // 4. DELETE /api/webhooks/cleanup
 app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
   try {
-    // No backend real, aqui removeria do Hookdeck
-    // Como é mock, só retorna sucesso
+    const { connectionId } = req.body
+    if (!connectionId) {
+      return res.status(400).json({ error: 'Connection ID is required' })
+    }
+    
+    // Remover connection real do Hookdeck
+    await deleteHookdeckConnection(connectionId)
     return res.status(200).json({ success: true })
   } catch (error) {
     console.error('Error cleaning up webhook:', error)
@@ -1956,7 +2047,7 @@ app.post('/api/webhooks/registrations/:userId', async (req: Request, res: Respon
     } = req.body;
 
     // Validação dos campos obrigatórios
-    const errors = [];
+    const errors: string[] = [];
     if (!name) errors.push('name is required');
     if (!email) errors.push('email is required');
     if (!contact) errors.push('contact is required');
@@ -2012,7 +2103,7 @@ app.post('/api/webhooks/payments/:userId', async (req: Request, res: Response) =
     } = req.body;
 
     // Validação dos campos obrigatórios
-    const errors = [];
+    const errors: string[] = [];
     if (!amount) errors.push('amount is required');
     if (!registration_id && !email) errors.push('registration_id or email is required');
     if (errors.length > 0) {
@@ -2050,12 +2141,12 @@ app.post('/api/webhooks/payments/:userId', async (req: Request, res: Response) =
 
     // Criar pagamento
     const now = new Date().toISOString();
-    const paymentResult = await sql`
+    await sql`
       INSERT INTO payments (
         registration_id, amount, payment_date, payment_status, created_at, updated_at
       ) VALUES (
         ${registration.id}, ${amount}, ${now}, 'confirmed', ${now}, ${now}
-      ) RETURNING *
+      )
     `;
 
     // Atualizar status do registro se enviado
