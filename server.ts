@@ -1902,7 +1902,7 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
     config: {
       custom_response: {
         status: 200,
-        content_type: 'application/json', // Obrigatório para o Hookdeck
+        content_type: 'json', // Hookdeck exige 'json', 'text' ou 'xml'
         headers: {
           'Content-Type': 'application/json'
         },
