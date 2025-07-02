@@ -2260,13 +2260,13 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
       }
     }
 
-    // Criar registration
+    // Criar registration (sem team_id)
     const now = new Date().toISOString();
     const result = await sql`
       INSERT INTO registrations (
-        team_id, camp_id, name, email, contact, status, form_id, id_number, sns_number, date_of_birth, dietary_restrictions, guardian_name, guardian_email, guardian_phone, created_at, updated_at
+        camp_id, name, email, contact, status, form_id, id_number, sns_number, date_of_birth, dietary_restrictions, guardian_name, guardian_email, guardian_phone, created_at, updated_at
       ) VALUES (
-        ${teamId}::uuid, ${camp_id || null}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${form_id || null}, ${id_number || null}, ${sns_number || null}, ${date_of_birth || null}, ${dietary_restrictions || null}, ${guardian_name || null}, ${guardian_email || null}, ${guardian_phone || null}, ${now}, ${now}
+        ${camp_id || null}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${form_id || null}, ${id_number || null}, ${sns_number || null}, ${date_of_birth || null}, ${dietary_restrictions || null}, ${guardian_name || null}, ${guardian_email || null}, ${guardian_phone || null}, ${now}, ${now}
       ) RETURNING *
     `;
 
@@ -2312,14 +2312,14 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
       const regResult = await sql`
         SELECT r.*, c.price as camp_price FROM registrations r
         LEFT JOIN camps c ON r.camp_id = c.id
-        WHERE r.id = ${registration_id} AND r.team_id = ${teamId}
+        WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
       `;
       registration = regResult[0];
     } else if (email) {
       const regResult = await sql`
         SELECT r.*, c.price as camp_price FROM registrations r
         LEFT JOIN camps c ON r.camp_id = c.id
-        WHERE r.email = ${email} AND r.team_id = ${teamId}
+        WHERE r.email = ${email} AND c.team_id = ${teamId}
         ORDER BY r.created_at DESC LIMIT 1
       `;
       registration = regResult[0];
