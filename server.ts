@@ -1838,7 +1838,8 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
     throw new Error('HOOKDECK_API_KEY not configured')
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://camp-management-1.onrender.com'
+  // Forçar o uso da URL do Render para garantir que funcione
+  const baseUrl = 'https://camp-management-1.onrender.com'
   const webhookUrl = `${baseUrl}/api/webhooks/${type}/${teamId}`
 
   console.log(`Creating Hookdeck connection for ${type}, team ${teamId}`)
@@ -1855,9 +1856,16 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
 
   // 1. Criar Destination
   const timestamp = Date.now()
+  const sanitizedName = `webhook-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
   const destinationPayload = {
-    name: `Webhook ${type} - Team ${teamId} - ${timestamp}`,
-    url: webhookUrl
+    name: sanitizedName,
+    url: webhookUrl,
+    config: {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
   }
   
   console.log('Creating destination with payload:', destinationPayload)
@@ -1886,8 +1894,9 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
 
   // 2. Criar Source
   const sourceUrl = `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}`
+  const sourceSanitizedName = `source-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
   const sourcePayload = {
-    name: `Source ${type} - Team ${teamId} - ${timestamp}`,
+    name: sourceSanitizedName,
     url: sourceUrl
   }
   
@@ -1916,8 +1925,9 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
   console.log('Source created successfully:', source)
 
   // 3. Criar Connection
+  const connectionSanitizedName = `connection-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
   const connectionPayload = {
-    name: `Connection ${type} - Team ${teamId} - ${timestamp}`,
+    name: connectionSanitizedName,
     source_id: source.id,
     destination_id: destination.id
   }
