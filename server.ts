@@ -1920,8 +1920,70 @@ async function deleteHookdeckConnection(connectionId: string) {
     }
   })
 
+  // Se a connection não existe (404), consideramos sucesso
+  if (response.status === 404) {
+    console.log(`Connection ${connectionId} not found, assuming already deleted`)
+    return true
+  }
+
   if (!response.ok) {
     throw new Error(`Failed to delete connection: ${response.statusText}`)
+  }
+
+  return true
+}
+
+async function deleteHookdeckResources(connectionId: string, sourceId?: string, destinationId?: string) {
+  const hookdeckApiKey = process.env.HOOKDECK_API_KEY
+  if (!hookdeckApiKey) {
+    throw new Error('HOOKDECK_API_KEY not configured')
+  }
+
+  const headers = {
+    'Authorization': `Bearer ${hookdeckApiKey}`
+  }
+
+  // 1. Deletar connection
+  try {
+    await deleteHookdeckConnection(connectionId)
+  } catch (error) {
+    console.warn(`Failed to delete connection ${connectionId}:`, error)
+  }
+
+  // 2. Deletar source se fornecido
+  if (sourceId) {
+    try {
+      const sourceResponse = await fetch(`https://api.hookdeck.com/2025-01-01/sources/${sourceId}`, {
+        method: 'DELETE',
+        headers
+      })
+      
+      if (sourceResponse.status === 404) {
+        console.log(`Source ${sourceId} not found, assuming already deleted`)
+      } else if (!sourceResponse.ok) {
+        console.warn(`Failed to delete source ${sourceId}: ${sourceResponse.statusText}`)
+      }
+    } catch (error) {
+      console.warn(`Error deleting source ${sourceId}:`, error)
+    }
+  }
+
+  // 3. Deletar destination se fornecido
+  if (destinationId) {
+    try {
+      const destinationResponse = await fetch(`https://api.hookdeck.com/2025-01-01/destinations/${destinationId}`, {
+        method: 'DELETE',
+        headers
+      })
+      
+      if (destinationResponse.status === 404) {
+        console.log(`Destination ${destinationId} not found, assuming already deleted`)
+      } else if (!destinationResponse.ok) {
+        console.warn(`Failed to delete destination ${destinationId}: ${destinationResponse.statusText}`)
+      }
+    } catch (error) {
+      console.warn(`Error deleting destination ${destinationId}:`, error)
+    }
   }
 
   return true
@@ -2012,13 +2074,20 @@ app.post('/api/webhooks/setup', (async (req: Request, res: Response) => {
 // 4. DELETE /api/webhooks/cleanup
 app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
   try {
-    const { connectionId } = req.body
+    const { connectionId, sourceId, destinationId } = req.body
     if (!connectionId) {
       return res.status(400).json({ error: 'Connection ID is required' })
     }
     
-    // Remover connection real do Hookdeck
-    await deleteHookdeckConnection(connectionId)
+    // Remover todos os recursos do Hookdeck (connection, source, destination)
+    try {
+      await deleteHookdeckResources(connectionId, sourceId, destinationId)
+      console.log(`Successfully cleaned up all resources for connection: ${connectionId}`)
+    } catch (hookdeckError) {
+      console.warn(`Hookdeck cleanup failed for connection ${connectionId}:`, hookdeckError)
+      // Continuamos mesmo se falhar no Hookdeck, pois pode já ter sido deletado
+    }
+    
     return res.status(200).json({ success: true })
   } catch (error) {
     console.error('Error cleaning up webhook:', error)
