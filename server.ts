@@ -1332,7 +1332,7 @@ app.post('/api/registrations', (async (req: Request, res: Response) => {
     const {
       camp_id, name, email, contact, status, onboarding_status, form_id,
       id_number, sns_number, date_of_birth, dietary_restrictions,
-      guardian_name, guardian_email, guardian_phone
+      guardian_name, guardian_email, guardian_phone, request_id
     } = req.body;
 
     if (!camp_id || !name || !email || !contact) {
@@ -1350,12 +1350,12 @@ app.post('/api/registrations', (async (req: Request, res: Response) => {
       INSERT INTO registrations (
         camp_id, name, email, contact, status, onboarding_status, form_id,
         id_number, sns_number, date_of_birth, dietary_restrictions,
-        guardian_name, guardian_email, guardian_phone, created_at, updated_at
+        guardian_name, guardian_email, guardian_phone, request_id, created_at, updated_at
       )
       VALUES (
         ${camp_id}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${onboarding_status || 'Pendente'}, ${form_id},
         ${id_number}, ${sns_number}, ${date_of_birth}, ${dietary_restrictions},
-        ${guardian_name}, ${guardian_email}, ${guardian_phone}, ${now}, ${now}
+        ${guardian_name}, ${guardian_email}, ${guardian_phone}, ${request_id || null}, ${now}, ${now}
       )
       RETURNING *
     `;
@@ -1376,7 +1376,7 @@ app.put('/api/registrations/:id', (async (req: Request, res: Response) => {
     const {
       camp_id, name, email, contact, status, onboarding_status, form_id,
       id_number, sns_number, date_of_birth, dietary_restrictions,
-      guardian_name, guardian_email, guardian_phone
+      guardian_name, guardian_email, guardian_phone, request_id
     } = req.body;
     const now = new Date().toISOString();
     const fields = [];
@@ -1897,7 +1897,18 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
   const sourceSanitizedName = `source-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
   const sourcePayload = {
     name: sourceSanitizedName,
-    url: sourceUrl
+    url: sourceUrl,
+    response_template: {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        status: 'SUCCESS',
+        message: 'Webhook received and processed successfully',
+        request_id: '{{request.id}}'
+      })
+    }
   }
   
   console.log('Creating source with payload:', sourcePayload)
@@ -2234,7 +2245,8 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
       dietary_restrictions,
       guardian_name,
       guardian_email,
-      guardian_phone
+      guardian_phone,
+      request_id
     } = req.body;
 
     // Validação dos campos obrigatórios
@@ -2264,9 +2276,9 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
     const now = new Date().toISOString();
     const result = await sql`
       INSERT INTO registrations (
-        camp_id, name, email, contact, status, form_id, id_number, sns_number, date_of_birth, dietary_restrictions, guardian_name, guardian_email, guardian_phone, created_at, updated_at
+        camp_id, name, email, contact, status, form_id, id_number, sns_number, date_of_birth, dietary_restrictions, guardian_name, guardian_email, guardian_phone, request_id, created_at, updated_at
       ) VALUES (
-        ${camp_id || null}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${form_id || null}, ${id_number || null}, ${sns_number || null}, ${date_of_birth || null}, ${dietary_restrictions || null}, ${guardian_name || null}, ${guardian_email || null}, ${guardian_phone || null}, ${now}, ${now}
+        ${camp_id || null}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${form_id || null}, ${id_number || null}, ${sns_number || null}, ${date_of_birth || null}, ${dietary_restrictions || null}, ${guardian_name || null}, ${guardian_email || null}, ${guardian_phone || null}, ${request_id || null}, ${now}, ${now}
       ) RETURNING *
     `;
 
@@ -2288,6 +2300,7 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
     const {
       registration_id,
       email,
+      request_id,
       amount,
       status
     } = req.body;
@@ -2295,7 +2308,7 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
     // Validação dos campos obrigatórios
     const errors: string[] = [];
     if (!amount) errors.push('amount is required');
-    if (!registration_id && !email) errors.push('registration_id or email is required');
+    if (!registration_id && !email && !request_id) errors.push('registration_id, email, or request_id is required');
     if (errors.length > 0) {
       return res.status(400).json({ error: 'Validation failed', details: errors });
     }
@@ -2313,6 +2326,14 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
         SELECT r.*, c.price as camp_price FROM registrations r
         LEFT JOIN camps c ON r.camp_id = c.id
         WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
+      `;
+      registration = regResult[0];
+    } else if (request_id) {
+      const regResult = await sql`
+        SELECT r.*, c.price as camp_price FROM registrations r
+        LEFT JOIN camps c ON r.camp_id = c.id
+        WHERE r.request_id = ${request_id} AND c.team_id = ${teamId}
+        ORDER BY r.created_at DESC LIMIT 1
       `;
       registration = regResult[0];
     } else if (email) {
