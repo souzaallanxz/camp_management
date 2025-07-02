@@ -143,6 +143,9 @@ class WebhookService {
     this.debug(`Starting webhook deactivation for ${webhookType}`)
     const config = await this.loadConfig()
     
+    // Debug: verificar se há dados do webhook
+    this.debug(`Webhook data for ${webhookType}:`, config.hookdeckData[webhookType])
+    
     try {
       // Cleanup in Hookdeck via backend
       const webhookData = config.hookdeckData[webhookType]

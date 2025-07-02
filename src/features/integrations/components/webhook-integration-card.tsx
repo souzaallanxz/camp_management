@@ -18,6 +18,7 @@ export function WebhookIntegrationCard() {
     hookdeckData: {}
   })
   const [showConfigDialog, setShowConfigDialog] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   // Carregar configuração inicial
   useEffect(() => {
@@ -29,16 +30,29 @@ export function WebhookIntegrationCard() {
   }, [])
 
   const handleConnect = async () => {
-    if (config.isConnected) {
+    if (isLoading) return // Prevent multiple clicks
+    
+    if (config.isConnected && hasActiveWebhooks) {
+      setIsLoading(true)
       try {
         // Properly disable any active webhooks
         let updatedConfig = config
+        
+        // Desabilitar webhooks ativos
+        const promises = []
         if (config.registrationWebhook) {
-          updatedConfig = await webhookService.disableWebhook('registrations')
+          promises.push(webhookService.disableWebhook('registrations'))
         }
         if (config.paymentWebhook) {
-          updatedConfig = await webhookService.disableWebhook('payments')
+          promises.push(webhookService.disableWebhook('payments'))
         }
+        
+        // Aguardar todas as operações
+        if (promises.length > 0) {
+          const results = await Promise.all(promises)
+          updatedConfig = results[results.length - 1] // Usar o último resultado
+        }
+        
         // Update state with the returned config
         setConfig(updatedConfig)
         toast.success('Webhooks desconectados com sucesso')
@@ -47,8 +61,11 @@ export function WebhookIntegrationCard() {
         // Reload config to ensure we have the latest state
         const loadedConfig = await webhookService.loadConfig()
         setConfig(loadedConfig)
+      } finally {
+        setIsLoading(false)
       }
     } else {
+      // Se não está conectado ou não há webhooks ativos, abrir diálogo
       setShowConfigDialog(true)
     }
   }
@@ -67,6 +84,9 @@ export function WebhookIntegrationCard() {
     if (config.paymentWebhook) count++
     return count
   }
+
+  // Verificar se realmente há webhooks ativos
+  const hasActiveWebhooks = config.registrationWebhook || config.paymentWebhook
 
   const getWebhookDescription = () => {
     const activeCount = getActiveWebhooksCount()
@@ -124,8 +144,9 @@ export function WebhookIntegrationCard() {
               onClick={handleConnect}
               variant={config.isConnected ? "outline" : "default"}
               className="flex-1"
+              disabled={isLoading}
             >
-              {config.isConnected ? "Desconectar" : "Conectar"}
+              {isLoading ? "Processando..." : (config.isConnected ? "Desconectar" : "Conectar")}
             </Button>
             <Button 
               variant="outline" 
