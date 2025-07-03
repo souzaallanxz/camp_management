@@ -103,63 +103,62 @@ export const teamService = {
       throw new Error('No authenticated user found')
     }
 
-    try {
-      // Criar a equipe via API 
-      const response = await fetch(buildApiUrl('/teams'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(dto),
-        credentials: 'include',
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Error creating team: ${errorText}`);
-      }
-      
-      const team = await response.json();
-      
-      // Salvar o team_id no localStorage
-      if (team && team.id) {
-        localStorage.setItem('teamId', team.id);
-        localStorage.setItem('team_id', team.id);
-      }
-      
-      return team;
-    } catch (error) {
-      throw error;
+    // Criar a equipe via API 
+    const response = await fetch(buildApiUrl('/teams'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(dto),
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error creating team: ${errorText}`);
     }
+    
+    const team = await response.json();
+    
+    // Salvar o team_id no localStorage
+    if (team && team.id) {
+      localStorage.setItem('teamId', team.id);
+      localStorage.setItem('team_id', team.id);
+    }
+    
+    return team;
   },
 
   async updateTeam(id: string, data: UpdateTeamData) {
     const token = localStorage.getItem('token')
+    const teamId = localStorage.getItem('teamId') || localStorage.getItem('team_id')
+    
     if (!token) {
       throw new Error('No authenticated user found')
     }
-
-    try {
-      const response = await fetch(buildApiUrl(`/teams/${id}`), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(data),
-        credentials: 'include',
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Error updating team: ${errorText}`)
-      }
-
-      const team = await response.json()
-      return team as Team
-    } catch (error) {
-      throw new Error(`Error updating team: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    
+    if (!teamId) {
+      throw new Error('No team ID found')
     }
+
+    const response = await fetch(buildApiUrl(`/teams/${id}`), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'x-team-id': teamId
+      },
+      body: JSON.stringify(data),
+      credentials: 'include',
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Error updating team: ${errorText}`)
+    }
+
+    const team = await response.json()
+    return team as Team
   }
 } 

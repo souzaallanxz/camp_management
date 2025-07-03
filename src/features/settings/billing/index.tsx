@@ -110,7 +110,7 @@ export default function SettingsBilling() {
                 className="w-full"
                 onClick={() => setShowUpgradeDialog(true)}
               >
-                Fazer Upgrade
+                Fazer Upgrade - €29/mês
               </Button>
             ) : (
               <Button variant="outline" className="w-full" disabled>

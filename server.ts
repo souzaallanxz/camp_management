@@ -561,6 +561,52 @@ app.post('/api/teams', (async (req: Request, res: Response) => {
   }
 }) as any)
 
+// === UPDATE TEAM ===
+app.put('/api/teams/:id', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const teamId = getTeamId(req)
+    
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    // Ensure user can only update their own team
+    if (id !== teamId) {
+      return res.status(403).json({ error: 'You can only update your own team' })
+    }
+
+    const { name, logo_url, tier } = req.body
+
+    // Validate tier value if provided
+    if (tier !== undefined && !['free', 'premium'].includes(tier)) {
+      return res.status(400).json({ error: 'Invalid tier value. Must be "free" or "premium"' })
+    }
+
+    // For now, we'll focus on tier updates (the main use case for Lemon Squeezy)
+    if (tier === undefined) {
+      return res.status(400).json({ error: 'Tier field is required' })
+    }
+
+    // Update team tier
+    const result = await sql`
+      UPDATE teams 
+      SET tier = ${tier}, updated_at = NOW()
+      WHERE id = ${teamId}::uuid
+      RETURNING *
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Team not found' })
+    }
+
+    return res.status(200).json(result[0])
+  } catch (error) {
+    console.error('Error updating team:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
 // ===== DASHBOARD ENDPOINTS =====
 
 // Helper para obter o teamId do header (produção)
@@ -2227,6 +2273,113 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
     return res.status(200).json({ success: true })
   } catch (error) {
     console.error('Error cleaning up webhook:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// ===== LEMON SQUEEZY WEBHOOKS =====
+
+// Process Lemon Squeezy payment confirmations
+app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
+  try {
+    const { meta, data } = req.body
+
+    if (!meta || !data) {
+      return res.status(400).json({ error: 'Invalid webhook payload' })
+    }
+
+    const eventName = meta.event_name
+    
+    // Handle subscription or order events
+    if (eventName === 'subscription_created' || eventName === 'order_created') {
+      const customData = data.attributes?.custom_data
+      
+      if (!customData || !customData.teamId) {
+        console.warn('Lemon Squeezy webhook missing team ID in custom data')
+        return res.status(200).json({ message: 'Processed but no team ID found' })
+      }
+
+      const teamId = customData.teamId
+      const planType = customData.planType || 'premium'
+
+      try {
+        // Update team to premium tier
+        const result = await sql`
+          UPDATE teams 
+          SET tier = ${planType}, updated_at = NOW()
+          WHERE id = ${teamId}::uuid
+          RETURNING *
+        `
+
+        if (result.length > 0) {
+          console.log(`Successfully upgraded team ${teamId} to ${planType}`)
+          
+          // Store subscription data for future reference
+          await sql`
+            INSERT INTO lemon_squeezy_subscriptions (
+              team_id, 
+              subscription_id, 
+              variant_id,
+              status,
+              event_name,
+              custom_data,
+              created_at,
+              updated_at
+            ) VALUES (
+              ${teamId}::uuid, 
+              ${data.id}, 
+              ${data.attributes?.variant_id || null},
+              ${data.attributes?.status || 'active'},
+              ${eventName},
+              ${JSON.stringify(customData)},
+              NOW(),
+              NOW()
+            )
+            ON CONFLICT (team_id, subscription_id) DO UPDATE SET
+              status = EXCLUDED.status,
+              updated_at = NOW()
+          `
+        } else {
+          console.warn(`Team ${teamId} not found for upgrade`)
+        }
+      } catch (dbError) {
+        console.error('Database error processing Lemon Squeezy webhook:', dbError)
+        // Don't fail the webhook response
+      }
+    }
+
+    // Handle subscription cancellation
+    if (eventName === 'subscription_cancelled') {
+      const customData = data.attributes?.custom_data
+      
+      if (customData && customData.teamId) {
+        const teamId = customData.teamId
+
+        try {
+          // Downgrade team to free tier
+          await sql`
+            UPDATE teams 
+            SET tier = 'free', updated_at = NOW()
+            WHERE id = ${teamId}::uuid
+          `
+
+          // Update subscription status
+          await sql`
+            UPDATE lemon_squeezy_subscriptions 
+            SET status = 'cancelled', updated_at = NOW()
+            WHERE team_id = ${teamId}::uuid AND subscription_id = ${data.id}
+          `
+
+          console.log(`Successfully downgraded team ${teamId} due to subscription cancellation`)
+        } catch (dbError) {
+          console.error('Database error processing subscription cancellation:', dbError)
+        }
+      }
+    }
+
+    return res.status(200).json({ message: 'Webhook processed successfully' })
+  } catch (error) {
+    console.error('Error processing Lemon Squeezy webhook:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
