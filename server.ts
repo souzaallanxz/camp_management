@@ -2296,17 +2296,24 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
 // Process Lemon Squeezy payment confirmations
 app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
   try {
+    // Log o payload recebido para debug
+    console.log('--- Lemon Squeezy Webhook Received ---')
+    console.log('Headers:', req.headers)
+    console.log('Body:', JSON.stringify(req.body, null, 2))
     const { meta, data } = req.body
 
     if (!meta || !data) {
+      console.error('Webhook: Payload inválido')
       return res.status(400).json({ error: 'Invalid webhook payload' })
     }
 
     const eventName = meta.event_name
+    console.log('Webhook: Event name:', eventName)
     
     // Handle subscription or order events
     if (eventName === 'subscription_created' || eventName === 'order_created') {
       const customData = data.attributes?.custom_data
+      console.log('Webhook: custom_data:', customData)
       
       if (!customData || !customData.teamId) {
         console.warn('Lemon Squeezy webhook missing team ID in custom data')
@@ -2351,8 +2358,11 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
             )
             ON CONFLICT (team_id, subscription_id) DO UPDATE SET
               status = EXCLUDED.status,
-              updated_at = NOW()
+              updated_at = NOW(),
+              event_name = EXCLUDED.event_name,
+              custom_data = EXCLUDED.custom_data
           `
+          console.log('Subscription upserted in lemon_squeezy_subscriptions')
         } else {
           console.warn(`Team ${teamId} not found for upgrade`)
         }
@@ -2365,6 +2375,7 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
     // Handle subscription cancellation
     if (eventName === 'subscription_cancelled') {
       const customData = data.attributes?.custom_data
+      console.log('Webhook: custom_data (cancel):', customData)
       
       if (customData && customData.teamId) {
         const teamId = customData.teamId
@@ -2380,7 +2391,7 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
           // Update subscription status
           await sql`
             UPDATE lemon_squeezy_subscriptions 
-            SET status = 'cancelled', updated_at = NOW()
+            SET status = 'cancelled', updated_at = NOW(), event_name = ${eventName}
             WHERE team_id = ${teamId}::uuid AND subscription_id = ${data.id}
           `
 

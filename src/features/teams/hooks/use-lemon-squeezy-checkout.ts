@@ -54,7 +54,7 @@ export function useLemonSqueezyCheckout(options?: UseCheckoutOptions) {
       }))
 
       // Redirect to Lemon Squeezy checkout
-      window.location.href = checkoutUrl
+      window.open(checkoutUrl, '_blank')
       
       options?.onSuccess?.()
       
