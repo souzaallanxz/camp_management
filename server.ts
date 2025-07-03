@@ -2596,6 +2596,47 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
   }
 });
 
+// === LEMON SQUEEZY CHECKOUT (BACKEND) ===
+app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    const { teamId, teamName } = req.body;
+    if (!teamId || !teamName) {
+      return res.status(400).json({ error: 'teamId and teamName are required' });
+    }
+    // Validar se o user pertence ao teamId
+    const userResult = await sql`
+      SELECT id, team_id FROM public.users WHERE id = ${token}::uuid
+    `;
+    const user = userResult[0];
+    if (!user || user.team_id !== teamId) {
+      return res.status(403).json({ error: 'You can only create checkout for your own team' });
+    }
+    // Importar função do serviço Lemon Squeezy
+    const { createCheckout, PREMIUM_PLAN } = require('./src/services/lemon-squeezy.service');
+    // Chamar a API do Lemon Squeezy
+    const checkoutUrl = await createCheckout({
+      storeId: PREMIUM_PLAN.storeId,
+      variantId: PREMIUM_PLAN.variantId,
+      customData: {
+        teamId,
+        planType: 'premium',
+        teamName,
+        timestamp: new Date().toISOString(),
+      },
+      customerName: teamName,
+    });
+    return res.json({ checkoutUrl });
+  } catch (error) {
+    console.error('Erro ao criar checkout Lemon Squeezy:', error);
+    return res.status(500).json({ error: 'Erro ao criar checkout' });
+  }
+});
+
 // Start the server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
