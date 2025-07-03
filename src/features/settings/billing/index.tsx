@@ -10,6 +10,7 @@ import { TestWebhook } from './test-webhook'
 import { LemonSqueezyDebug } from './lemon-squeezy-debug'
 import { SignatureDebug } from './signature-debug'
 import { CorsDebug } from './cors-debug'
+import { WebhookDebug } from './webhook-debug'
 import { toast } from 'sonner'
 
 export default function SettingsBilling() {
@@ -48,136 +49,9 @@ export default function SettingsBilling() {
       // eslint-disable-next-line no-console
       console.log('Checkout URL received:', data.url)
       
-      // Função para aguardar o Lemon Squeezy estar disponível
-      const waitForLemonSqueezy = async () => {
-        try {
-          // eslint-disable-next-line no-console
-          console.log('Waiting for Lemon Squeezy to be available...');
-          
-          // Use the global ensure function if available
-          if (window.ensureLemonSqueezyLoaded) {
-            await window.ensureLemonSqueezyLoaded();
-            // eslint-disable-next-line no-console
-            console.log('Lemon Squeezy loaded successfully via ensureLemonSqueezyLoaded');
-            return true;
-          }
-          
-          // Fallback to polling method
-          return new Promise<boolean>((resolve) => {
-            let attempts = 0;
-            const maxAttempts = 20;
-            const interval = 500;
-            
-            const checkLemonSqueezy = () => {
-              attempts++;
-              // eslint-disable-next-line no-console
-              console.log(`Checking Lemon Squeezy availability (attempt ${attempts})`);
-              
-              if (window.LemonSqueezy) {
-                // eslint-disable-next-line no-console
-                console.log('Lemon Squeezy is available:', window.LemonSqueezy);
-                resolve(true);
-                return;
-              }
-              
-              if (attempts >= maxAttempts) {
-                // eslint-disable-next-line no-console
-                console.error('Lemon Squeezy not available after maximum attempts');
-                resolve(false);
-                return;
-              }
-              
-              setTimeout(checkLemonSqueezy, interval);
-            };
-            
-            checkLemonSqueezy();
-          });
-        } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error('Error waiting for Lemon Squeezy:', error);
-          return false;
-        }
-      };
-      
-      // Função para tentar abrir o overlay
-      const openOverlay = () => {
-        // eslint-disable-next-line no-console
-        console.log('Available Lemon Squeezy methods:', {
-          Setup: window.LemonSqueezy?.Setup,
-          Url: window.LemonSqueezy?.Url,
-          open: window.LemonSqueezy?.open
-        });
-        
-        // Método 1: Usar Setup (recomendado)
-        if (window.LemonSqueezy?.Setup && typeof window.LemonSqueezy.Setup === 'function') {
-          // eslint-disable-next-line no-console
-          console.log('Opening Lemon Squeezy overlay with Setup...')
-          try {
-            const checkout = window.LemonSqueezy.Setup({
-              checkout: data.url
-            });
-            checkout.open();
-            return true;
-          } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error with Setup method:', error);
-          }
-        }
-        
-        // Método 2: Usar Url.open
-        if (window.LemonSqueezy?.Url?.open && typeof window.LemonSqueezy.Url.open === 'function') {
-          // eslint-disable-next-line no-console
-          console.log('Opening Lemon Squeezy overlay with Url.open...')
-          try {
-            window.LemonSqueezy.Url.open(data.url);
-            return true;
-          } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error with Url.open method:', error);
-          }
-        }
-        
-        // Método 3: Usar open direto
-        if (window.LemonSqueezy?.open && typeof window.LemonSqueezy.open === 'function') {
-          // eslint-disable-next-line no-console
-          console.log('Opening Lemon Squeezy with direct open method...')
-          try {
-            window.LemonSqueezy.open(data.url);
-            return true;
-          } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error with direct open method:', error);
-          }
-        }
-        
-        return false;
-      };
-      
-      // Aguardar o Lemon Squeezy estar disponível e tentar abrir o overlay
-      const lemonSqueezyAvailable = await waitForLemonSqueezy();
-      
-      if (lemonSqueezyAvailable) {
-        // Aguardar um pouco para a inicialização
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        if (!openOverlay()) {
-          // eslint-disable-next-line no-console
-          console.error('Lemon Squeezy available but overlay method not found')
-          toast.error('Método de overlay não encontrado', { 
-            description: 'Abrindo checkout em nova janela...' 
-          })
-          window.open(data.url, '_blank')
-        } else {
-          toast.success('Abrindo checkout...')
-        }
-      } else {
-        // eslint-disable-next-line no-console
-        console.error('Lemon Squeezy not available after waiting')
-        toast.error('Lemon Squeezy não disponível', { 
-          description: 'Abrindo checkout em nova janela...' 
-        })
-        window.open(data.url, '_blank')
-      }
+      // Sempre abrir em nova janela (overlay desabilitado)
+      toast.success('Abrindo checkout em nova janela...')
+      window.open(data.url, '_blank')
     } catch (err) {
       toast.dismiss()
       toast.error('Erro ao criar checkout', { description: err instanceof Error ? err.message : 'Erro desconhecido' })
@@ -319,6 +193,10 @@ export default function SettingsBilling() {
       
       <div className="mt-8 border-t pt-6">
         <CorsDebug />
+      </div>
+      
+      <div className="mt-8 border-t pt-6">
+        <WebhookDebug />
       </div>
     </div>
   )

@@ -2296,29 +2296,43 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
 
 // Função utilitária para validar assinatura do Lemon Squeezy
 function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
+  console.log('🔐 VALIDATING LEMON SQUEEZY SIGNATURE')
+  
   const signature = req.headers['x-signature'] as string
   if (!signature) {
-    console.log('No signature header found')
+    console.log('❌ No x-signature header found')
+    console.log('Available headers:', Object.keys(req.headers))
     return false
   }
+  
+  console.log('📝 Signature header found:', signature)
   
   // Como o Express já parseou o JSON, vamos usar o corpo parseado
   // O Lemon Squeezy usa o corpo JSON stringificado para gerar a assinatura
   const payload = JSON.stringify(req.body)
   
-  console.log('Validating signature:')
-  console.log('Signature header:', signature)
-  console.log('Payload length:', payload.length)
-  console.log('Secret length:', secret.length)
+  console.log('📊 Payload details:')
+  console.log('  - Payload length:', payload.length)
+  console.log('  - Secret length:', secret.length)
+  console.log('  - Payload preview:', payload.substring(0, 200) + '...')
   
   const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(payload)
     .digest('hex')
   
-  console.log('Expected signature:', expectedSignature)
-  console.log('Received signature:', signature)
-  console.log('Signatures match:', signature === expectedSignature)
+  console.log('🔍 Signature comparison:')
+  console.log('  - Expected signature:', expectedSignature)
+  console.log('  - Received signature:', signature)
+  console.log('  - Signatures match:', signature === expectedSignature)
+  
+  if (signature !== expectedSignature) {
+    console.log('❌ SIGNATURE MISMATCH')
+    console.log('  - Expected starts with:', expectedSignature.substring(0, 10))
+    console.log('  - Received starts with:', signature.substring(0, 10))
+  } else {
+    console.log('✅ SIGNATURE MATCH')
+  }
   
   return signature === expectedSignature
 }
@@ -2327,32 +2341,52 @@ function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
 app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
   try {
     console.log('=== LEMON SQUEEZY WEBHOOK RECEIVED ===')
-    console.log('Headers:', req.headers)
+    console.log('Timestamp:', new Date().toISOString())
+    console.log('Request method:', req.method)
+    console.log('Request URL:', req.url)
+    console.log('Content-Type:', req.headers['content-type'])
+    console.log('User-Agent:', req.headers['user-agent'])
+    console.log('X-Signature header:', req.headers['x-signature'])
+    console.log('X-Event-Name header:', req.headers['x-event-name'])
+    console.log('All headers:', JSON.stringify(req.headers, null, 2))
+    console.log('Raw body length:', req.body ? JSON.stringify(req.body).length : 0)
     console.log('Body:', JSON.stringify(req.body, null, 2))
     
-    // Validar assinatura do webhook (desabilitada temporariamente para debug)
+    // Validar assinatura do webhook
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    if (secret && process.env.NODE_ENV === 'production') {
+    console.log('Webhook secret configured:', !!secret)
+    console.log('Secret length:', secret?.length || 0)
+    console.log('NODE_ENV:', process.env.NODE_ENV)
+    
+    if (secret) {
       const isValid = isValidLemonSqueezySignature(req, secret)
       console.log('Signature validation result:', isValid)
       
       if (!isValid) {
-        console.error('Invalid webhook signature')
+        console.error('❌ INVALID WEBHOOK SIGNATURE')
+        console.error('Expected signature calculation failed')
         return res.status(401).json({ error: 'Invalid webhook signature' })
+      } else {
+        console.log('✅ SIGNATURE VALIDATION PASSED')
       }
     } else {
-      console.log('Skipping signature validation (development mode or no secret)')
+      console.log('⚠️ SKIPPING SIGNATURE VALIDATION - No secret configured')
     }
     
     const { meta, data } = req.body
 
     if (!meta || !data) {
-      console.error('Invalid webhook payload - missing meta or data')
+      console.error('❌ Invalid webhook payload - missing meta or data')
+      console.log('Meta present:', !!meta)
+      console.log('Data present:', !!data)
+      console.log('Body keys:', Object.keys(req.body))
       return res.status(400).json({ error: 'Invalid webhook payload' })
     }
 
     const eventName = meta.event_name
-    console.log('Processing event:', eventName)
+    console.log('🎯 Processing event:', eventName)
+    console.log('📋 Meta data:', JSON.stringify(meta, null, 2))
+    console.log('📦 Event data:', JSON.stringify(data, null, 2))
     
     // Handle subscription or order events
     if (eventName === 'subscription_created' || eventName === 'order_created' || eventName === 'checkout_completed' || eventName === 'order_created') {
@@ -2366,20 +2400,28 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
       let teamId = null
       let planType = 'premium'
       
+      console.log('🔍 SEARCHING FOR TEAM ID IN CUSTOM DATA')
+      console.log('  - customData:', customData)
+      console.log('  - data.attributes?.custom_data:', data.attributes?.custom_data)
+      console.log('  - data.attributes?.custom:', data.attributes?.custom)
+      
       if (customData && customData.teamId) {
         teamId = customData.teamId
         planType = customData.planType || 'premium'
+        console.log('✅ Found teamId in customData:', teamId)
       } else if (data.attributes?.custom_data?.teamId) {
         teamId = data.attributes.custom_data.teamId
         planType = data.attributes.custom_data.planType || 'premium'
+        console.log('✅ Found teamId in data.attributes.custom_data:', teamId)
       } else if (data.attributes?.custom?.teamId) {
         teamId = data.attributes.custom.teamId
         planType = data.attributes.custom.planType || 'premium'
+        console.log('✅ Found teamId in data.attributes.custom:', teamId)
       }
       
       if (!teamId) {
-        console.warn('Lemon Squeezy webhook missing team ID in custom data')
-        console.log('Available data for team ID search:', {
+        console.warn('❌ Lemon Squeezy webhook missing team ID in custom data')
+        console.log('🔍 Available data for team ID search:', {
           customData,
           dataAttributes: data.attributes,
           customDataInAttributes: data.attributes?.custom_data,
@@ -2388,9 +2430,11 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
         return res.status(200).json({ message: 'Processed but no team ID found' })
       }
 
-      console.log(`Processing upgrade for team ${teamId} to ${planType}`)
+      console.log(`🚀 Processing upgrade for team ${teamId} to ${planType}`)
 
       try {
+        console.log('💾 UPDATING TEAM TIER IN DATABASE')
+        
         // Update team to premium tier
         const result = await sql`
           UPDATE teams 
@@ -2400,9 +2444,22 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
         `
 
         if (result.length > 0) {
-          console.log(`Successfully upgraded team ${teamId} to ${planType}`)
+          console.log(`✅ Successfully upgraded team ${teamId} to ${planType}`)
+          console.log('📊 Updated team data:', result[0])
           
           // Store subscription data for future reference
+          console.log('💾 STORING SUBSCRIPTION DATA')
+          const subscriptionData = {
+            team_id: teamId,
+            subscription_id: data.id,
+            variant_id: data.attributes?.variant_id || null,
+            status: data.attributes?.status || 'active',
+            event_name: eventName,
+            custom_data: customData || data.attributes?.custom_data || data.attributes?.custom
+          }
+          
+          console.log('📋 Subscription data to store:', subscriptionData)
+          
           await sql`
             INSERT INTO lemon_squeezy_subscriptions (
               team_id, 
@@ -2430,12 +2487,19 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
               updated_at = NOW()
           `
           
-          console.log('Subscription data stored successfully')
+          console.log('✅ Subscription data stored successfully')
         } else {
-          console.warn(`Team ${teamId} not found for upgrade`)
+          console.warn(`❌ Team ${teamId} not found for upgrade`)
         }
       } catch (dbError) {
-        console.error('Database error processing Lemon Squeezy webhook:', dbError)
+        console.error('❌ Database error processing Lemon Squeezy webhook:', dbError)
+        console.error('Error details:', {
+          message: dbError.message,
+          stack: dbError.stack,
+          teamId,
+          planType,
+          eventName
+        })
         // Don't fail the webhook response
       }
     }
@@ -2469,10 +2533,16 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
       }
     }
 
-    console.log('Webhook processed successfully')
+    console.log('✅ WEBHOOK PROCESSED SUCCESSFULLY')
+    console.log('📤 Sending 200 response to Lemon Squeezy')
     return res.status(200).json({ message: 'Webhook processed successfully' })
   } catch (error) {
-    console.error('Error processing Lemon Squeezy webhook:', error)
+    console.error('❌ ERROR PROCESSING LEMON SQUEEZY WEBHOOK:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      body: req.body
+    })
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -2694,7 +2764,7 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
         type: 'checkouts',
         attributes: {
           checkout_options: {
-            embed: true, // true para usar overlay
+            embed: false, // false para desabilitar overlay - abrir em nova página
             media: true,
             logo: true,
             desc: true,
@@ -2774,6 +2844,7 @@ app.post('/api/lemon-squeezy/test-signature', (async (req: Request, res: Respons
       signatureValid: isValid,
       secretConfigured: !!secret,
       secretLength: secret.length,
+      secretPreview: secret.substring(0, 10) + '...',
       headers: req.headers,
       body: req.body,
       envVars: {
@@ -2784,6 +2855,21 @@ app.post('/api/lemon-squeezy/test-signature', (async (req: Request, res: Respons
     console.error('Error testing signature:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
+}) as any)
+
+// Test endpoint for Lemon Squeezy webhook accessibility
+app.get('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
+  console.log('=== LEMON SQUEEZY WEBHOOK ENDPOINT TEST ===')
+  console.log('GET request received at webhook endpoint')
+  console.log('Headers:', req.headers)
+  console.log('Query params:', req.query)
+  
+  return res.status(200).json({ 
+    message: 'Lemon Squeezy webhook endpoint is accessible',
+    method: 'GET',
+    timestamp: new Date().toISOString(),
+    note: 'This endpoint only accepts POST requests from Lemon Squeezy'
+  })
 }) as any)
 
 // Test endpoint for Lemon Squeezy webhook

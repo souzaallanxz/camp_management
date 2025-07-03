@@ -117,7 +117,7 @@ export async function createCheckout(params: {
     type: 'checkouts',
     attributes: {
       checkout_options: {
-        embed: true, // true para usar overlay
+        embed: false, // false para desabilitar overlay - abrir em nova página
         media: true,
         logo: true,
         desc: true,
