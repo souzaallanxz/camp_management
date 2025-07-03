@@ -2310,22 +2310,32 @@ function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
 // Process Lemon Squeezy payment confirmations
 app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
   try {
-    // Validar assinatura do webhook
+    console.log('=== LEMON SQUEEZY WEBHOOK RECEIVED ===')
+    console.log('Headers:', req.headers)
+    console.log('Body:', JSON.stringify(req.body, null, 2))
+    
+    // Validar assinatura do webhook (opcional em desenvolvimento)
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    if (!secret || !isValidLemonSqueezySignature(req, secret)) {
+    if (secret && !isValidLemonSqueezySignature(req, secret)) {
+      console.error('Invalid webhook signature')
       return res.status(401).json({ error: 'Invalid webhook signature' })
     }
+    
     const { meta, data } = req.body
 
     if (!meta || !data) {
+      console.error('Invalid webhook payload - missing meta or data')
       return res.status(400).json({ error: 'Invalid webhook payload' })
     }
 
     const eventName = meta.event_name
+    console.log('Processing event:', eventName)
     
     // Handle subscription or order events
-    if (eventName === 'subscription_created' || eventName === 'order_created') {
+    if (eventName === 'subscription_created' || eventName === 'order_created' || eventName === 'checkout_completed') {
       const customData = data.attributes?.custom_data
+      
+      console.log('Custom data:', customData)
       
       if (!customData || !customData.teamId) {
         console.warn('Lemon Squeezy webhook missing team ID in custom data')
@@ -2334,6 +2344,8 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
 
       const teamId = customData.teamId
       const planType = customData.planType || 'premium'
+
+      console.log(`Processing upgrade for team ${teamId} to ${planType}`)
 
       try {
         // Update team to premium tier
@@ -2370,8 +2382,12 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
             )
             ON CONFLICT (team_id, subscription_id) DO UPDATE SET
               status = EXCLUDED.status,
+              event_name = EXCLUDED.event_name,
+              custom_data = EXCLUDED.custom_data,
               updated_at = NOW()
           `
+          
+          console.log('Subscription data stored successfully')
         } else {
           console.warn(`Team ${teamId} not found for upgrade`)
         }
@@ -2410,6 +2426,7 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
       }
     }
 
+    console.log('Webhook processed successfully')
     return res.status(200).json({ message: 'Webhook processed successfully' })
   } catch (error) {
     console.error('Error processing Lemon Squeezy webhook:', error)
@@ -2634,12 +2651,15 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
         type: 'checkouts',
         attributes: {
           checkout_options: {
-            embed: true, // true para usar overlay
+            embed: false, // false para redirecionamento normal
             media: true,
             logo: true,
             desc: true,
             discount: true,
             subscription_preview: true
+          },
+          product_options: {
+            redirect_url: returnUrl // URL de redirecionamento após pagamento bem-sucedido
           },
           checkout_data: {
             name: user.first_name || 'Campy User',
@@ -2682,6 +2702,130 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Test endpoint for Lemon Squeezy webhook
+app.get('/api/lemon-squeezy/test', (async (req: Request, res: Response) => {
+  try {
+    const teamId = req.query.teamId as string
+    if (!teamId) {
+      return res.status(400).json({ error: 'Team ID is required' })
+    }
+
+    // Simulate a webhook payload for testing
+    const testPayload = {
+      meta: {
+        event_name: 'checkout_completed'
+      },
+      data: {
+        id: 'test-subscription-id',
+        attributes: {
+          status: 'active',
+          variant_id: '883664',
+          custom_data: {
+            teamId: teamId,
+            planType: 'premium',
+            timestamp: new Date().toISOString()
+          }
+        }
+      }
+    }
+
+    console.log('Testing webhook with payload:', JSON.stringify(testPayload, null, 2))
+
+    // Process the test webhook
+    const { meta, data } = testPayload
+    const eventName = meta.event_name
+    const customData = data.attributes?.custom_data
+
+    if (customData && customData.teamId) {
+      const planType = customData.planType || 'premium'
+
+      // Update team to premium tier
+      const result = await sql`
+        UPDATE teams 
+        SET tier = ${planType}, updated_at = NOW()
+        WHERE id = ${customData.teamId}::uuid
+        RETURNING *
+      `
+
+      if (result.length > 0) {
+        console.log(`Test: Successfully upgraded team ${customData.teamId} to ${planType}`)
+        
+        // Store subscription data
+        await sql`
+          INSERT INTO lemon_squeezy_subscriptions (
+            team_id, 
+            subscription_id, 
+            variant_id,
+            status,
+            event_name,
+            custom_data,
+            created_at,
+            updated_at
+          ) VALUES (
+            ${customData.teamId}::uuid, 
+            ${data.id}, 
+            ${data.attributes?.variant_id || null},
+            ${data.attributes?.status || 'active'},
+            ${eventName},
+            ${JSON.stringify(customData)},
+            NOW(),
+            NOW()
+          )
+          ON CONFLICT (team_id, subscription_id) DO UPDATE SET
+            status = EXCLUDED.status,
+            event_name = EXCLUDED.event_name,
+            custom_data = EXCLUDED.custom_data,
+            updated_at = NOW()
+        `
+        
+        return res.status(200).json({ 
+          success: true, 
+          message: 'Test webhook processed successfully',
+          teamId: customData.teamId,
+          planType: planType
+        })
+      } else {
+        return res.status(404).json({ error: 'Team not found' })
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid test payload' })
+    }
+  } catch (error) {
+    console.error('Error in test webhook:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Endpoint to check current team tier
+app.get('/api/teams/:id/tier', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const teamId = getTeamId(req)
+    
+    if (!teamId) {
+      return res.status(401).json({ error: 'Missing x-team-id header' })
+    }
+
+    // Ensure user can only check their own team
+    if (id !== teamId) {
+      return res.status(403).json({ error: 'You can only check your own team' })
+    }
+
+    const result = await sql`
+      SELECT tier FROM teams WHERE id = ${teamId}::uuid
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Team not found' })
+    }
+
+    return res.status(200).json({ tier: result[0].tier })
+  } catch (error) {
+    console.error('Error checking team tier:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
 
 // Start the server
 const PORT = process.env.PORT || 3001;

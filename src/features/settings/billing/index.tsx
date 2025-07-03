@@ -6,6 +6,7 @@ import { useTeamData } from '@/features/teams/hooks/use-team-data'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
 import { TestLemonSqueezy } from '@/test-lemon-squeezy'
+import { TestWebhook } from './test-webhook'
 import { toast } from 'sonner'
 
 export default function SettingsBilling() {
@@ -43,110 +44,12 @@ export default function SettingsBilling() {
       
       // eslint-disable-next-line no-console
       console.log('Checkout URL received:', data.url)
-      // eslint-disable-next-line no-console
-      console.log('LemonSqueezy object:', window.LemonSqueezy)
-      // eslint-disable-next-line no-console
-      console.log('LemonSqueezy.Url:', window.LemonSqueezy?.Url)
       
-      // Função para aguardar o Lemon Squeezy estar disponível e inicializar
-      const waitForLemonSqueezy = (maxAttempts = 10, interval = 500) => {
-        return new Promise<boolean>((resolve) => {
-          let attempts = 0;
-          
-          const checkLemonSqueezy = () => {
-            attempts++;
-            // eslint-disable-next-line no-console
-            console.log(`Checking Lemon Squeezy availability (attempt ${attempts})`);
-            
-            if (window.LemonSqueezy) {
-              // eslint-disable-next-line no-console
-              console.log('Lemon Squeezy is available:', window.LemonSqueezy);
-              
-              // Inicializar o Lemon Squeezy conforme documentação
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              if (typeof (window as any).createLemonSqueezy === 'function') {
-                // eslint-disable-next-line no-console
-                console.log('Initializing Lemon Squeezy...');
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (window as any).createLemonSqueezy();
-              }
-              
-              resolve(true);
-              return;
-            }
-            
-            if (attempts >= maxAttempts) {
-              // eslint-disable-next-line no-console
-              console.error('Lemon Squeezy not available after maximum attempts');
-              resolve(false);
-              return;
-            }
-            
-            setTimeout(checkLemonSqueezy, interval);
-          };
-          
-          checkLemonSqueezy();
-        });
-      };
+      // Com embed: false, vamos redirecionar diretamente para a URL do checkout
+      toast.success('Redirecionando para o checkout...')
       
-      // Função para tentar abrir o overlay
-      const openOverlay = () => {
-        // Tentar método principal conforme documentação
-        if (window.LemonSqueezy && typeof window.LemonSqueezy.Url?.open === 'function') {
-          // eslint-disable-next-line no-console
-          console.log('Opening Lemon Squeezy overlay with Url.open...')
-          window.LemonSqueezy.Url.open(data.url)
-          return true
-        }
-        
-        // Tentar método alternativo
-        if (window.LemonSqueezy && typeof window.LemonSqueezy?.open === 'function') {
-          // eslint-disable-next-line no-console
-          console.log('Opening Lemon Squeezy with direct open method...')
-          window.LemonSqueezy.open(data.url)
-          return true
-        }
-        
-        // Tentar criar um link temporário e clicar nele (método alternativo)
-        if (window.LemonSqueezy) {
-          // eslint-disable-next-line no-console
-          console.log('Trying alternative method with temporary link...')
-          const tempLink = document.createElement('a');
-          tempLink.href = data.url;
-          tempLink.className = 'lemonsqueezy-button';
-          tempLink.style.display = 'none';
-          document.body.appendChild(tempLink);
-          tempLink.click();
-          document.body.removeChild(tempLink);
-          return true;
-        }
-        
-        return false
-      }
-      
-      // Aguardar o Lemon Squeezy estar disponível e tentar abrir o overlay
-      const lemonSqueezyAvailable = await waitForLemonSqueezy();
-      
-      if (lemonSqueezyAvailable) {
-        // Aguardar um pouco para a inicialização
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        if (!openOverlay()) {
-          // eslint-disable-next-line no-console
-          console.error('Lemon Squeezy available but overlay method not found')
-          toast.error('Método de overlay não encontrado', { 
-            description: 'Abrindo checkout em nova janela...' 
-          })
-          window.open(data.url, '_blank')
-        }
-      } else {
-        // eslint-disable-next-line no-console
-        console.error('Lemon Squeezy not available after waiting')
-        toast.error('Lemon Squeezy não disponível', { 
-          description: 'Abrindo checkout em nova janela...' 
-        })
-        window.open(data.url, '_blank')
-      }
+      // Redirecionar para a URL do checkout
+      window.location.href = data.url
     } catch (err) {
       toast.dismiss()
       toast.error('Erro ao criar checkout', { description: err instanceof Error ? err.message : 'Erro desconhecido' })
@@ -272,6 +175,10 @@ export default function SettingsBilling() {
       
       <div className="mt-8 border-t pt-6">
         <TestLemonSqueezy />
+      </div>
+      
+      <div className="mt-8 border-t pt-6">
+        <TestWebhook />
       </div>
     </div>
   )

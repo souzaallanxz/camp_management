@@ -23,7 +23,16 @@ interface CheckoutData {
       discount?: boolean;
       subscription_preview?: boolean;
       button_color?: string;
-      return_url?: string;
+    };
+    product_options?: {
+      name?: string;
+      description?: string;
+      media?: string[];
+      redirect_url?: string;
+      receipt_button_text?: string;
+      receipt_link_url?: string;
+      receipt_thank_you_note?: string;
+      enabled_variants?: string[];
     };
     checkout_data?: {
       email?: string;
@@ -114,7 +123,9 @@ export async function createCheckout(params: {
         desc: true,
         discount: true,
         subscription_preview: true,
-        ...(params.returnUrl ? { return_url: params.returnUrl } : {}),
+      },
+      product_options: {
+        ...(params.returnUrl ? { redirect_url: params.returnUrl } : {}),
       },
       checkout_data: {
         email: params.customerEmail,

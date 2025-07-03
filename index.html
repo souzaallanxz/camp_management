@@ -46,21 +46,7 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
-    <script>
-      // Aguardar o carregamento do Lemon Squeezy
-      window.addEventListener('load', function() {
-        // Verificar se o Lemon Squeezy foi carregado
-        if (window.LemonSqueezy) {
-          console.log('Lemon Squeezy loaded successfully');
-          // Inicializar para frameworks modernos
-          if (typeof window.createLemonSqueezy === 'function') {
-            console.log('Initializing Lemon Squeezy for modern frameworks...');
-            window.createLemonSqueezy();
-          }
-        } else {
-          console.warn('Lemon Squeezy not loaded');
-        }
-      });
-    </script>
+    <script src="/lemon-squeezy-init.js" defer></script>
+
   </body>
 </html>
