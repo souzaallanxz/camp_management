@@ -2628,19 +2628,19 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
     const storeId = '181507';
     const variantId = '883664';
     const returnUrl = req.body.returnUrl || (process.env.NEXT_PUBLIC_APP_URL + '/settings/billing');
-    // Montar payload
+    // Montar payload baseado na documentação oficial do Lemon Squeezy
     const payload = {
       data: {
         type: 'checkouts',
         attributes: {
-          checkout_options: [
-            'embed',
-            'media',
-            'logo',
-            'desc',
-            'discount',
-            'subscription_preview'
-          ],
+          checkout_options: {
+            embed: true,
+            media: true,
+            logo: true,
+            desc: true,
+            discount: true,
+            subscription_preview: true
+          },
           checkout_data: {
             name: user.first_name || 'Campy User',
             custom: {
@@ -2650,7 +2650,7 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
             },
           },
           test_mode: process.env.NODE_ENV !== 'production',
-          return_url: returnUrl,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Expira em 24 horas
         },
         relationships: {
           store: { data: { type: 'stores', id: storeId } },
