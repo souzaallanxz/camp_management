@@ -5,7 +5,6 @@ import { Resend } from 'resend'
 import { neon } from '@neondatabase/serverless'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import fetch from 'node-fetch'
 
 // Load environment variables
 dotenv.config()
