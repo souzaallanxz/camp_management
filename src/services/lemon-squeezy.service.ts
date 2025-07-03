@@ -15,17 +15,7 @@ interface LemonSqueezyResponse<T> {
 interface CheckoutData {
   type: 'checkouts';
   attributes: {
-    checkout_options?: {
-      embed?: boolean;
-      media?: boolean;
-      logo?: boolean;
-      desc?: boolean;
-      discount?: boolean;
-      dark?: boolean;
-      subscription_preview?: boolean;
-      button_color?: string;
-      return_url?: string;
-    };
+    checkout_options?: string[];
     checkout_data?: {
       email?: string;
       name?: string;
@@ -108,16 +98,14 @@ export async function createCheckout(params: {
   const checkoutData: CheckoutData = {
     type: 'checkouts',
     attributes: {
-      checkout_options: {
-        embed: false, // false para usar overlay
-        media: true,
-        logo: true,
-        desc: true,
-        discount: true,
-        dark: false,
-        subscription_preview: true,
-        ...(params.returnUrl ? { return_url: params.returnUrl } : {}),
-      },
+      checkout_options: [
+        'embed',
+        'media',
+        'logo',
+        'desc',
+        'discount',
+        'subscription_preview'
+      ],
       checkout_data: {
         email: params.customerEmail,
         name: params.customerName,

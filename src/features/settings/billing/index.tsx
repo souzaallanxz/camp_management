@@ -48,7 +48,7 @@ export default function SettingsBilling() {
       // eslint-disable-next-line no-console
       console.log('LemonSqueezy.Url:', window.LemonSqueezy?.Url)
       
-      // Função para aguardar o Lemon Squeezy estar disponível
+      // Função para aguardar o Lemon Squeezy estar disponível e inicializar
       const waitForLemonSqueezy = (maxAttempts = 10, interval = 500) => {
         return new Promise<boolean>((resolve) => {
           let attempts = 0;
@@ -61,6 +61,16 @@ export default function SettingsBilling() {
             if (window.LemonSqueezy) {
               // eslint-disable-next-line no-console
               console.log('Lemon Squeezy is available:', window.LemonSqueezy);
+              
+              // Inicializar o Lemon Squeezy conforme documentação
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              if (typeof (window as any).createLemonSqueezy === 'function') {
+                // eslint-disable-next-line no-console
+                console.log('Initializing Lemon Squeezy...');
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (window as any).createLemonSqueezy();
+              }
+              
               resolve(true);
               return;
             }
@@ -81,19 +91,36 @@ export default function SettingsBilling() {
       
       // Função para tentar abrir o overlay
       const openOverlay = () => {
+        // Tentar método principal conforme documentação
         if (window.LemonSqueezy && typeof window.LemonSqueezy.Url?.open === 'function') {
           // eslint-disable-next-line no-console
           console.log('Opening Lemon Squeezy overlay with Url.open...')
           window.LemonSqueezy.Url.open(data.url)
           return true
         }
-        // Tentar método alternativo se o primeiro não funcionar
+        
+        // Tentar método alternativo
         if (window.LemonSqueezy && typeof window.LemonSqueezy?.open === 'function') {
           // eslint-disable-next-line no-console
           console.log('Opening Lemon Squeezy with direct open method...')
           window.LemonSqueezy.open(data.url)
           return true
         }
+        
+        // Tentar criar um link temporário e clicar nele (método alternativo)
+        if (window.LemonSqueezy) {
+          // eslint-disable-next-line no-console
+          console.log('Trying alternative method with temporary link...')
+          const tempLink = document.createElement('a');
+          tempLink.href = data.url;
+          tempLink.className = 'lemonsqueezy-button';
+          tempLink.style.display = 'none';
+          document.body.appendChild(tempLink);
+          tempLink.click();
+          document.body.removeChild(tempLink);
+          return true;
+        }
+        
         return false
       }
       
@@ -101,6 +128,9 @@ export default function SettingsBilling() {
       const lemonSqueezyAvailable = await waitForLemonSqueezy();
       
       if (lemonSqueezyAvailable) {
+        // Aguardar um pouco para a inicialização
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         if (!openOverlay()) {
           // eslint-disable-next-line no-console
           console.error('Lemon Squeezy available but overlay method not found')
