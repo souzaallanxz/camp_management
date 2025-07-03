@@ -21,7 +21,12 @@ export default function SettingsBilling() {
       setIsLoading(true)
       toast.loading('A preparar pagamento...')
       const token = localStorage.getItem('token')
-      const res = await fetch('/api/lemon-squeezy/checkout', {
+      
+      // Use the buildApiUrl function to get the correct backend URL
+      const { buildApiUrl } = await import('@/services/api')
+      const apiUrl = buildApiUrl('/lemon-squeezy/checkout')
+      
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

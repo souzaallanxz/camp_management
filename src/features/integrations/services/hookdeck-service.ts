@@ -145,7 +145,11 @@ export class HookdeckService {
     }
   }> {
     try {
-      const response = await fetch('/api/webhooks/setup', {
+      // Use the buildApiUrl function to get the correct backend URL
+      const { buildApiUrl } = await import('@/services/api')
+      const apiUrl = buildApiUrl('/webhooks/setup')
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,7 +177,11 @@ export class HookdeckService {
     destinationId: string
   ): Promise<void> {
     try {
-      const response = await fetch('/api/webhooks/cleanup', {
+      // Use the buildApiUrl function to get the correct backend URL
+      const { buildApiUrl } = await import('@/services/api')
+      const apiUrl = buildApiUrl('/webhooks/cleanup')
+      
+      const response = await fetch(apiUrl, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
