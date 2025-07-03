@@ -5,6 +5,7 @@ import { Resend } from 'resend'
 import { neon } from '@neondatabase/serverless'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import fetch from 'node-fetch'
 
 // Load environment variables
 dotenv.config()
@@ -2600,6 +2601,83 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
     });
   } catch (error) {
     console.error('Error processing payment webhook:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/lemon-squeezy/checkout
+app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    // Buscar o usuário pelo token (id)
+    const userResult = await sql`SELECT team_id, first_name FROM public.users WHERE id = ${token}::uuid`;
+    const user = userResult[0];
+    if (!user || !user.team_id) {
+      return res.status(401).json({ error: 'User not found or no team associated' });
+    }
+    const { planType } = req.body;
+    // Chamar o serviço Lemon Squeezy (API)
+    const lemonApiKey = process.env.LEMON_SQUEEZY_API_KEY;
+    if (!lemonApiKey) {
+      return res.status(500).json({ error: 'Lemon Squeezy API key not configured' });
+    }
+    // IDs fixos do plano premium
+    const storeId = '181507';
+    const variantId = '883664';
+    const returnUrl = req.body.returnUrl || (process.env.NEXT_PUBLIC_APP_URL + '/settings/billing');
+    // Montar payload
+    const payload = {
+      data: {
+        type: 'checkouts',
+        attributes: {
+          checkout_options: {
+            embed: true,
+            media: true,
+            logo: true,
+            desc: true,
+            discount: true,
+            dark: false,
+            subscription_preview: true,
+            return_url: returnUrl,
+          },
+          checkout_data: {
+            name: user.first_name || 'Campy User',
+            custom: {
+              teamId: user.team_id,
+              planType: planType || 'premium',
+              timestamp: new Date().toISOString(),
+            },
+          },
+          test_mode: process.env.NODE_ENV !== 'production',
+        },
+        relationships: {
+          store: { data: { type: 'stores', id: storeId } },
+          variant: { data: { type: 'variants', id: variantId } },
+        },
+      },
+    };
+    // Fazer request à API Lemon Squeezy
+    const response = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/vnd.api+json',
+        'Content-Type': 'application/vnd.api+json',
+        'Authorization': `Bearer ${lemonApiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(500).json({ error: 'Lemon Squeezy API error', details: errorText });
+    }
+    const data = await response.json();
+    return res.status(200).json({ url: data.data.attributes.url });
+  } catch (error) {
+    console.error('Error creating Lemon Squeezy checkout:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

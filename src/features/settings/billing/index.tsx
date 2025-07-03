@@ -6,12 +6,47 @@ import { useTeamData } from '@/features/teams/hooks/use-team-data'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
 import { TestLemonSqueezy } from '@/test-lemon-squeezy'
+import { toast } from 'sonner'
 
 export default function SettingsBilling() {
   const { teams } = useTeamData()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
   const currentTeam = teams[0]
   const isPremium = currentTeam?.tier === 'premium'
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Função para abrir overlay Lemon Squeezy
+  const handleUpgrade = async () => {
+    try {
+      setIsLoading(true)
+      toast.loading('A preparar pagamento...')
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/lemon-squeezy/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ planType: 'premium', returnUrl: window.location.origin + '/settings/billing' }),
+      })
+      const data = await res.json()
+      toast.dismiss()
+      if (!res.ok || !data.url) {
+        toast.error('Erro ao criar checkout', { description: data.error || 'Erro desconhecido' })
+        return
+      }
+      if (window.LemonSqueezy && window.LemonSqueezy.Url && typeof window.LemonSqueezy.Url.open === 'function') {
+        window.LemonSqueezy.Url.open(data.url)
+      } else {
+        toast.error('Overlay Lemon Squeezy não disponível', { description: 'Verifique se o script lemon.js está incluído.' })
+      }
+    } catch (err) {
+      toast.dismiss()
+      toast.error('Erro ao criar checkout', { description: err instanceof Error ? err.message : 'Erro desconhecido' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -109,9 +144,10 @@ export default function SettingsBilling() {
             {!isPremium ? (
               <Button 
                 className="w-full"
-                onClick={() => setShowUpgradeDialog(true)}
+                onClick={handleUpgrade}
+                disabled={isLoading}
               >
-                Fazer Upgrade - €19/mês
+                {isLoading ? 'A preparar...' : 'Fazer Upgrade - €19/mês'}
               </Button>
             ) : (
               <Button variant="outline" className="w-full" disabled>
