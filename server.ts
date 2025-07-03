@@ -2332,18 +2332,38 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
     console.log('Processing event:', eventName)
     
     // Handle subscription or order events
-    if (eventName === 'subscription_created' || eventName === 'order_created' || eventName === 'checkout_completed') {
+    if (eventName === 'subscription_created' || eventName === 'order_created' || eventName === 'checkout_completed' || eventName === 'order_created') {
       const customData = data.attributes?.custom_data
       
       console.log('Custom data:', customData)
+      console.log('Event name:', eventName)
+      console.log('Data attributes:', data.attributes)
       
-      if (!customData || !customData.teamId) {
+      // Try to get teamId from different possible locations
+      let teamId = null
+      let planType = 'premium'
+      
+      if (customData && customData.teamId) {
+        teamId = customData.teamId
+        planType = customData.planType || 'premium'
+      } else if (data.attributes?.custom_data?.teamId) {
+        teamId = data.attributes.custom_data.teamId
+        planType = data.attributes.custom_data.planType || 'premium'
+      } else if (data.attributes?.custom?.teamId) {
+        teamId = data.attributes.custom.teamId
+        planType = data.attributes.custom.planType || 'premium'
+      }
+      
+      if (!teamId) {
         console.warn('Lemon Squeezy webhook missing team ID in custom data')
+        console.log('Available data for team ID search:', {
+          customData,
+          dataAttributes: data.attributes,
+          customDataInAttributes: data.attributes?.custom_data,
+          customInAttributes: data.attributes?.custom
+        })
         return res.status(200).json({ message: 'Processed but no team ID found' })
       }
-
-      const teamId = customData.teamId
-      const planType = customData.planType || 'premium'
 
       console.log(`Processing upgrade for team ${teamId} to ${planType}`)
 
@@ -2376,7 +2396,7 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
               ${data.attributes?.variant_id || null},
               ${data.attributes?.status || 'active'},
               ${eventName},
-              ${JSON.stringify(customData)},
+              ${JSON.stringify(customData || data.attributes?.custom_data || data.attributes?.custom)},
               NOW(),
               NOW()
             )
@@ -2651,7 +2671,7 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
         type: 'checkouts',
         attributes: {
           checkout_options: {
-            embed: false, // false para redirecionamento normal
+            embed: true, // true para usar overlay
             media: true,
             logo: true,
             desc: true,
