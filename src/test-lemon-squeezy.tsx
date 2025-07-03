@@ -28,10 +28,34 @@ export function TestLemonSqueezy() {
       // eslint-disable-next-line no-console
       console.log('✅ Checkout URL created:', checkoutUrl)
       
-      // Show the URL in a toast instead of redirecting
-      toast.success('Checkout URL Created!', {
-        description: checkoutUrl,
-      })
+      // Testar se o Lemon Squeezy está disponível
+      if (window.LemonSqueezy) {
+        // eslint-disable-next-line no-console
+        console.log('✅ Lemon Squeezy is available:', window.LemonSqueezy)
+        
+        // Tentar abrir o overlay
+        if (typeof window.LemonSqueezy.Url?.open === 'function') {
+          // eslint-disable-next-line no-console
+          console.log('✅ Opening Lemon Squeezy overlay...')
+          window.LemonSqueezy.Url.open(checkoutUrl)
+        } else if (typeof window.LemonSqueezy.open === 'function') {
+          // eslint-disable-next-line no-console
+          console.log('✅ Opening Lemon Squeezy with direct method...')
+          window.LemonSqueezy.open(checkoutUrl)
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn('⚠️ Lemon Squeezy available but no open method found')
+          toast.warning('Lemon Squeezy disponível mas método de abertura não encontrado', {
+            description: checkoutUrl,
+          })
+        }
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn('⚠️ Lemon Squeezy not available')
+        toast.warning('Lemon Squeezy não disponível', {
+          description: checkoutUrl,
+        })
+      }
       
     } catch (error) {
       // eslint-disable-next-line no-console

@@ -109,7 +109,7 @@ export async function createCheckout(params: {
     type: 'checkouts',
     attributes: {
       checkout_options: {
-        embed: false,
+        embed: false, // false para usar overlay
         media: true,
         logo: true,
         desc: true,
