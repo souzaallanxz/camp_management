@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import type { Team } from '../types'
+import { buildApiUrl } from '@/services/api'
 
 interface UseCheckoutOptions {
   onSuccess?: () => void
@@ -22,7 +23,8 @@ export function useLemonSqueezyCheckout(options?: UseCheckoutOptions) {
       if (!token) {
         throw new Error('Utilizador não autenticado')
       }
-      const response = await fetch('/api/lemon-squeezy/checkout', {
+      const apiUrl = buildApiUrl('/api/lemon-squeezy/checkout')
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
