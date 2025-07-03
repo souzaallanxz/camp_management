@@ -40,10 +40,35 @@ export default function SettingsBilling() {
         toast.error('Erro ao criar checkout', { description: data.error || 'Erro desconhecido' })
         return
       }
-      if (window.LemonSqueezy && window.LemonSqueezy.Url && typeof window.LemonSqueezy.Url.open === 'function') {
-        window.LemonSqueezy.Url.open(data.url)
-      } else {
-        toast.error('Overlay Lemon Squeezy não disponível', { description: 'Verifique se o script lemon.js está incluído.' })
+      
+      console.log('Checkout URL received:', data.url)
+      console.log('LemonSqueezy object:', window.LemonSqueezy)
+      console.log('LemonSqueezy.Url:', window.LemonSqueezy?.Url)
+      
+      // Função para tentar abrir o overlay
+      const openOverlay = () => {
+        if (window.LemonSqueezy && window.LemonSqueezy.Url && typeof window.LemonSqueezy.Url.open === 'function') {
+          console.log('Opening Lemon Squeezy overlay...')
+          window.LemonSqueezy.Url.open(data.url)
+          return true
+        }
+        return false
+      }
+      
+      // Tentar abrir imediatamente
+      if (!openOverlay()) {
+        console.log('Lemon Squeezy not ready, waiting...')
+        // Se não estiver pronto, aguardar um pouco e tentar novamente
+        setTimeout(() => {
+          if (!openOverlay()) {
+            console.error('Lemon Squeezy overlay still not available after timeout')
+            toast.error('Overlay Lemon Squeezy não disponível', { 
+              description: 'Abrindo checkout em nova janela...' 
+            })
+            // Fallback: abrir em nova janela
+            window.open(data.url, '_blank')
+          }
+        }, 1000) // Aguardar 1 segundo
       }
     } catch (err) {
       toast.dismiss()
