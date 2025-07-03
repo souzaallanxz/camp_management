@@ -4,6 +4,7 @@ import dotenv from 'dotenv'
 import { Resend } from 'resend'
 import { neon } from '@neondatabase/serverless'
 import bcrypt from 'bcryptjs'
+import { createCheckout, PREMIUM_PLAN } from './src/services/lemon-squeezy.service.js'
 
 // Load environment variables
 dotenv.config()
@@ -2616,8 +2617,6 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
     if (!user || user.team_id !== teamId) {
       return res.status(403).json({ error: 'You can only create checkout for your own team' });
     }
-    // Importar função do serviço Lemon Squeezy
-    const { createCheckout, PREMIUM_PLAN } = require('./src/services/lemon-squeezy.service');
     // Chamar a API do Lemon Squeezy
     const checkoutUrl = await createCheckout({
       storeId: PREMIUM_PLAN.storeId,
