@@ -2400,7 +2400,8 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
     
     // Handle subscription or order events
     if (eventName === 'subscription_created' || eventName === 'order_created' || eventName === 'checkout_completed' || eventName === 'order_created') {
-      const customData = data.attributes?.custom_data
+      // O custom_data está no meta, não no data.attributes
+      const customData = meta.custom_data
       
       console.log('Custom data:', customData)
       console.log('Event name:', eventName)
@@ -2411,11 +2412,15 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
       let planType = 'premium'
       
       console.log('🔍 SEARCHING FOR TEAM ID IN CUSTOM DATA')
-      console.log('  - customData:', customData)
+      console.log('  - meta.custom_data:', meta.custom_data)
       console.log('  - data.attributes?.custom_data:', data.attributes?.custom_data)
       console.log('  - data.attributes?.custom:', data.attributes?.custom)
       
-      if (customData && customData.teamId) {
+      if (meta.custom_data && meta.custom_data.teamId) {
+        teamId = meta.custom_data.teamId
+        planType = meta.custom_data.planType || 'premium'
+        console.log('✅ Found teamId in meta.custom_data:', teamId)
+      } else if (customData && customData.teamId) {
         teamId = customData.teamId
         planType = customData.planType || 'premium'
         console.log('✅ Found teamId in customData:', teamId)
@@ -2465,7 +2470,7 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
             variant_id: data.attributes?.variant_id || null,
             status: data.attributes?.status || 'active',
             event_name: eventName,
-            custom_data: customData || data.attributes?.custom_data || data.attributes?.custom
+            custom_data: meta.custom_data || customData || data.attributes?.custom_data || data.attributes?.custom
           }
           
           console.log('📋 Subscription data to store:', subscriptionData)
@@ -2486,7 +2491,7 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
               ${data.attributes?.variant_id || null},
               ${data.attributes?.status || 'active'},
               ${eventName},
-              ${JSON.stringify(customData || data.attributes?.custom_data || data.attributes?.custom)},
+              ${JSON.stringify(meta.custom_data || customData || data.attributes?.custom_data || data.attributes?.custom)},
               NOW(),
               NOW()
             )
