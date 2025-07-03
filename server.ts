@@ -5,6 +5,7 @@ import { Resend } from 'resend'
 import { neon } from '@neondatabase/serverless'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import bodyParser from 'body-parser'
 
 // Load environment variables
 dotenv.config()
@@ -22,7 +23,14 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id']
 }))
 
-// Parse JSON request bodies
+// Capturar corpo RAW do webhook Lemon Squeezy antes do express.json()
+app.post('/api/webhooks/lemon-squeezy', bodyParser.json({
+  verify: (req, res, buf) => {
+    (req as any).rawBody = buf.toString('utf8')
+  }
+}))
+
+// Parse JSON request bodies (para o resto da app)
 app.use(express.json())
 
 // Health check endpoint for Render
@@ -2294,23 +2302,6 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
 
 // ===== LEMON SQUEEZY WEBHOOKS =====
 
-// Middleware para capturar o corpo raw para validação de assinatura
-app.use('/api/webhooks/lemon-squeezy', (req: Request, res: Response, next) => {
-  let data = ''
-  req.on('data', (chunk) => {
-    data += chunk
-  })
-  req.on('end', () => {
-    ;(req as any).rawBody = data
-    try {
-      req.body = JSON.parse(data)
-    } catch (e) {
-      console.log('Failed to parse JSON body:', e)
-    }
-    next()
-  })
-})
-
 // Função utilitária para validar assinatura do Lemon Squeezy
 function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
   console.log('🔐 VALIDATING LEMON SQUEEZY SIGNATURE')
@@ -2324,58 +2315,31 @@ function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
   
   console.log('📝 Signature header found:', signature)
   
-  // Tentar diferentes métodos de validação
-  const rawBody = JSON.stringify(req.body)
-  
-  console.log('📊 Payload details:')
-  console.log('  - Payload length:', rawBody.length)
+  // Usar sempre o corpo RAW se disponível
+  const rawBody = (req as any).rawBody || JSON.stringify(req.body)
+  console.log('📦 RAW BODY:', rawBody.substring(0, 300) + (rawBody.length > 300 ? '...' : ''))
+  console.log('📊 Payload length:', rawBody.length)
   console.log('  - Secret length:', secret.length)
-  console.log('  - Payload preview:', rawBody.substring(0, 200) + '...')
   
-  // Método 1: Usar o corpo JSON como está (método atual)
-  const expectedSignature1 = crypto
+  const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(rawBody)
     .digest('hex')
   
-  // Método 2: Tentar sem espaços extras (método alternativo)
-  const expectedSignature2 = crypto
-    .createHmac('sha256', secret)
-    .update(rawBody.replace(/\s+/g, ''))
-    .digest('hex')
-  
-  // Método 3: Tentar com o corpo original (se disponível)
-  let expectedSignature3 = ''
-  if ((req as any).rawBody) {
-    expectedSignature3 = crypto
-      .createHmac('sha256', secret)
-      .update((req as any).rawBody)
-      .digest('hex')
-  }
-  
   console.log('🔍 Signature comparison:')
-  console.log('  - Method 1 (JSON.stringify):', expectedSignature1)
-  console.log('  - Method 2 (no spaces):', expectedSignature2)
-  console.log('  - Method 3 (raw body):', expectedSignature3 || 'N/A')
+  console.log('  - Expected signature:', expectedSignature)
   console.log('  - Received signature:', signature)
-  console.log('  - Method 1 matches:', signature === expectedSignature1)
-  console.log('  - Method 2 matches:', signature === expectedSignature2)
-  console.log('  - Method 3 matches:', expectedSignature3 ? signature === expectedSignature3 : 'N/A')
+  console.log('  - Signatures match:', signature === expectedSignature)
   
-  // Retornar true se qualquer método funcionar (para debug)
-  const isValid = signature === expectedSignature1 || signature === expectedSignature2 || (expectedSignature3 && signature === expectedSignature3)
-  
-  if (!isValid) {
-    console.log('❌ SIGNATURE MISMATCH - All methods failed')
-    console.log('  - Expected 1 starts with:', expectedSignature1.substring(0, 10))
-    console.log('  - Expected 2 starts with:', expectedSignature2.substring(0, 10))
-    console.log('  - Expected 3 starts with:', expectedSignature3 ? expectedSignature3.substring(0, 10) : 'N/A')
+  if (signature !== expectedSignature) {
+    console.log('❌ SIGNATURE MISMATCH')
+    console.log('  - Expected starts with:', expectedSignature.substring(0, 10))
     console.log('  - Received starts with:', signature.substring(0, 10))
   } else {
-    console.log('✅ SIGNATURE MATCH - At least one method worked')
+    console.log('✅ SIGNATURE MATCH')
   }
   
-  return isValid
+  return signature === expectedSignature
 }
 
 // Process Lemon Squeezy payment confirmations
