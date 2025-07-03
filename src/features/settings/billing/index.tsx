@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { TestLemonSqueezy } from '@/test-lemon-squeezy'
 import { TestWebhook } from './test-webhook'
 import { LemonSqueezyDebug } from './lemon-squeezy-debug'
+import { SignatureDebug } from './signature-debug'
+import { CorsDebug } from './cors-debug'
 import { toast } from 'sonner'
 
 export default function SettingsBilling() {
@@ -47,34 +49,54 @@ export default function SettingsBilling() {
       console.log('Checkout URL received:', data.url)
       
       // Função para aguardar o Lemon Squeezy estar disponível
-      const waitForLemonSqueezy = (maxAttempts = 10, interval = 500) => {
-        return new Promise<boolean>((resolve) => {
-          let attempts = 0;
+      const waitForLemonSqueezy = async () => {
+        try {
+          // eslint-disable-next-line no-console
+          console.log('Waiting for Lemon Squeezy to be available...');
           
-          const checkLemonSqueezy = () => {
-            attempts++;
+          // Use the global ensure function if available
+          if (window.ensureLemonSqueezyLoaded) {
+            await window.ensureLemonSqueezyLoaded();
             // eslint-disable-next-line no-console
-            console.log(`Checking Lemon Squeezy availability (attempt ${attempts})`);
-            
-            if (window.LemonSqueezy) {
-              // eslint-disable-next-line no-console
-              console.log('Lemon Squeezy is available:', window.LemonSqueezy);
-              resolve(true);
-              return;
-            }
-            
-            if (attempts >= maxAttempts) {
-              // eslint-disable-next-line no-console
-              console.error('Lemon Squeezy not available after maximum attempts');
-              resolve(false);
-              return;
-            }
-            
-            setTimeout(checkLemonSqueezy, interval);
-          };
+            console.log('Lemon Squeezy loaded successfully via ensureLemonSqueezyLoaded');
+            return true;
+          }
           
-          checkLemonSqueezy();
-        });
+          // Fallback to polling method
+          return new Promise<boolean>((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 20;
+            const interval = 500;
+            
+            const checkLemonSqueezy = () => {
+              attempts++;
+              // eslint-disable-next-line no-console
+              console.log(`Checking Lemon Squeezy availability (attempt ${attempts})`);
+              
+              if (window.LemonSqueezy) {
+                // eslint-disable-next-line no-console
+                console.log('Lemon Squeezy is available:', window.LemonSqueezy);
+                resolve(true);
+                return;
+              }
+              
+              if (attempts >= maxAttempts) {
+                // eslint-disable-next-line no-console
+                console.error('Lemon Squeezy not available after maximum attempts');
+                resolve(false);
+                return;
+              }
+              
+              setTimeout(checkLemonSqueezy, interval);
+            };
+            
+            checkLemonSqueezy();
+          });
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error('Error waiting for Lemon Squeezy:', error);
+          return false;
+        }
       };
       
       // Função para tentar abrir o overlay
@@ -289,6 +311,14 @@ export default function SettingsBilling() {
       
       <div className="mt-8 border-t pt-6">
         <LemonSqueezyDebug />
+      </div>
+      
+      <div className="mt-8 border-t pt-6">
+        <SignatureDebug />
+      </div>
+      
+      <div className="mt-8 border-t pt-6">
+        <CorsDebug />
       </div>
     </div>
   )

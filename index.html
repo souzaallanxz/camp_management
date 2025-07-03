@@ -45,7 +45,43 @@
   <body class="group/body">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script src="https://app.lemonsqueezy.com/js/lemon.js" type="module"></script>
+    <!-- Lemon Squeezy Script - Loaded dynamically to avoid CORS issues -->
+    <script>
+      // Dynamic script loading for Lemon Squeezy
+      function loadLemonSqueezy() {
+        return new Promise((resolve, reject) => {
+          // Check if already loaded
+          if (window.LemonSqueezy) {
+            resolve(window.LemonSqueezy);
+            return;
+          }
+
+          const script = document.createElement('script');
+          script.src = 'https://app.lemonsqueezy.com/js/lemon.js';
+          script.async = true;
+          script.onload = () => {
+            console.log('Lemon Squeezy script loaded successfully');
+            // Wait a bit for initialization
+            setTimeout(() => {
+              if (window.LemonSqueezy) {
+                resolve(window.LemonSqueezy);
+              } else {
+                reject(new Error('Lemon Squeezy not available after loading'));
+              }
+            }, 100);
+          };
+          script.onerror = () => {
+            console.error('Failed to load Lemon Squeezy script');
+            reject(new Error('Failed to load Lemon Squeezy script'));
+          };
+          
+          document.head.appendChild(script);
+        });
+      }
+
+      // Initialize Lemon Squeezy when needed
+      window.loadLemonSqueezy = loadLemonSqueezy;
+    </script>
     <script src="/lemon-squeezy-init.js" defer></script>
 
   </body>

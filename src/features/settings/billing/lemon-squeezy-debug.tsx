@@ -17,41 +17,54 @@ export function LemonSqueezyDebug() {
   const [checkoutUrl, setCheckoutUrl] = useState<string>('')
 
   useEffect(() => {
-    const checkLemonSqueezy = () => {
+    const checkLemonSqueezy = async () => {
       const methods: string[] = []
       
-      if (window.LemonSqueezy) {
-        methods.push('LemonSqueezy object exists')
-        
-        if (window.LemonSqueezy.Setup) {
-          methods.push('Setup method available')
+      try {
+        // Try to ensure Lemon Squeezy is loaded
+        if (window.ensureLemonSqueezyLoaded) {
+          await window.ensureLemonSqueezyLoaded()
         }
         
-        if (window.LemonSqueezy.Url) {
-          methods.push('Url object available')
+        if (window.LemonSqueezy) {
+          methods.push('LemonSqueezy object exists')
           
-          if (window.LemonSqueezy.Url.open) {
-            methods.push('Url.open method available')
+          if (window.LemonSqueezy.Setup) {
+            methods.push('Setup method available')
           }
           
-          if (window.LemonSqueezy.Url.Open) {
-            methods.push('Url.Open method available')
+          if (window.LemonSqueezy.Url) {
+            methods.push('Url object available')
+            
+            if (window.LemonSqueezy.Url.open) {
+              methods.push('Url.open method available')
+            }
+            
+            if (window.LemonSqueezy.Url.Open) {
+              methods.push('Url.Open method available')
+            }
           }
+          
+          if (window.LemonSqueezy.open) {
+            methods.push('Direct open method available')
+          }
+          
+          setLemonSqueezyStatus({
+            loaded: true,
+            methods
+          })
+        } else {
+          setLemonSqueezyStatus({
+            loaded: false,
+            methods: [],
+            error: 'LemonSqueezy not found in window object'
+          })
         }
-        
-        if (window.LemonSqueezy.open) {
-          methods.push('Direct open method available')
-        }
-        
-        setLemonSqueezyStatus({
-          loaded: true,
-          methods
-        })
-      } else {
+      } catch (error) {
         setLemonSqueezyStatus({
           loaded: false,
           methods: [],
-          error: 'LemonSqueezy not found in window object'
+          error: error instanceof Error ? error.message : 'Unknown error'
         })
       }
     }

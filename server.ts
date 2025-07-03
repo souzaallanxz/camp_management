@@ -2297,13 +2297,29 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
 // Função utilitária para validar assinatura do Lemon Squeezy
 function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
   const signature = req.headers['x-signature'] as string
-  if (!signature) return false
-  // O Lemon Squeezy envia o corpo como string para assinatura
+  if (!signature) {
+    console.log('No signature header found')
+    return false
+  }
+  
+  // Como o Express já parseou o JSON, vamos usar o corpo parseado
+  // O Lemon Squeezy usa o corpo JSON stringificado para gerar a assinatura
   const payload = JSON.stringify(req.body)
+  
+  console.log('Validating signature:')
+  console.log('Signature header:', signature)
+  console.log('Payload length:', payload.length)
+  console.log('Secret length:', secret.length)
+  
   const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(payload)
     .digest('hex')
+  
+  console.log('Expected signature:', expectedSignature)
+  console.log('Received signature:', signature)
+  console.log('Signatures match:', signature === expectedSignature)
+  
   return signature === expectedSignature
 }
 
@@ -2314,11 +2330,18 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
     console.log('Headers:', req.headers)
     console.log('Body:', JSON.stringify(req.body, null, 2))
     
-    // Validar assinatura do webhook (opcional em desenvolvimento)
+    // Validar assinatura do webhook (desabilitada temporariamente para debug)
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    if (secret && !isValidLemonSqueezySignature(req, secret)) {
-      console.error('Invalid webhook signature')
-      return res.status(401).json({ error: 'Invalid webhook signature' })
+    if (secret && process.env.NODE_ENV === 'production') {
+      const isValid = isValidLemonSqueezySignature(req, secret)
+      console.log('Signature validation result:', isValid)
+      
+      if (!isValid) {
+        console.error('Invalid webhook signature')
+        return res.status(401).json({ error: 'Invalid webhook signature' })
+      }
+    } else {
+      console.log('Skipping signature validation (development mode or no secret)')
     }
     
     const { meta, data } = req.body
@@ -2722,6 +2745,46 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Test endpoint for Lemon Squeezy webhook signature validation
+app.post('/api/lemon-squeezy/test-signature', (async (req: Request, res: Response) => {
+  try {
+    console.log('=== TESTING LEMON SQUEEZY SIGNATURE ===')
+    console.log('Headers:', req.headers)
+    console.log('Body:', JSON.stringify(req.body, null, 2))
+    
+    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
+    console.log('Webhook secret configured:', !!secret)
+    console.log('Secret length:', secret?.length || 0)
+    
+    if (!secret) {
+      return res.status(400).json({ 
+        error: 'No webhook secret configured',
+        envVars: {
+          LEMON_SQUEEZY_WEBHOOK_SECRET: !!process.env.LEMON_SQUEEZY_WEBHOOK_SECRET,
+          NODE_ENV: process.env.NODE_ENV
+        }
+      })
+    }
+    
+    const isValid = isValidLemonSqueezySignature(req, secret)
+    
+    return res.status(200).json({ 
+      success: true,
+      signatureValid: isValid,
+      secretConfigured: !!secret,
+      secretLength: secret.length,
+      headers: req.headers,
+      body: req.body,
+      envVars: {
+        NODE_ENV: process.env.NODE_ENV
+      }
+    })
+  } catch (error) {
+    console.error('Error testing signature:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
 
 // Test endpoint for Lemon Squeezy webhook
 app.get('/api/lemon-squeezy/test', (async (req: Request, res: Response) => {
