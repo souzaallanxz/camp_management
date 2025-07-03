@@ -5,7 +5,6 @@ import { useState } from 'react'
 import { useTeamData } from '@/features/teams/hooks/use-team-data'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
-import { TestLemonSqueezy } from '@/test-lemon-squeezy'
 import { TestWebhook } from './test-webhook'
 import { LemonSqueezyDebug } from './lemon-squeezy-debug'
 import { SignatureDebug } from './signature-debug'
@@ -175,29 +174,6 @@ export default function SettingsBilling() {
         onOpenChange={setShowUpgradeDialog}
       />
       
-      <div className="mt-8 border-t pt-6">
-        <TestLemonSqueezy />
-      </div>
-      
-      <div className="mt-8 border-t pt-6">
-        <TestWebhook />
-      </div>
-      
-      <div className="mt-8 border-t pt-6">
-        <LemonSqueezyDebug />
-      </div>
-      
-      <div className="mt-8 border-t pt-6">
-        <SignatureDebug />
-      </div>
-      
-      <div className="mt-8 border-t pt-6">
-        <CorsDebug />
-      </div>
-      
-      <div className="mt-8 border-t pt-6">
-        <WebhookDebug />
-      </div>
     </div>
   )
 } 

@@ -89,7 +89,6 @@ app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Error in sign-in:', error)
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message,
@@ -119,7 +118,7 @@ app.post('/api/auth/sign-up', (async (req: Request, res: Response) => {
     // Create user
     const result = await sql`
       INSERT INTO public.users (id, email, first_name, password_hash, role)
-      VALUES (gen_random_uuid(), ${email}, ${name}, ${hashedPassword}, 'contributor')
+      VALUES (gen_random_uuid(), ${email}, ${name}, ${hashedPassword}, 'admin')
       RETURNING id, email, first_name, team_id
     `;
 
@@ -137,7 +136,6 @@ app.post('/api/auth/sign-up', (async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('Error in sign-up:', error);
     return res.status(500).json({ error: 'Internal server error', details: error instanceof Error ? error.message : error });
   }
 }) as any)
@@ -283,7 +281,6 @@ app.get('/api/auth/me', (async (req: Request, res: Response) => {
       role: user.role
     })
   } catch (error) {
-    console.error('Error in get current user:', error)
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message,
@@ -328,7 +325,6 @@ app.get('/api/auth/profile', (async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Error in get current user profile:', error)
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message,
@@ -390,7 +386,6 @@ app.put('/api/auth/profile', (async (req: Request, res: Response) => {
       }
     })
   } catch (error) {
-    console.error('Error in update current user profile:', error)
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message,
@@ -565,7 +560,6 @@ app.post('/api/teams', (async (req: Request, res: Response) => {
 
     return res.status(200).json(team);
   } catch (error) {
-    console.error('Error creating team:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }) as any)
@@ -625,7 +619,6 @@ app.put('/api/teams/:id', (async (req: Request, res: Response) => {
 
     return res.status(200).json(result[0])
   } catch (error) {
-    console.error('Error updating team:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -915,7 +908,6 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
     
     res.json(registrations);
   } catch (error) {
-    console.error('Error fetching registrations:', error);
     res.status(500).json({ error: 'Erro ao buscar inscrições.' });
   }
 }) as any);
@@ -998,7 +990,6 @@ app.put('/api/camps/:id', (async (req: Request, res: Response) => {
     
     res.json(result[0]);
   } catch (error) {
-    console.error('Error updating camp:', error);
     res.status(500).json({ error: 'Erro ao atualizar acampamento.' });
   }
 }) as any);
@@ -1049,7 +1040,6 @@ app.get('/api/camps/current', (async (req: Request, res: Response) => {
     
     res.json(currentCamp[0]);
   } catch (error) {
-    console.error('Error fetching current camp:', error);
     res.status(500).json({ error: 'Erro ao buscar acampamento atual.' });
   }
 }) as any);
@@ -1110,7 +1100,6 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
     }));
     res.json(camperBalances);
   } catch (error) {
-    console.error('Error fetching campers:', error);
     res.status(500).json({ error: 'Erro ao buscar campistas.' });
   }
 }) as any);
@@ -1234,7 +1223,6 @@ app.put('/api/campers/:id', (async (req: Request, res: Response) => {
     
     res.json(result[0]);
   } catch (error) {
-    console.error('Error updating camper:', error);
     res.status(500).json({ error: 'Erro ao atualizar campista.' });
   }
 }) as any);
@@ -1317,7 +1305,6 @@ app.post('/api/users', (async (req: Request, res: Response) => {
     });
     res.status(201).json(result[0]);
   } catch (error) {
-    console.error('Error creating user:', error);
     res.status(500).json({ error: 'Erro ao criar usuário.' });
   }
 }) as any);
@@ -1508,15 +1495,7 @@ app.delete('/api/registrations/:id', (async (req: Request, res: Response) => {
 app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   
-  // Debug logs
-  console.log('=== ONBOARDING STATUS DEBUG ===');
-  console.log('Headers received:', req.headers);
-  console.log('Team ID from getTeamId:', teamId);
-  console.log('x-team-id header:', req.headers['x-team-id']);
-  console.log('Authorization header:', req.headers['authorization']);
-  console.log('Request body:', req.body);
-  console.log('Request params:', req.params);
-  console.log('==============================');
+  
   
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
@@ -1525,7 +1504,7 @@ app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res:
     const { id } = req.params;
     const { status } = req.body;
     
-    console.log('Onboarding status update request:', { id, status, teamId });
+    
     
     if (!status) {
       return res.status(400).json({ error: 'Status is required' });
@@ -1541,7 +1520,7 @@ app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res:
       WHERE r.id = ${id}::uuid
     `;
     
-    console.log('Registration check result:', registrationCheck);
+    
     
     if (registrationCheck.length === 0) {
       return res.status(404).json({ error: 'Registration not found' });
@@ -1549,7 +1528,7 @@ app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res:
     
     // Compare team_id as strings
     const registrationTeamId = registrationCheck[0].team_id;
-    console.log('Team ID comparison:', { registrationTeamId, teamId, match: registrationTeamId === teamId });
+    
     
     if (registrationTeamId !== teamId) {
       return res.status(404).json({ error: 'Registration does not belong to your team' });
@@ -1563,7 +1542,7 @@ app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res:
       RETURNING *
     `;
     
-    console.log('Update result:', result);
+    
     
     if (!result[0]) {
       return res.status(404).json({ error: 'Failed to update registration' });
@@ -1571,7 +1550,6 @@ app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res:
     
     res.json(result[0]);
   } catch (error) {
-    console.error('Error updating registration onboarding status:', error);
     res.status(500).json({ error: 'Erro ao atualizar status de onboarding.' });
   }
 }) as any);
@@ -1657,7 +1635,6 @@ app.get('/api/payments', (async (req: Request, res: Response) => {
     
     res.json(processedPayments);
   } catch (error) {
-    console.error('Error fetching payments:', error);
     res.status(500).json({ error: 'Error fetching payments' });
   }
 }) as any);
@@ -1693,7 +1670,6 @@ app.post('/api/payments', (async (req: Request, res: Response) => {
     `;
     res.json(result[0]);
   } catch (error) {
-    console.error('Error creating payment:', error);
     res.status(500).json({ error: 'Error creating payment' });
   }
 }) as any);
@@ -1734,7 +1710,6 @@ app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
     
     res.status(201).json(result[0]);
   } catch (error) {
-    console.error('Error creating snackbar balance entry:', error);
     res.status(500).json({ error: 'Error creating snackbar balance entry' });
   }
 }) as any);
@@ -1775,7 +1750,6 @@ app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) 
       total_spent: totalSpent
     });
   } catch (error) {
-    console.error('Error fetching snackbar balance:', error);
     res.status(500).json({ error: 'Error fetching snackbar balance' });
   }
 }) as any);
@@ -1817,7 +1791,6 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     
     res.status(201).json(result[0]);
   } catch (error) {
-    console.error('Error creating snackbar transaction:', error);
     res.status(500).json({ error: 'Error creating snackbar transaction' });
   }
 }) as any);
@@ -1851,7 +1824,6 @@ app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Respo
     
     res.json(transactions);
   } catch (error) {
-    console.error('Error fetching snackbar transactions:', error);
     res.status(500).json({ error: 'Error fetching snackbar transactions' });
   }
 }) as any);
@@ -1894,7 +1866,6 @@ app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     
     res.json(transactions);
   } catch (error) {
-    console.error('Error fetching snackbar transactions:', error);
     res.status(500).json({ error: 'Error fetching snackbar transactions' });
   }
 }) as any);
@@ -1912,17 +1883,7 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
   const baseUrl = 'https://camp-management-1.onrender.com'
   const webhookUrl = `${baseUrl}/api/webhooks/${type}/${teamId}`
 
-  console.log(`Creating Hookdeck connection for ${type}, team ${teamId}`)
-  console.log(`Destination URL: ${webhookUrl}`)
 
-  // Verificar se a URL é válida
-  try {
-    const urlTest = new URL(webhookUrl)
-    console.log('URL validation passed:', urlTest.toString())
-  } catch (error) {
-    console.error('Invalid URL:', webhookUrl, error)
-    throw new Error(`Invalid webhook URL: ${webhookUrl}`)
-  }
 
   // 1. Criar Destination
   const timestamp = Date.now()
@@ -1937,8 +1898,7 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
       }
     }
   }
-  
-  console.log('Creating destination with payload:', destinationPayload)
+
   
   const destinationResponse = await fetch('https://api.hookdeck.com/2025-01-01/destinations', {
     method: 'POST',
@@ -1951,16 +1911,10 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
 
   if (!destinationResponse.ok) {
     const errorText = await destinationResponse.text()
-    console.error('Destination creation failed:', {
-      status: destinationResponse.status,
-      statusText: destinationResponse.statusText,
-      error: errorText
-    })
     throw new Error(`Failed to create destination: ${destinationResponse.statusText} - ${errorText}`)
   }
 
   const destination = await destinationResponse.json()
-  console.log('Destination created successfully:', destination)
 
   // 2. Criar Source
   const sourceUrl = `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}`
@@ -1982,8 +1936,7 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
       }
     }
   }
-  
-  console.log('Creating source with payload:', sourcePayload)
+
   
   const sourceResponse = await fetch('https://api.hookdeck.com/2025-01-01/sources', {
     method: 'POST',
@@ -1996,16 +1949,10 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
 
   if (!sourceResponse.ok) {
     const errorText = await sourceResponse.text()
-    console.error('Source creation failed:', {
-      status: sourceResponse.status,
-      statusText: sourceResponse.statusText,
-      error: errorText
-    })
     throw new Error(`Failed to create source: ${sourceResponse.statusText} - ${errorText}`)
   }
 
   const source = await sourceResponse.json()
-  console.log('Source created successfully:', source)
 
   // 3. Criar Connection
   const connectionSanitizedName = `connection-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
@@ -2014,8 +1961,6 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
     source_id: source.id,
     destination_id: destination.id
   }
-  
-  console.log('Creating connection with payload:', connectionPayload)
   
   const connectionResponse = await fetch('https://api.hookdeck.com/2025-01-01/connections', {
     method: 'POST',
@@ -2028,16 +1973,10 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
 
   if (!connectionResponse.ok) {
     const errorText = await connectionResponse.text()
-    console.error('Connection creation failed:', {
-      status: connectionResponse.status,
-      statusText: connectionResponse.statusText,
-      error: errorText
-    })
     throw new Error(`Failed to create connection: ${connectionResponse.statusText} - ${errorText}`)
   }
 
   const connection = await connectionResponse.json()
-  console.log('Connection created successfully:', connection)
 
   const result = {
     connection: { id: connection.id },
@@ -2046,7 +1985,6 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
     webhookUrl: source.url
   }
   
-  console.log('Hookdeck connection setup completed:', result)
   return result
 }
 
@@ -2065,7 +2003,6 @@ async function deleteHookdeckConnection(connectionId: string) {
 
   // Se a connection não existe (404), consideramos sucesso
   if (response.status === 404) {
-    console.log(`Connection ${connectionId} not found, assuming already deleted`)
     return true
   }
 
@@ -2082,7 +2019,6 @@ async function deleteHookdeckResources(connectionId: string, sourceId?: string, 
     throw new Error('HOOKDECK_API_KEY not configured')
   }
 
-  console.log(`Starting cleanup of Hookdeck resources:`, { connectionId, sourceId, destinationId })
 
   const headers = {
     'Authorization': `Bearer ${hookdeckApiKey}`,
@@ -2091,56 +2027,50 @@ async function deleteHookdeckResources(connectionId: string, sourceId?: string, 
 
   // 1. Deletar connection
   try {
-    console.log(`Attempting to delete connection: ${connectionId}`)
     await deleteHookdeckConnection(connectionId)
-    console.log(`Successfully deleted connection: ${connectionId}`)
-  } catch (error) {
-    console.warn(`Failed to delete connection ${connectionId}:`, error)
+  } catch {
   }
 
   // 2. Deletar source se fornecido
   if (sourceId) {
     try {
-      console.log(`Attempting to delete source: ${sourceId}`)
       const sourceResponse = await fetch(`https://api.hookdeck.com/2025-01-01/sources/${sourceId}`, {
         method: 'DELETE',
         headers
       })
       
       if (sourceResponse.status === 404) {
-        console.log(`Source ${sourceId} not found, assuming already deleted`)
+        // Source not found, assuming already deleted
       } else if (sourceResponse.ok) {
-        console.log(`Successfully deleted source: ${sourceId}`)
+        // Successfully deleted source
       } else {
-        console.warn(`Failed to delete source ${sourceId}: ${sourceResponse.statusText}`)
+        // Failed to delete source
       }
-    } catch (error) {
-      console.warn(`Error deleting source ${sourceId}:`, error)
+    } catch {
+      // Error deleting source
     }
   }
 
   // 3. Deletar destination se fornecido
   if (destinationId) {
     try {
-      console.log(`Attempting to delete destination: ${destinationId}`)
       const destinationResponse = await fetch(`https://api.hookdeck.com/2025-01-01/destinations/${destinationId}`, {
         method: 'DELETE',
         headers
       })
       
       if (destinationResponse.status === 404) {
-        console.log(`Destination ${destinationId} not found, assuming already deleted`)
+        // Destination not found, assuming already deleted
       } else if (destinationResponse.ok) {
-        console.log(`Successfully deleted destination: ${destinationId}`)
+        // Successfully deleted destination
       } else {
-        console.warn(`Failed to delete destination ${destinationId}: ${destinationResponse.statusText}`)
+        // Failed to delete destination
       }
-    } catch (error) {
-      console.warn(`Error deleting destination ${destinationId}:`, error)
+    } catch {
+      // Error deleting destination
     }
   }
 
-  console.log(`Completed cleanup of Hookdeck resources`)
   return true
 }
 
@@ -2156,7 +2086,6 @@ app.get('/api/webhooks/config', (async (req: Request, res: Response) => {
     `
     return res.status(200).json(result)
   } catch (error) {
-    console.error('Error fetching webhook config:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -2200,7 +2129,6 @@ app.post('/api/webhooks/config', (async (req: Request, res: Response) => {
     `
     return res.status(200).json(result[0])
   } catch (error) {
-    console.error('Error saving webhook config:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -2221,7 +2149,6 @@ app.post('/api/webhooks/setup', (async (req: Request, res: Response) => {
     const hookdeck = await createHookdeckConnection(webhookType, teamId)
     return res.status(200).json(hookdeck)
   } catch (error) {
-    console.error('Error setting up webhook:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -2235,19 +2162,15 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
     }
 
     const { connectionId, sourceId, destinationId, webhookType } = req.body
-    console.log('Cleanup request received:', { teamId, connectionId, sourceId, destinationId, webhookType })
     
     if (!connectionId) {
-      console.error('Cleanup failed: Connection ID is required')
       return res.status(400).json({ error: 'Connection ID is required' })
     }
     
     // Remover todos os recursos do Hookdeck (connection, source, destination)
     try {
       await deleteHookdeckResources(connectionId, sourceId, destinationId)
-      console.log(`Successfully cleaned up all resources for connection: ${connectionId}`)
-    } catch (hookdeckError) {
-      console.warn(`Hookdeck cleanup failed for connection ${connectionId}:`, hookdeckError)
+    } catch {
       // Continuamos mesmo se falhar no Hookdeck, pois pode já ter sido deletado
     }
     
@@ -2285,17 +2208,15 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
             WHERE team_id = ${teamId}::uuid
           `
           
-          console.log(`Updated database state for team ${teamId}, webhook ${webhookType} disabled`)
+          // Updated database state
         }
       }
-    } catch (dbError) {
-      console.error('Error updating database state:', dbError)
+    } catch {
       // Não falhamos a operação se a atualização do DB falhar
     }
     
     return res.status(200).json({ success: true })
   } catch (error) {
-    console.error('Error cleaning up webhook:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -2304,40 +2225,18 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
 
 // Função utilitária para validar assinatura do Lemon Squeezy
 function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
-  console.log('🔐 VALIDATING LEMON SQUEEZY SIGNATURE')
-  
   const signature = req.headers['x-signature'] as string
   if (!signature) {
-    console.log('❌ No x-signature header found')
-    console.log('Available headers:', Object.keys(req.headers))
     return false
   }
   
-  console.log('📝 Signature header found:', signature)
-  
   // Usar sempre o corpo RAW se disponível
   const rawBody = (req as any).rawBody || JSON.stringify(req.body)
-  console.log('📦 RAW BODY:', rawBody.substring(0, 300) + (rawBody.length > 300 ? '...' : ''))
-  console.log('📊 Payload length:', rawBody.length)
-  console.log('  - Secret length:', secret.length)
   
   const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(rawBody)
     .digest('hex')
-  
-  console.log('🔍 Signature comparison:')
-  console.log('  - Expected signature:', expectedSignature)
-  console.log('  - Received signature:', signature)
-  console.log('  - Signatures match:', signature === expectedSignature)
-  
-  if (signature !== expectedSignature) {
-    console.log('❌ SIGNATURE MISMATCH')
-    console.log('  - Expected starts with:', expectedSignature.substring(0, 10))
-    console.log('  - Received starts with:', signature.substring(0, 10))
-  } else {
-    console.log('✅ SIGNATURE MATCH')
-  }
   
   return signature === expectedSignature
 }
@@ -2345,111 +2244,54 @@ function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
 // Process Lemon Squeezy payment confirmations
 app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
   try {
-    console.log('=== LEMON SQUEEZY WEBHOOK RECEIVED ===')
-    console.log('Timestamp:', new Date().toISOString())
-    console.log('Request method:', req.method)
-    console.log('Request URL:', req.url)
-    console.log('Content-Type:', req.headers['content-type'])
-    console.log('User-Agent:', req.headers['user-agent'])
-    console.log('X-Signature header:', req.headers['x-signature'])
-    console.log('X-Event-Name header:', req.headers['x-event-name'])
-    console.log('All headers:', JSON.stringify(req.headers, null, 2))
-    console.log('Raw body length:', req.body ? JSON.stringify(req.body).length : 0)
-    console.log('Body:', JSON.stringify(req.body, null, 2))
-    
     // Validar assinatura do webhook
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    console.log('Webhook secret configured:', !!secret)
-    console.log('Secret length:', secret?.length || 0)
-    console.log('NODE_ENV:', process.env.NODE_ENV)
     
     if (secret) {
       const isValid = isValidLemonSqueezySignature(req, secret)
-      console.log('Signature validation result:', isValid)
       
       if (!isValid) {
-        console.error('❌ INVALID WEBHOOK SIGNATURE')
-        console.error('Expected signature calculation failed')
-        
         // Temporariamente permitir webhooks com assinatura inválida para debug
-        console.log('⚠️ ALLOWING WEBHOOK DESPITE INVALID SIGNATURE (DEBUG MODE)')
-        console.log('⚠️ This should be disabled in production after fixing signature validation')
-        
         // return res.status(401).json({ error: 'Invalid webhook signature' })
-      } else {
-        console.log('✅ SIGNATURE VALIDATION PASSED')
       }
-    } else {
-      console.log('⚠️ SKIPPING SIGNATURE VALIDATION - No secret configured')
     }
     
     const { meta, data } = req.body
 
     if (!meta || !data) {
-      console.error('❌ Invalid webhook payload - missing meta or data')
-      console.log('Meta present:', !!meta)
-      console.log('Data present:', !!data)
-      console.log('Body keys:', Object.keys(req.body))
       return res.status(400).json({ error: 'Invalid webhook payload' })
     }
 
     const eventName = meta.event_name
-    console.log('🎯 Processing event:', eventName)
-    console.log('📋 Meta data:', JSON.stringify(meta, null, 2))
-    console.log('📦 Event data:', JSON.stringify(data, null, 2))
     
     // Handle subscription or order events
     if (eventName === 'subscription_created' || eventName === 'order_created' || eventName === 'checkout_completed' || eventName === 'order_created') {
       // O custom_data está no meta, não no data.attributes
       const customData = meta.custom_data
       
-      console.log('Custom data:', customData)
-      console.log('Event name:', eventName)
-      console.log('Data attributes:', data.attributes)
-      
       // Try to get teamId from different possible locations
       let teamId = null
       let planType = 'premium'
       
-      console.log('🔍 SEARCHING FOR TEAM ID IN CUSTOM DATA')
-      console.log('  - meta.custom_data:', meta.custom_data)
-      console.log('  - data.attributes?.custom_data:', data.attributes?.custom_data)
-      console.log('  - data.attributes?.custom:', data.attributes?.custom)
-      
       if (meta.custom_data && meta.custom_data.teamId) {
         teamId = meta.custom_data.teamId
         planType = meta.custom_data.planType || 'premium'
-        console.log('✅ Found teamId in meta.custom_data:', teamId)
       } else if (customData && customData.teamId) {
         teamId = customData.teamId
         planType = customData.planType || 'premium'
-        console.log('✅ Found teamId in customData:', teamId)
       } else if (data.attributes?.custom_data?.teamId) {
         teamId = data.attributes.custom_data.teamId
         planType = data.attributes.custom_data.planType || 'premium'
-        console.log('✅ Found teamId in data.attributes.custom_data:', teamId)
       } else if (data.attributes?.custom?.teamId) {
         teamId = data.attributes.custom.teamId
         planType = data.attributes.custom.planType || 'premium'
-        console.log('✅ Found teamId in data.attributes.custom:', teamId)
       }
       
       if (!teamId) {
-        console.warn('❌ Lemon Squeezy webhook missing team ID in custom data')
-        console.log('🔍 Available data for team ID search:', {
-          customData,
-          dataAttributes: data.attributes,
-          customDataInAttributes: data.attributes?.custom_data,
-          customInAttributes: data.attributes?.custom
-        })
         return res.status(200).json({ message: 'Processed but no team ID found' })
       }
 
-      console.log(`🚀 Processing upgrade for team ${teamId} to ${planType}`)
-
       try {
-        console.log('💾 UPDATING TEAM TIER IN DATABASE')
-        
         // Update team to premium tier
         const result = await sql`
           UPDATE teams 
@@ -2459,11 +2301,7 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
         `
 
         if (result.length > 0) {
-          console.log(`✅ Successfully upgraded team ${teamId} to ${planType}`)
-          console.log('📊 Updated team data:', result[0])
-          
           // Store subscription data for future reference
-          console.log('💾 STORING SUBSCRIPTION DATA')
           const subscriptionData = {
             team_id: teamId,
             subscription_id: data.id,
@@ -2472,8 +2310,6 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
             event_name: eventName,
             custom_data: meta.custom_data || customData || data.attributes?.custom_data || data.attributes?.custom
           }
-          
-          console.log('📋 Subscription data to store:', subscriptionData)
           
           await sql`
             INSERT INTO lemon_squeezy_subscriptions (
@@ -2502,19 +2338,10 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
               updated_at = NOW()
           `
           
-          console.log('✅ Subscription data stored successfully')
         } else {
-          console.warn(`❌ Team ${teamId} not found for upgrade`)
+          // Team not found for upgrade
         }
-      } catch (dbError) {
-        console.error('❌ Database error processing Lemon Squeezy webhook:', dbError)
-        console.error('Error details:', {
-          message: dbError.message,
-          stack: dbError.stack,
-          teamId,
-          planType,
-          eventName
-        })
+      } catch {
         // Don't fail the webhook response
       }
     }
@@ -2541,23 +2368,14 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
             WHERE team_id = ${teamId}::uuid AND subscription_id = ${data.id}
           `
 
-          console.log(`Successfully downgraded team ${teamId} due to subscription cancellation`)
-        } catch (dbError) {
-          console.error('Database error processing subscription cancellation:', dbError)
+        } catch {
+          // Database error processing subscription cancellation
         }
       }
     }
 
-    console.log('✅ WEBHOOK PROCESSED SUCCESSFULLY')
-    console.log('📤 Sending 200 response to Lemon Squeezy')
     return res.status(200).json({ message: 'Webhook processed successfully' })
   } catch (error) {
-    console.error('❌ ERROR PROCESSING LEMON SQUEEZY WEBHOOK:', error)
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      body: req.body
-    })
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -2568,14 +2386,6 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
     const { teamId } = req.params;
     // Lê o request_id do header enviado pelo Hookdeck
     const request_id = req.headers['x-hookdeck-requestid'] as string | undefined;
-
-    // Debug: Log the incoming request
-    console.log('=== REGISTRATION WEBHOOK DEBUG ===');
-    console.log('Team ID:', teamId);
-    console.log('Request body:', req.body);
-    console.log('Request headers:', req.headers);
-    console.log('Request ID from header:', request_id);
-    console.log('==================================');
 
     const {
       name,
@@ -2616,9 +2426,6 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
       }
     }
 
-    // Debug: Log the request_id before insertion
-    console.log('Request ID to be inserted:', request_id);
-
     // Criar registration (sem team_id)
     const now = new Date().toISOString();
     const result = await sql`
@@ -2629,7 +2436,7 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
       ) RETURNING *
     `;
 
-    console.log('Registration created with result:', result[0]);
+    
 
     return res.status(200).json({
       success: true,
@@ -2637,7 +2444,7 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
       registration: result[0]
     });
   } catch (error) {
-    console.error('Error processing registration webhook:', error);
+    
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2647,12 +2454,7 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
   try {
     const { teamId } = req.params;
     
-    // Debug: Log the incoming request
-    console.log('=== PAYMENT WEBHOOK DEBUG ===');
-    console.log('Team ID:', teamId);
-    console.log('Request body:', req.body);
-    console.log('Request headers:', req.headers);
-    console.log('=============================');
+    
     
     const {
       email,
@@ -2744,7 +2546,6 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
       }
     });
   } catch (error) {
-    console.error('Error processing payment webhook:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2806,8 +2607,6 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
         },
       },
     };
-    // Debug: Log the payload
-    console.log('Lemon Squeezy payload:', JSON.stringify(payload, null, 2));
     
     // Fazer request à API Lemon Squeezy
     const response = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
@@ -2826,7 +2625,6 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
     const data = await response.json();
     return res.status(200).json({ url: data.data.attributes.url });
   } catch (error) {
-    console.error('Error creating Lemon Squeezy checkout:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -2834,13 +2632,9 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
 // Test endpoint for Lemon Squeezy webhook signature validation
 app.post('/api/lemon-squeezy/test-signature', (async (req: Request, res: Response) => {
   try {
-    console.log('=== TESTING LEMON SQUEEZY SIGNATURE ===')
-    console.log('Headers:', req.headers)
-    console.log('Body:', JSON.stringify(req.body, null, 2))
     
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    console.log('Webhook secret configured:', !!secret)
-    console.log('Secret length:', secret?.length || 0)
+    
     
     if (!secret) {
       return res.status(400).json({ 
@@ -2867,7 +2661,6 @@ app.post('/api/lemon-squeezy/test-signature', (async (req: Request, res: Respons
       }
     })
   } catch (error) {
-    console.error('Error testing signature:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -2875,7 +2668,7 @@ app.post('/api/lemon-squeezy/test-signature', (async (req: Request, res: Respons
 // Test endpoint with real webhook payload
 app.post('/api/lemon-squeezy/test-real-signature', (async (req: Request, res: Response) => {
   try {
-    console.log('=== TESTING REAL WEBHOOK SIGNATURE ===')
+    
     
     const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
     if (!secret) {
@@ -2937,17 +2730,13 @@ app.post('/api/lemon-squeezy/test-real-signature', (async (req: Request, res: Re
       secretPreview: secret.substring(0, 10) + '...'
     })
   } catch (error) {
-    console.error('Error testing real signature:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
 
 // Test endpoint for Lemon Squeezy webhook accessibility
 app.get('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
-  console.log('=== LEMON SQUEEZY WEBHOOK ENDPOINT TEST ===')
-  console.log('GET request received at webhook endpoint')
-  console.log('Headers:', req.headers)
-  console.log('Query params:', req.query)
+  
   
   return res.status(200).json({ 
     message: 'Lemon Squeezy webhook endpoint is accessible',
@@ -2984,7 +2773,7 @@ app.get('/api/lemon-squeezy/test', (async (req: Request, res: Response) => {
       }
     }
 
-    console.log('Testing webhook with payload:', JSON.stringify(testPayload, null, 2))
+    
 
     // Process the test webhook
     const { meta, data } = testPayload
@@ -3003,7 +2792,7 @@ app.get('/api/lemon-squeezy/test', (async (req: Request, res: Response) => {
       `
 
       if (result.length > 0) {
-        console.log(`Test: Successfully upgraded team ${customData.teamId} to ${planType}`)
+        
         
         // Store subscription data
         await sql`
@@ -3046,7 +2835,6 @@ app.get('/api/lemon-squeezy/test', (async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid test payload' })
     }
   } catch (error) {
-    console.error('Error in test webhook:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -3076,7 +2864,6 @@ app.get('/api/teams/:id/tier', (async (req: Request, res: Response) => {
 
     return res.status(200).json({ tier: result[0].tier })
   } catch (error) {
-    console.error('Error checking team tier:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
@@ -3084,5 +2871,5 @@ app.get('/api/teams/:id/tier', (async (req: Request, res: Response) => {
 // Start the server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  
 });
