@@ -2634,12 +2634,13 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
         type: 'checkouts',
         attributes: {
           checkout_options: {
-            embed: true,
+            embed: false, // false para usar overlay
             media: true,
             logo: true,
             desc: true,
             discount: true,
-            subscription_preview: true
+            subscription_preview: true,
+            return_url: returnUrl
           },
           checkout_data: {
             name: user.first_name || 'Campy User',

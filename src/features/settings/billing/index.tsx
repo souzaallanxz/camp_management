@@ -41,34 +41,81 @@ export default function SettingsBilling() {
         return
       }
       
+      // eslint-disable-next-line no-console
       console.log('Checkout URL received:', data.url)
+      // eslint-disable-next-line no-console
       console.log('LemonSqueezy object:', window.LemonSqueezy)
+      // eslint-disable-next-line no-console
       console.log('LemonSqueezy.Url:', window.LemonSqueezy?.Url)
+      
+      // Função para aguardar o Lemon Squeezy estar disponível
+      const waitForLemonSqueezy = (maxAttempts = 10, interval = 500) => {
+        return new Promise<boolean>((resolve) => {
+          let attempts = 0;
+          
+          const checkLemonSqueezy = () => {
+            attempts++;
+            // eslint-disable-next-line no-console
+            console.log(`Checking Lemon Squeezy availability (attempt ${attempts})`);
+            
+            if (window.LemonSqueezy) {
+              // eslint-disable-next-line no-console
+              console.log('Lemon Squeezy is available:', window.LemonSqueezy);
+              resolve(true);
+              return;
+            }
+            
+            if (attempts >= maxAttempts) {
+              // eslint-disable-next-line no-console
+              console.error('Lemon Squeezy not available after maximum attempts');
+              resolve(false);
+              return;
+            }
+            
+            setTimeout(checkLemonSqueezy, interval);
+          };
+          
+          checkLemonSqueezy();
+        });
+      };
       
       // Função para tentar abrir o overlay
       const openOverlay = () => {
-        if (window.LemonSqueezy && window.LemonSqueezy.Url && typeof window.LemonSqueezy.Url.open === 'function') {
-          console.log('Opening Lemon Squeezy overlay...')
+        if (window.LemonSqueezy && typeof window.LemonSqueezy.Url?.open === 'function') {
+          // eslint-disable-next-line no-console
+          console.log('Opening Lemon Squeezy overlay with Url.open...')
           window.LemonSqueezy.Url.open(data.url)
+          return true
+        }
+        // Tentar método alternativo se o primeiro não funcionar
+        if (window.LemonSqueezy && typeof window.LemonSqueezy?.open === 'function') {
+          // eslint-disable-next-line no-console
+          console.log('Opening Lemon Squeezy with direct open method...')
+          window.LemonSqueezy.open(data.url)
           return true
         }
         return false
       }
       
-      // Tentar abrir imediatamente
-      if (!openOverlay()) {
-        console.log('Lemon Squeezy not ready, waiting...')
-        // Se não estiver pronto, aguardar um pouco e tentar novamente
-        setTimeout(() => {
-          if (!openOverlay()) {
-            console.error('Lemon Squeezy overlay still not available after timeout')
-            toast.error('Overlay Lemon Squeezy não disponível', { 
-              description: 'Abrindo checkout em nova janela...' 
-            })
-            // Fallback: abrir em nova janela
-            window.open(data.url, '_blank')
-          }
-        }, 1000) // Aguardar 1 segundo
+      // Aguardar o Lemon Squeezy estar disponível e tentar abrir o overlay
+      const lemonSqueezyAvailable = await waitForLemonSqueezy();
+      
+      if (lemonSqueezyAvailable) {
+        if (!openOverlay()) {
+          // eslint-disable-next-line no-console
+          console.error('Lemon Squeezy available but overlay method not found')
+          toast.error('Método de overlay não encontrado', { 
+            description: 'Abrindo checkout em nova janela...' 
+          })
+          window.open(data.url, '_blank')
+        }
+      } else {
+        // eslint-disable-next-line no-console
+        console.error('Lemon Squeezy not available after waiting')
+        toast.error('Lemon Squeezy não disponível', { 
+          description: 'Abrindo checkout em nova janela...' 
+        })
+        window.open(data.url, '_blank')
       }
     } catch (err) {
       toast.dismiss()
