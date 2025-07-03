@@ -4,7 +4,7 @@ import dotenv from 'dotenv'
 import { Resend } from 'resend'
 import { neon } from '@neondatabase/serverless'
 import bcrypt from 'bcryptjs'
-import { createCheckout, PREMIUM_PLAN } from './src/services/lemon-squeezy.service.js'
+import crypto from 'crypto'
 
 // Load environment variables
 dotenv.config()
@@ -2294,27 +2294,38 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
 
 // ===== LEMON SQUEEZY WEBHOOKS =====
 
+// Função utilitária para validar assinatura do Lemon Squeezy
+function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
+  const signature = req.headers['x-signature'] as string
+  if (!signature) return false
+  // O Lemon Squeezy envia o corpo como string para assinatura
+  const payload = JSON.stringify(req.body)
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex')
+  return signature === expectedSignature
+}
+
 // Process Lemon Squeezy payment confirmations
 app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
   try {
-    // Log o payload recebido para debug
-    console.log('--- Lemon Squeezy Webhook Received ---')
-    console.log('Headers:', req.headers)
-    console.log('Body:', JSON.stringify(req.body, null, 2))
+    // Validar assinatura do webhook
+    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
+    if (!secret || !isValidLemonSqueezySignature(req, secret)) {
+      return res.status(401).json({ error: 'Invalid webhook signature' })
+    }
     const { meta, data } = req.body
 
     if (!meta || !data) {
-      console.error('Webhook: Payload inválido')
       return res.status(400).json({ error: 'Invalid webhook payload' })
     }
 
     const eventName = meta.event_name
-    console.log('Webhook: Event name:', eventName)
     
     // Handle subscription or order events
     if (eventName === 'subscription_created' || eventName === 'order_created') {
       const customData = data.attributes?.custom_data
-      console.log('Webhook: custom_data:', customData)
       
       if (!customData || !customData.teamId) {
         console.warn('Lemon Squeezy webhook missing team ID in custom data')
@@ -2359,11 +2370,8 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
             )
             ON CONFLICT (team_id, subscription_id) DO UPDATE SET
               status = EXCLUDED.status,
-              updated_at = NOW(),
-              event_name = EXCLUDED.event_name,
-              custom_data = EXCLUDED.custom_data
+              updated_at = NOW()
           `
-          console.log('Subscription upserted in lemon_squeezy_subscriptions')
         } else {
           console.warn(`Team ${teamId} not found for upgrade`)
         }
@@ -2376,7 +2384,6 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
     // Handle subscription cancellation
     if (eventName === 'subscription_cancelled') {
       const customData = data.attributes?.custom_data
-      console.log('Webhook: custom_data (cancel):', customData)
       
       if (customData && customData.teamId) {
         const teamId = customData.teamId
@@ -2392,7 +2399,7 @@ app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => 
           // Update subscription status
           await sql`
             UPDATE lemon_squeezy_subscriptions 
-            SET status = 'cancelled', updated_at = NOW(), event_name = ${eventName}
+            SET status = 'cancelled', updated_at = NOW()
             WHERE team_id = ${teamId}::uuid AND subscription_id = ${data.id}
           `
 
@@ -2594,45 +2601,6 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
   } catch (error) {
     console.error('Error processing payment webhook:', error);
     return res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// === LEMON SQUEEZY CHECKOUT (BACKEND) ===
-app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const token = authHeader.split(' ')[1];
-    const { teamId, teamName } = req.body;
-    if (!teamId || !teamName) {
-      return res.status(400).json({ error: 'teamId and teamName are required' });
-    }
-    // Validar se o user pertence ao teamId
-    const userResult = await sql`
-      SELECT id, team_id FROM public.users WHERE id = ${token}::uuid
-    `;
-    const user = userResult[0];
-    if (!user || user.team_id !== teamId) {
-      return res.status(403).json({ error: 'You can only create checkout for your own team' });
-    }
-    // Chamar a API do Lemon Squeezy
-    const checkoutUrl = await createCheckout({
-      storeId: PREMIUM_PLAN.storeId,
-      variantId: PREMIUM_PLAN.variantId,
-      customData: {
-        teamId,
-        planType: 'premium',
-        teamName,
-        timestamp: new Date().toISOString(),
-      },
-      customerName: teamName,
-    });
-    return res.json({ checkoutUrl });
-  } catch (error) {
-    console.error('Erro ao criar checkout Lemon Squeezy:', error);
-    return res.status(500).json({ error: 'Erro ao criar checkout' });
   }
 });
 

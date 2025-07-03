@@ -24,6 +24,7 @@ interface CheckoutData {
       dark?: boolean;
       subscription_preview?: boolean;
       button_color?: string;
+      return_url?: string;
     };
     checkout_data?: {
       email?: string;
@@ -102,6 +103,7 @@ export async function createCheckout(params: {
   customData?: Record<string, unknown>;
   customerEmail?: string;
   customerName?: string;
+  returnUrl?: string;
 }): Promise<string> {
   const checkoutData: CheckoutData = {
     type: 'checkouts',
@@ -114,6 +116,7 @@ export async function createCheckout(params: {
         discount: true,
         dark: false,
         subscription_preview: true,
+        ...(params.returnUrl ? { return_url: params.returnUrl } : {}),
       },
       checkout_data: {
         email: params.customerEmail,
