@@ -2633,16 +2633,14 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
       data: {
         type: 'checkouts',
         attributes: {
-          checkout_options: {
-            embed: true,
-            media: true,
-            logo: true,
-            desc: true,
-            discount: true,
-            dark: false,
-            subscription_preview: true,
-            return_url: returnUrl,
-          },
+          checkout_options: [
+            'embed',
+            'media',
+            'logo',
+            'desc',
+            'discount',
+            'subscription_preview'
+          ],
           checkout_data: {
             name: user.first_name || 'Campy User',
             custom: {
@@ -2652,6 +2650,7 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
             },
           },
           test_mode: process.env.NODE_ENV !== 'production',
+          return_url: returnUrl,
         },
         relationships: {
           store: { data: { type: 'stores', id: storeId } },
@@ -2659,6 +2658,9 @@ app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
         },
       },
     };
+    // Debug: Log the payload
+    console.log('Lemon Squeezy payload:', JSON.stringify(payload, null, 2));
+    
     // Fazer request à API Lemon Squeezy
     const response = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
       method: 'POST',
