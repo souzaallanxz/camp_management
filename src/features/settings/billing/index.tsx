@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { useTeamData } from '@/features/teams/hooks/use-team-data'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
+import { TestLemonSqueezy } from '@/test-lemon-squeezy'
 
 export default function SettingsBilling() {
   const { teams } = useTeamData()
@@ -81,7 +82,7 @@ export default function SettingsBilling() {
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="text-2xl font-bold">
-              €29 <span className="text-sm font-normal text-muted-foreground">/mês</span>
+              €19 <span className="text-sm font-normal text-muted-foreground">/mês</span>
             </div>
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2">
@@ -110,7 +111,7 @@ export default function SettingsBilling() {
                 className="w-full"
                 onClick={() => setShowUpgradeDialog(true)}
               >
-                Fazer Upgrade - €29/mês
+                Fazer Upgrade - €19/mês
               </Button>
             ) : (
               <Button variant="outline" className="w-full" disabled>
@@ -125,6 +126,10 @@ export default function SettingsBilling() {
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
       />
+      
+      <div className="mt-8 border-t pt-6">
+        <TestLemonSqueezy />
+      </div>
     </div>
   )
 } 

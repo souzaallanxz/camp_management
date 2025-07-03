@@ -175,7 +175,7 @@ export async function getVariants(productId: string) {
  */
 export const PREMIUM_PLAN = {
   storeId: '181507', // Campy store ID
-  variantId: '883664', // Replace with your premium variant ID after creating product
+  variantId: '883664', // Premium variant ID from Lemon Squeezy
   price: 19,
   currency: 'EUR',
   interval: 'month',

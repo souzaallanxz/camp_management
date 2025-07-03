@@ -90,7 +90,7 @@ export function TierUpgradeDialog({ open, onOpenChange }: Props) {
             <DialogDescription className="text-base">
               {isPremium 
                 ? 'Ao fazer downgrade, perderá acesso a recursos premium imediatamente'
-                : 'Será redirecionado para o pagamento seguro. Acesso ilimitado a todas as funcionalidades premium por apenas €29/mês'
+                : 'Será redirecionado para o pagamento seguro. Acesso ilimitado a todas as funcionalidades premium por apenas €19/mês'
               }
             </DialogDescription>
           </DialogHeader>
