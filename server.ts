@@ -565,11 +565,25 @@ app.post('/api/teams', (async (req: Request, res: Response) => {
 app.put('/api/teams/:id', (async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const teamId = getTeamId(req)
+    const authHeader = req.headers.authorization
     
-    if (!teamId) {
-      return res.status(401).json({ error: 'Team ID is required' })
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' })
     }
+
+    const token = authHeader.split(' ')[1]
+
+    // Get user's team_id from their profile
+    const userResult = await sql`
+      SELECT team_id FROM public.users WHERE id = ${token}::uuid
+    `
+
+    const user = userResult[0]
+    if (!user || !user.team_id) {
+      return res.status(401).json({ error: 'User not found or no team associated' })
+    }
+
+    const teamId = user.team_id
 
     // Ensure user can only update their own team
     if (id !== teamId) {

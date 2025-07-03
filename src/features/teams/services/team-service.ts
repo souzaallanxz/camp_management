@@ -132,22 +132,16 @@ export const teamService = {
 
   async updateTeam(id: string, data: UpdateTeamData) {
     const token = localStorage.getItem('token')
-    const teamId = localStorage.getItem('teamId') || localStorage.getItem('team_id')
     
     if (!token) {
       throw new Error('No authenticated user found')
-    }
-    
-    if (!teamId) {
-      throw new Error('No team ID found')
     }
 
     const response = await fetch(buildApiUrl(`/teams/${id}`), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'x-team-id': teamId
+        'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(data),
       credentials: 'include',
