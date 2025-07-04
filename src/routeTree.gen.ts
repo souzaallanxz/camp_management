@@ -13,6 +13,8 @@ import { createFileRoute } from '@tanstack/react-router'
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as TermsImport } from './routes/terms'
+import { Route as PrivacyImport } from './routes/privacy'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedSnackBarImport } from './routes/_authenticated/snack-bar'
@@ -81,6 +83,18 @@ const AuthenticatedSettingsAccountLazyImport = createFileRoute(
 )()
 
 // Create/Update Routes
+
+const TermsRoute = TermsImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const PrivacyRoute = PrivacyImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const AuthenticatedRouteRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -390,6 +404,20 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: ''
       preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRoute
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyImport
+      parentRoute: typeof rootRoute
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsImport
       parentRoute: typeof rootRoute
     }
     '/(auth)/500': {
@@ -718,6 +746,8 @@ const AuthenticatedRouteRouteWithChildren =
 
 export interface FileRoutesByFullPath {
   '': typeof AuthenticatedRouteRouteWithChildren
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/setup-password': typeof authSetupPasswordRoute
@@ -754,6 +784,8 @@ export interface FileRoutesByFullPath {
 }
 
 export interface FileRoutesByTo {
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/setup-password': typeof authSetupPasswordRoute
@@ -790,6 +822,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/(auth)/500': typeof auth500Route
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/setup-password': typeof authSetupPasswordRoute
@@ -830,6 +864,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | ''
+    | '/privacy'
+    | '/terms'
     | '/500'
     | '/otp'
     | '/setup-password'
@@ -865,6 +901,8 @@ export interface FileRouteTypes {
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/privacy'
+    | '/terms'
     | '/500'
     | '/otp'
     | '/setup-password'
@@ -899,6 +937,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
+    | '/privacy'
+    | '/terms'
     | '/(auth)/500'
     | '/(auth)/otp'
     | '/(auth)/setup-password'
@@ -938,6 +978,8 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   auth500Route: typeof auth500Route
   authOtpRoute: typeof authOtpRoute
   authSetupPasswordRoute: typeof authSetupPasswordRoute
@@ -955,6 +997,8 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   auth500Route: auth500Route,
   authOtpRoute: authOtpRoute,
   authSetupPasswordRoute: authSetupPasswordRoute,
@@ -981,6 +1025,8 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/_authenticated",
+        "/privacy",
+        "/terms",
         "/(auth)/500",
         "/(auth)/otp",
         "/(auth)/setup-password",
@@ -1013,6 +1059,12 @@ export const routeTree = rootRoute
         "/_authenticated/tasks/",
         "/_authenticated/users/"
       ]
+    },
+    "/privacy": {
+      "filePath": "privacy.tsx"
+    },
+    "/terms": {
+      "filePath": "terms.tsx"
     },
     "/(auth)/500": {
       "filePath": "(auth)/500.tsx"
