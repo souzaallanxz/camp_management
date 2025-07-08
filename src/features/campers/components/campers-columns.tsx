@@ -51,27 +51,14 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     ),
   },
   {
-    accessorKey: 'camp',
+    accessorKey: 'camp_name',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Acampamento" />
     ),
-    cell: ({ row }) => {
-      const camp = row.original.camp;
-      // Verificar se camp é objeto e tem propriedade name, ou é string
-      if (typeof camp === 'object' && camp?.name) {
-        return camp.name;
-      }
-      return camp || '-';
-    },
+    cell: ({ row }) => row.getValue('camp_name') || '-',
     enableColumnFilter: true,
     filterFn: (row, id, value) => {
-      const camp = row.getValue(id);
-      let campName = '';
-      if (camp !== undefined && camp !== null && typeof camp === 'object' && 'name' in camp && typeof (camp as { name?: string }).name === 'string') {
-        campName = String((camp as { name: string }).name).trim();
-      } else if (typeof camp === 'string') {
-        campName = camp.trim();
-      }
+      const campName = row.getValue(id);
       return value.includes(campName);
     }
   },

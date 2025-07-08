@@ -10,31 +10,24 @@ import { type CamperWithActions } from './campers-table'
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
+  data: TData[]
 }
 
 export function DataTableToolbar<TData>({
   table,
+  data,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
 
-  // Extrair acampamentos únicos dos dados da tabela
+  // Extrair acampamentos únicos dos dados recebidos
   const campFilters = useMemo(() => {
-    const tableData = table.getCoreRowModel().rows.map(row => row.original) as CamperWithActions[]
-    const uniqueCamps = Array.from(new Set(tableData.map(item => {
-      const camp = item.camp;
-      if (camp !== undefined && camp !== null && typeof camp === 'object' && 'name' in camp && typeof (camp as { name?: string }).name === 'string') {
-        return String((camp as { name: string }).name).trim();
-      }
-      if (typeof camp === 'string') {
-        return camp.trim();
-      }
-      return '';
-    }).filter(Boolean)))
+    const tableData = data as CamperWithActions[];
+    const uniqueCamps = Array.from(new Set(tableData.map(item => item.camp_name).filter(Boolean)));
     return uniqueCamps.map(campName => ({
       label: campName,
       value: campName
     }))
-  }, [table])
+  }, [data])
 
   return (
     <div className='flex items-center justify-between'>
