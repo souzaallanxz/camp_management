@@ -4,6 +4,14 @@ import { Table } from '@tanstack/react-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTableViewOptions } from './data-table-view-options'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useCamps } from '@/features/camps/hooks/use-camps'
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
@@ -13,6 +21,7 @@ export function DataTableToolbar<TData>({
   table,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
+  const { data: camps = [] } = useCamps()
 
   return (
     <div className='flex items-center justify-between'>
@@ -25,6 +34,24 @@ export function DataTableToolbar<TData>({
           }
           className='h-8 w-[150px] lg:w-[250px]'
         />
+        <Select
+          value={(table.getColumn('camp')?.getFilterValue() as string) ?? ''}
+          onValueChange={(value) => {
+            table.getColumn('camp')?.setFilterValue(value === 'all' ? '' : value)
+          }}
+        >
+          <SelectTrigger className='h-8 w-[180px]'>
+            <SelectValue placeholder='Filtrar por acampamento' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='all'>Todos os acampamentos</SelectItem>
+            {camps.map((camp) => (
+              <SelectItem key={camp.id} value={camp.name}>
+                {camp.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {isFiltered && (
           <Button
             variant='ghost'
