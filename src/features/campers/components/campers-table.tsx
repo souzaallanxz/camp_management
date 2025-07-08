@@ -29,6 +29,7 @@ export interface CamperWithActions extends Camper {
   onEdit?: (camper: Camper) => void
   onLoadCard?: (camper: Camper) => void
   total_balance: number
+  camp_name?: string;
 }
 
 interface DataTableProps {

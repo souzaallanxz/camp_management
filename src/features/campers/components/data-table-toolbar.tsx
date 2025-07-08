@@ -42,7 +42,7 @@ export function DataTableToolbar<TData>({
         />
         <div className='flex gap-x-2'>
           <DataTableFacetedFilter
-            column={table.getColumn('camp')}
+            column={table.getColumn('camp_name')}
             title='Acampamento'
             options={campFilters}
           />
