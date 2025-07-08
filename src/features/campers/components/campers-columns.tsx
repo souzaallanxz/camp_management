@@ -62,7 +62,19 @@ export const columns: ColumnDef<CamperWithActions>[] = [
         return camp.name;
       }
       return camp || '-';
-    }
+    },
+    filterFn: (row, id, value) => {
+      const camp = (row.original as { camp?: string | { name?: string } }).camp;
+      let campValue = '';
+      
+      if (typeof camp === 'object' && camp && 'name' in camp && camp.name) {
+        campValue = camp.name;
+      } else if (camp) {
+        campValue = String(camp);
+      }
+      
+      return value.includes(campValue);
+    },
   },
   {
     accessorKey: 'snack_bar_balance',

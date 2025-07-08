@@ -43,24 +43,33 @@ export function CampersTable({ data }: DataTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
 
+  // Crie um campo virtual camp_name para cada camper
+  const campersWithCampName = useMemo(() => data.map(camper => {
+    let camp_name = '';
+    const camp = camper.camp;
+    if (camp !== undefined && camp !== null && typeof camp === 'object' && 'name' in (camp as NonNullable<typeof camp>) && (camp as any).name) {
+      camp_name = (camp as any).name as string;
+    } else if (typeof camp === 'string') {
+      camp_name = camp;
+    }
+    return {
+      ...camper,
+      camp_name,
+    };
+  }), [data]);
+
   // Extrair acampamentos únicos dos dados
   const campFilters = useMemo(() => {
-    const uniqueCamps = Array.from(new Set(data.map(item => {
-      const camp = item.camp;
-      if (typeof camp === 'object' && camp && typeof camp === 'object' && 'name' in camp) {
-        return (camp as { name: string }).name;
-      }
-      return camp;
-    }).filter(Boolean)))
+    const uniqueCamps = Array.from(new Set(campersWithCampName.map(item => item.camp_name).filter(Boolean)))
     return uniqueCamps.map(campName => ({
       label: campName,
       value: campName
     }))
-  }, [data])
+  }, [campersWithCampName])
 
   const table = useReactTable({
-    data,
-    columns: defaultColumns as ColumnDef<CamperWithActions, unknown>[],
+    data: campersWithCampName,
+    columns: defaultColumns as ColumnDef<(CamperWithActions & { camp_name: string }), unknown>[],
     state: {
       sorting,
       columnVisibility,
@@ -99,7 +108,7 @@ export function CampersTable({ data }: DataTableProps) {
         onGlobalFilterChange={setGlobalFilter}
         filters={[
           {
-            column: 'camp',
+            column: 'camp_name',
             title: 'Acampamento',
             options: campFilters
           }
