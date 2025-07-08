@@ -22,12 +22,11 @@ export function DataTableToolbar<TData>({
     const tableData = table.getCoreRowModel().rows.map(row => row.original) as CamperWithActions[]
     const uniqueCamps = Array.from(new Set(tableData.map(item => {
       const camp = item.camp;
-      if (camp && typeof camp === 'string') {
-        return camp;
+      if (camp !== undefined && camp !== null && typeof camp === 'object' && 'name' in camp && typeof (camp as { name?: string }).name === 'string') {
+        return String((camp as { name: string }).name).trim();
       }
-      if (camp && typeof camp === 'object' && camp !== null) {
-        const campObj = camp as { name?: string };
-        return campObj.name || '';
+      if (typeof camp === 'string') {
+        return camp.trim();
       }
       return '';
     }).filter(Boolean)))

@@ -66,10 +66,13 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     enableColumnFilter: true,
     filterFn: (row, id, value) => {
       const camp = row.getValue(id);
-      if (typeof camp === 'object' && camp && 'name' in camp && camp.name) {
-        return value.includes(camp.name);
+      let campName = '';
+      if (camp !== undefined && camp !== null && typeof camp === 'object' && 'name' in camp && typeof (camp as { name?: string }).name === 'string') {
+        campName = String((camp as { name: string }).name).trim();
+      } else if (typeof camp === 'string') {
+        campName = camp.trim();
       }
-      return value.includes(camp);
+      return value.includes(campName);
     }
   },
   {
