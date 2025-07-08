@@ -24,8 +24,18 @@ interface CamperComboboxProps {
 
 export function CamperCombobox({ value, onValueChange, campers }: CamperComboboxProps) {
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
 
   const selectedCamper = campers?.find((camper) => camper.id === value)
+
+  // Filtrar por nome OU form_id
+  const filteredCampers = campers?.filter((camper) => {
+    const searchLower = search.toLowerCase()
+    return (
+      camper.name.toLowerCase().includes(searchLower) ||
+      (camper.form_id && camper.form_id.toLowerCase().includes(searchLower))
+    )
+  })
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -36,19 +46,19 @@ export function CamperCombobox({ value, onValueChange, campers }: CamperCombobox
           aria-expanded={open}
           className="w-full justify-between"
         >
-          {value ? selectedCamper?.name : 'Selecione um campista...'}
+          {value ? `${selectedCamper?.name}${selectedCamper?.form_id ? ` (${selectedCamper.form_id})` : ''}` : 'Selecione um campista...'}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0">
         <Command>
-          <CommandInput placeholder="Procurar campista..." className="h-9" />
+          <CommandInput placeholder="Procurar campista por nome ou form_id..." className="h-9" value={search} onValueChange={setSearch} />
           <CommandEmpty>Nenhum campista encontrado.</CommandEmpty>
           <CommandGroup className="max-h-[200px] overflow-auto">
-            {campers?.map((camper) => (
+            {filteredCampers?.map((camper) => (
               <CommandItem
                 key={camper.id}
-                value={camper.name}
+                value={`${camper.name}${camper.form_id ? ` (${camper.form_id})` : ''}`}
                 onSelect={() => {
                   onValueChange(camper.id)
                   setOpen(false)
@@ -62,6 +72,9 @@ export function CamperCombobox({ value, onValueChange, campers }: CamperCombobox
                   )}
                 />
                 {camper.name}
+                {camper.form_id && (
+                  <span className="ml-2 text-xs text-muted-foreground">({camper.form_id})</span>
+                )}
               </CommandItem>
             ))}
           </CommandGroup>

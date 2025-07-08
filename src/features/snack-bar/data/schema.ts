@@ -36,4 +36,5 @@ export interface CamperWithBalance {
     id: string
     camp_id: string
   }
+  form_id?: string | null
 } 

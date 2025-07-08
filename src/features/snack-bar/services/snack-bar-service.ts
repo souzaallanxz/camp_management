@@ -37,14 +37,15 @@ export const snackBarService = {
     try {
       const url = campId ? `/campers?camp_id=${campId}` : '/campers'
       const response = await api.get(url)
-      return response.data.map((camper: CamperResponse & { registration_name?: string }) => ({
+      return response.data.map((camper: CamperResponse & { registration_name?: string, form_id?: string | null }) => ({
         id: camper.id,
         name: camper.name || camper.registration_name || 'Sem nome',
         snack_bar_balance: Number(camper.snack_bar_balance) || 0,
         registration: {
           id: camper.registration_id,
           camp_id: camper.camp_id
-        }
+        },
+        form_id: camper.form_id ?? null
       }))
     } catch {
       return []
@@ -53,7 +54,7 @@ export const snackBarService = {
 
   async getCamperById(id: string): Promise<CamperWithBalance> {
     const response = await api.get(`/campers/${id}`)
-    const camper = response.data as CamperResponse
+    const camper = response.data as CamperResponse & { form_id?: string | null }
     return {
       id: camper.id,
       name: camper.name,
@@ -61,7 +62,8 @@ export const snackBarService = {
       registration: {
         id: camper.registration_id,
         camp_id: camper.camp_id
-      }
+      },
+      form_id: camper.form_id ?? null
     }
   },
 
