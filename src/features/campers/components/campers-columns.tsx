@@ -59,7 +59,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     enableColumnFilter: true,
     filterFn: (row, id, value) => {
       const campName = row.getValue(id);
-      return value.includes(campName);
+      return Array.isArray(value) ? value.includes(campName) : false;
     }
   },
   {
