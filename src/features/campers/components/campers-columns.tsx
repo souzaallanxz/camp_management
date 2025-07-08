@@ -63,18 +63,14 @@ export const columns: ColumnDef<CamperWithActions>[] = [
       }
       return camp || '-';
     },
+    enableColumnFilter: true,
     filterFn: (row, id, value) => {
-      const camp = (row.original as { camp?: string | { name?: string } }).camp;
-      let campValue = '';
-      
+      const camp = row.getValue(id);
       if (typeof camp === 'object' && camp && 'name' in camp && camp.name) {
-        campValue = camp.name;
-      } else if (camp) {
-        campValue = String(camp);
+        return value.includes(camp.name);
       }
-      
-      return value.includes(campValue);
-    },
+      return value.includes(camp);
+    }
   },
   {
     accessorKey: 'snack_bar_balance',
@@ -119,7 +115,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' className='w-[160px]'>
             <DropdownMenuItem
-              onClick={() => camper.onEdit?.(camper)}
+              onClick={() => camper.onEdit?.(camper as Camper)}
               className='flex items-center'
             >
               Editar
@@ -131,7 +127,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DropdownMenuItem
-                    onClick={() => permissions.campers.rechargeCard ? camper.onLoadCard?.(camper) : camper.onUpgradeClick?.()}
+                    onClick={() => permissions.campers.rechargeCard ? camper.onLoadCard?.(camper as Camper) : camper.onUpgradeClick?.()}
                     className='flex items-center'
                     disabled={!permissions.campers.rechargeCard}
                   >

@@ -4,14 +4,9 @@ import { Table } from '@tanstack/react-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTableViewOptions } from './data-table-view-options'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { useCamps } from '@/features/camps/hooks/use-camps'
+import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter'
+import { useMemo } from 'react'
+import { type CamperWithActions } from './campers-table'
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
@@ -21,11 +16,30 @@ export function DataTableToolbar<TData>({
   table,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
-  const { data: camps = [] } = useCamps()
+
+  // Extrair acampamentos únicos dos dados da tabela
+  const campFilters = useMemo(() => {
+    const tableData = table.getCoreRowModel().rows.map(row => row.original) as CamperWithActions[]
+    const uniqueCamps = Array.from(new Set(tableData.map(item => {
+      const camp = item.camp;
+      if (camp && typeof camp === 'string') {
+        return camp;
+      }
+      if (camp && typeof camp === 'object' && camp !== null) {
+        const campObj = camp as { name?: string };
+        return campObj.name || '';
+      }
+      return '';
+    }).filter(Boolean)))
+    return uniqueCamps.map(campName => ({
+      label: campName,
+      value: campName
+    }))
+  }, [table])
 
   return (
     <div className='flex items-center justify-between'>
-      <div className='flex flex-1 items-center space-x-2'>
+      <div className='flex flex-1 flex-col-reverse items-start gap-y-2 sm:flex-row sm:items-center sm:space-x-2'>
         <Input
           placeholder='Filtrar por nome...'
           value={(table.getColumn('name')?.getFilterValue() as string) ?? ''}
@@ -34,24 +48,13 @@ export function DataTableToolbar<TData>({
           }
           className='h-8 w-[150px] lg:w-[250px]'
         />
-        <Select
-          value={(table.getColumn('camp')?.getFilterValue() as string) ?? ''}
-          onValueChange={(value) => {
-            table.getColumn('camp')?.setFilterValue(value === 'all' ? '' : value)
-          }}
-        >
-          <SelectTrigger className='h-8 w-[180px]'>
-            <SelectValue placeholder='Filtrar por acampamento' />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value='all'>Todos os acampamentos</SelectItem>
-            {camps.map((camp) => (
-              <SelectItem key={camp.id} value={camp.name}>
-                {camp.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className='flex gap-x-2'>
+          <DataTableFacetedFilter
+            column={table.getColumn('camp')}
+            title='Acampamento'
+            options={campFilters}
+          />
+        </div>
         {isFiltered && (
           <Button
             variant='ghost'

@@ -1,6 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import {
-  type ColumnDef,
   type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
@@ -23,7 +22,7 @@ import {
 } from '@/components/ui/table'
 import { type Camper } from '../data/schema'
 import { DataTablePagination } from './data-table-pagination'
-import { DataTableToolbar } from '@/components/data-table/data-table-toolbar'
+import { DataTableToolbar } from './data-table-toolbar'
 import { columns as defaultColumns } from './campers-columns'
 
 export interface CamperWithActions extends Camper {
@@ -41,79 +40,32 @@ export function CampersTable({ data }: DataTableProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [sorting, setSorting] = useState<SortingState>([])
-  const [globalFilter, setGlobalFilter] = useState('')
-
-  // Crie um campo virtual camp_name para cada camper
-  const campersWithCampName = useMemo(() => data.map(camper => {
-    let camp_name = '';
-    const camp = camper.camp;
-    if (camp !== undefined && camp !== null && typeof camp === 'object' && 'name' in (camp as NonNullable<typeof camp>) && (camp as any).name) {
-      camp_name = (camp as any).name as string;
-    } else if (typeof camp === 'string') {
-      camp_name = camp;
-    }
-    return {
-      ...camper,
-      camp_name,
-    };
-  }), [data]);
-
-  // Extrair acampamentos únicos dos dados
-  const campFilters = useMemo(() => {
-    const uniqueCamps = Array.from(new Set(campersWithCampName.map(item => item.camp_name).filter(Boolean)))
-    return uniqueCamps.map(campName => ({
-      label: campName,
-      value: campName
-    }))
-  }, [campersWithCampName])
 
   const table = useReactTable({
-    data: campersWithCampName,
-    columns: defaultColumns as ColumnDef<(CamperWithActions & { camp_name: string }), unknown>[],
+    data,
+    columns: defaultColumns,
     state: {
       sorting,
       columnVisibility,
       rowSelection,
       columnFilters,
-      globalFilter,
     },
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
-    globalFilterFn: (row, columnId, filterValue) => {
-      const value = row.getValue(columnId)
-      if (value == null) return false
-      
-      const searchValue = filterValue.toLowerCase()
-      const stringValue = String(value).toLowerCase()
-      
-      return stringValue.includes(searchValue)
-    },
   })
 
   return (
     <div className='space-y-4'>
-      <DataTableToolbar 
-        table={table} 
-        globalFilter={globalFilter}
-        onGlobalFilterChange={setGlobalFilter}
-        filters={[
-          {
-            column: 'camp_name',
-            title: 'Acampamento',
-            options: campFilters
-          }
-        ]}
-      />
+      <DataTableToolbar table={table} />
       <div className='rounded-md border'>
         <Table>
           <TableHeader>
