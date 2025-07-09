@@ -111,15 +111,20 @@ function CampersContent() {
   )
 }
 
-export function CampersFeature() {
+export default function CampersPage() {
   const permissions = useTeamPermissions()
   const navigate = useNavigate()
+  
   useEffect(() => {
-    if (!permissions.campers.viewList) {
+    // Só verificar permissões após carregamento completo
+    if (!permissions.isLoading && !permissions.campers.viewList) {
       navigate({ to: '/' })
     }
   }, [permissions, navigate])
-  if (!permissions.campers.viewList) return null
+  
+  // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
+  if (permissions.isLoading || !permissions.campers.viewList) return null
+  
   return (
     <CamperDialogsProvider>
       <CampersContent />

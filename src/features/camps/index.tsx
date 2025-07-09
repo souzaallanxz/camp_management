@@ -61,12 +61,17 @@ function CampsContent() {
 export default function CampsPage() {
   const permissions = useTeamPermissions()
   const navigate = useNavigate()
+  
   useEffect(() => {
-    if (!permissions.camps.viewList) {
+    // Só verificar permissões após carregamento completo
+    if (!permissions.isLoading && !permissions.camps.viewList) {
       navigate({ to: '/' })
     }
   }, [permissions, navigate])
-  if (!permissions.camps.viewList) return null
+  
+  // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
+  if (permissions.isLoading || !permissions.camps.viewList) return null
+  
   return (
     <CampDialogsProvider>
       <CampsContent />

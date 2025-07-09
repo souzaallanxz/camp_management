@@ -1,10 +1,7 @@
 import {
   IconLayoutDashboard,
   IconSettings,
-  IconTool,
   IconPalette,
-  IconNotification,
-  IconBrowserCheck,
   IconUserCog,
   IconFileDescription,
   IconTent,
@@ -113,13 +110,11 @@ export const sidebarData: SidebarData = {
 // Hook version with user info
 export function useSidebarData(): SidebarData & { isLoading: boolean } {
   const user = useUser()
-  const { teams: dbTeams, isLoading } = useTeamData()
+  const { teams: dbTeams, isLoading: teamsLoading } = useTeamData()
   const permissions = useTeamPermissions()
 
-  // Só gera menu quando usuário e permissões estão carregadas
-  if (user.isLoading || !user.user || !permissions) {
-    return { user: { name: '', email: '', avatar: '' }, teams: [], navGroups: [], isLoading: true }
-  }
+  // Se ainda está carregando informações do usuário ou permissões, não mostrar itens
+  const isLoading = user.isLoading || permissions.isLoading || teamsLoading
 
   const teams = dbTeams.map(team => ({
     name: team.name,
@@ -129,61 +124,66 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
 
   const generalItems: NavItem[] = [];
 
-  // Se for cashier, só mostra Dashboard e Snack Bar
-  if (user?.role === 'cashier') {
-    generalItems.push({
-      title: 'Dashboard',
-      url: '/',
-      icon: IconLayoutDashboard,
-    })
-    if (permissions.snackBar.access) {
-      generalItems.push({
-        title: 'Snack Bar',
-        url: '/snack-bar',
-        icon: IconIceCream,
-      })
-    }
+  // Se ainda está carregando, não mostrar nenhum item
+  if (isLoading) {
+    // Não adicionar itens enquanto carrega
   } else {
-    generalItems.push({
-      title: 'Dashboard',
-      url: '/',
-      icon: IconLayoutDashboard,
-    })
-    generalItems.push({
-      title: 'Inscrições',
-      url: '/registrations',
-      icon: IconFileDescription,
-    })
-    generalItems.push({
-      title: 'Campistas',
-      url: '/campers',
-      icon: IconTent,
-    })
-    // Only show Users menu item for superadmin and admin roles
-    if (user?.role === 'superadmin' || user?.role === 'admin') {
+    // Se for cashier, só mostra Dashboard e Snack Bar
+    if (user?.role === 'cashier') {
       generalItems.push({
-        title: 'Utilizadores',
-        url: '/users',
-        icon: IconUsers,
+        title: 'Dashboard',
+        url: '/',
+        icon: IconLayoutDashboard,
+      })
+      if (permissions.snackBar.access) {
+        generalItems.push({
+          title: 'Snack Bar',
+          url: '/snack-bar',
+          icon: IconIceCream,
+        })
+      }
+    } else {
+      generalItems.push({
+        title: 'Dashboard',
+        url: '/',
+        icon: IconLayoutDashboard,
+      })
+      generalItems.push({
+        title: 'Inscrições',
+        url: '/registrations',
+        icon: IconFileDescription,
+      })
+      generalItems.push({
+        title: 'Campistas',
+        url: '/campers',
+        icon: IconTent,
+      })
+      // Only show Users menu item for superadmin and admin roles
+      if (user?.role === 'superadmin' || user?.role === 'admin') {
+        generalItems.push({
+          title: 'Utilizadores',
+          url: '/users',
+          icon: IconUsers,
+        })
+      }
+      generalItems.push({
+        title: 'Acampamentos',
+        url: '/camps',
+        icon: IconCampfire,
+      })
+      if (permissions.snackBar.access) {
+        generalItems.push({
+          title: 'Snack Bar',
+          url: '/snack-bar',
+          icon: IconIceCream,
+        })
+      }
+      generalItems.push({
+        title: 'Integrações',
+        url: '/integrations',
+        icon: IconWebhook,
       })
     }
-    generalItems.push({
-      title: 'Acampamentos',
-      url: '/camps',
-      icon: IconCampfire,
-    })
-    if (permissions.snackBar.access) {
-      generalItems.push({
-        title: 'Snack Bar',
-        url: '/snack-bar',
-        icon: IconIceCream,
-      })
-    }
-    generalItems.push({
-      title: 'Integrações',
-      url: '/integrations',
-      icon: IconWebhook,
-    })
   }
 
   return {

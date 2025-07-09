@@ -115,15 +115,20 @@ function RegistrationsContent() {
   )
 }
 
-export function RegistrationsFeature() {
+export default function RegistrationsPage() {
   const permissions = useTeamPermissions()
   const navigate = useNavigate()
+  
   useEffect(() => {
-    if (!permissions.registrations.viewList) {
+    // Só verificar permissões após carregamento completo
+    if (!permissions.isLoading && !permissions.registrations.viewList) {
       navigate({ to: '/' })
     }
   }, [permissions, navigate])
-  if (!permissions.registrations.viewList) return null
+  
+  // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
+  if (permissions.isLoading || !permissions.registrations.viewList) return null
+  
   return (
     <RegistrationDialogsProvider>
       <RegistrationsContent />

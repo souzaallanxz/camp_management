@@ -37,14 +37,19 @@ function IntegrationsContent() {
   )
 }
 
-export function IntegrationsFeature() {
+export default function IntegrationsFeature() {
   const permissions = useTeamPermissions()
   const navigate = useNavigate()
+  
   useEffect(() => {
-    if (!permissions.dashboard.viewOverview) {
+    // Só verificar permissões após carregamento completo
+    if (!permissions.isLoading && !permissions.dashboard.viewOverview) {
       navigate({ to: '/' })
     }
   }, [permissions, navigate])
-  if (!permissions.dashboard.viewOverview) return null
+  
+  // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
+  if (permissions.isLoading || !permissions.dashboard.viewOverview) return null
+  
   return <IntegrationsContent />
 } 

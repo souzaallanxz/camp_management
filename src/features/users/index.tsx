@@ -68,13 +68,17 @@ function UsersContent() {
 export default function UsersPage() {
   const permissions = useTeamPermissions()
   const navigate = useNavigate()
+  
   useEffect(() => {
-    if (!(permissions && (permissions.dashboard && permissions.dashboard.viewOverview))) {
+    // Só verificar permissões após carregamento completo
+    if (!permissions.isLoading && !(permissions && (permissions.dashboard && permissions.dashboard.viewOverview))) {
       navigate({ to: '/' })
     }
   }, [permissions, navigate])
-  if (!(permissions && (permissions.dashboard && permissions.dashboard.viewOverview))) return null
-
+  
+  // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
+  if (permissions.isLoading || !(permissions && (permissions.dashboard && permissions.dashboard.viewOverview))) return null
+  
   return (
     <UsersProvider>
       <UsersContent />

@@ -17,7 +17,6 @@ import { RecentSales } from './components/recent-sales'
 import { useDashboardMetrics } from './hooks/use-dashboard-metrics'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
-import { useUser } from '@/features/auth/hooks/use-user'
 import { useState } from 'react'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -81,21 +80,41 @@ function MetricCard({
 }
 
 export default function Dashboard() {
+  const { totalPayments, totalRegistrations, totalSnackbar, totalCampers, isLoading, error } = useDashboardMetrics()
   const permissions = useTeamPermissions()
-  const { isLoading: userLoading, user } = useUser()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
 
-  // Só busca métricas se pelo menos um indicador é permitido e usuário está carregado
-  const shouldFetchMetrics = !userLoading && user && (
-    permissions.dashboard.viewPaymentsTotal ||
-    permissions.dashboard.viewRegistrationsTotal ||
-    permissions.dashboard.viewRechargesTotal ||
-    permissions.dashboard.viewCamperTotal
-  )
-  const { totalPayments, totalRegistrations, totalSnackbar, totalCampers, isLoading, error } = useDashboardMetrics({ enabled: shouldFetchMetrics })
-
-  // Só renderiza após usuário e permissões carregadas
-  if (userLoading || !user) return null
+  // Se ainda está carregando as permissões, não mostrar o conteúdo
+  if (permissions.isLoading) {
+    return (
+      <>
+        <Header fixed>
+          <Search />
+          <div className='ml-auto flex items-center space-x-4'>
+            <ThemeSwitch />
+            <ProfileDropdown />
+          </div>
+        </Header>
+        <Main>
+          <div className='mb-2 flex items-center justify-between space-y-2'>
+            <div>
+              <h2 className='text-2xl font-bold tracking-tight'>Dashboard</h2>
+              <p className='text-muted-foreground'>
+                Acompanhe as métricas e atividades do seu acampamento.
+              </p>
+            </div>
+          </div>
+          <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+            {/* Skeleton loading cards */}
+            <div className="h-24 bg-muted animate-pulse rounded-lg"></div>
+            <div className="h-24 bg-muted animate-pulse rounded-lg"></div>
+            <div className="h-24 bg-muted animate-pulse rounded-lg"></div>
+            <div className="h-24 bg-muted animate-pulse rounded-lg"></div>
+          </div>
+        </Main>
+      </>
+    )
+  }
 
   return (
     <>
