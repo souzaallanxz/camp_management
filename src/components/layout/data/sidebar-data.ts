@@ -122,53 +122,64 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
     plan: team.tier === 'premium' ? 'Premium' : 'Free',
   }))
 
-  const generalItems: NavItem[] = [
-    {
+  const generalItems: NavItem[] = [];
+
+  // Se for cashier, só mostra Dashboard e Snack Bar
+  if (user?.role === 'cashier') {
+    generalItems.push({
       title: 'Dashboard',
       url: '/',
       icon: IconLayoutDashboard,
-    },
-    {
+    })
+    if (permissions.snackBar.access) {
+      generalItems.push({
+        title: 'Snack Bar',
+        url: '/snack-bar',
+        icon: IconIceCream,
+      })
+    }
+  } else {
+    generalItems.push({
+      title: 'Dashboard',
+      url: '/',
+      icon: IconLayoutDashboard,
+    })
+    generalItems.push({
       title: 'Inscrições',
       url: '/registrations',
       icon: IconFileDescription,
-    },
-    {
+    })
+    generalItems.push({
       title: 'Campistas',
       url: '/campers',
       icon: IconTent,
-    },
-  ]
-
-  // Only show Users menu item for superadmin and admin roles
-  if (user?.role === 'superadmin' || user?.role === 'admin') {
+    })
+    // Only show Users menu item for superadmin and admin roles
+    if (user?.role === 'superadmin' || user?.role === 'admin') {
+      generalItems.push({
+        title: 'Utilizadores',
+        url: '/users',
+        icon: IconUsers,
+      })
+    }
     generalItems.push({
-      title: 'Utilizadores',
-      url: '/users',
-      icon: IconUsers,
+      title: 'Acampamentos',
+      url: '/camps',
+      icon: IconCampfire,
+    })
+    if (permissions.snackBar.access) {
+      generalItems.push({
+        title: 'Snack Bar',
+        url: '/snack-bar',
+        icon: IconIceCream,
+      })
+    }
+    generalItems.push({
+      title: 'Integrações',
+      url: '/integrations',
+      icon: IconWebhook,
     })
   }
-
-  generalItems.push({
-    title: 'Acampamentos',
-    url: '/camps',
-    icon: IconCampfire,
-  })
-
-  if (permissions.snackBar.access) {
-    generalItems.push({
-      title: 'Snack Bar',
-      url: '/snack-bar',
-      icon: IconIceCream,
-    })
-  }
-
-  // Add Integrations to the menu
-  generalItems.push({
-    title: 'Integrações',
-    url: '/integrations',
-    icon: IconWebhook,
-  })
 
   return {
     user: {
