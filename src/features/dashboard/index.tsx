@@ -130,89 +130,97 @@ export default function Dashboard() {
           </div>
           <TabsContent value='overview' className='space-y-4'>
             <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-              <MetricCard
-                title='Total Pagamentos'
-                value={totalPayments?.total || 0}
-                isLoading={isLoading}
-                valueFormatter={formatCurrency}
-                icon={
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth='2'
-                    className='h-4 w-4 text-muted-foreground'
-                  >
-                    <path d='M6 12h12M6 12c0-3.314 2.686-6 6-6s6 2.686 6 6-2.686 6-6 6-6-2.686-6-6z' />
-                    <path d='M6 12c0 3.314 2.686 6 6 6s6-2.686 6-6' />
-                  </svg>
-                }
-              />
-              <MetricCard
-                title='Total de Inscrições'
-                value={totalRegistrations?.total || 0}
-                isLoading={isLoading}
-                icon={
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth='2'
-                    className='h-4 w-4 text-muted-foreground'
-                  >
-                    <path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' />
-                    <circle cx='9' cy='7' r='4' />
-                    <path d='M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' />
-                  </svg>
-                }
-              />
-              <MetricCard
-                title='Total de Carregamentos'
-                value={totalSnackbar?.total || 0}
-                isLoading={isLoading}
-                valueFormatter={formatCurrency}
-                isLocked={!permissions.dashboard.viewRechargesTotal}
-                icon={
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth='2'
-                    className='h-4 w-4 text-muted-foreground'
-                  >
-                    <rect width='20' height='14' x='2' y='5' rx='2' />
-                    <path d='M2 10h20' />
-                  </svg>
-                }
-              />
-              <MetricCard
-                title='Total de Campistas'
-                value={totalCampers?.total || 0}
-                isLoading={isLoading}
-                icon={
-                  <svg
-                    xmlns='http://www.w3.org/2000/svg'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth='2'
-                    className='h-4 w-4 text-muted-foreground'
-                  >
-                    <path d='M22 12h-4l-3 9L9 3l-3 9H2' />
-                  </svg>
-                }
-              />
+              {permissions.dashboard.viewPaymentsTotal && (
+                <MetricCard
+                  title='Total Pagamentos'
+                  value={totalPayments?.total || 0}
+                  isLoading={isLoading}
+                  valueFormatter={formatCurrency}
+                  icon={
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      className='h-4 w-4 text-muted-foreground'
+                    >
+                      <path d='M6 12h12M6 12c0-3.314 2.686-6 6-6s6 2.686 6 6-2.686 6-6 6-6-2.686-6-6z' />
+                      <path d='M6 12c0 3.314 2.686 6 6 6s6-2.686 6-6' />
+                    </svg>
+                  }
+                />
+              )}
+              {permissions.dashboard.viewRegistrationsTotal && (
+                <MetricCard
+                  title='Total de Inscrições'
+                  value={totalRegistrations?.total || 0}
+                  isLoading={isLoading}
+                  icon={
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      className='h-4 w-4 text-muted-foreground'
+                    >
+                      <path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' />
+                      <circle cx='9' cy='7' r='4' />
+                      <path d='M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' />
+                    </svg>
+                  }
+                />
+              )}
+              {permissions.dashboard.viewRechargesTotal && (
+                <MetricCard
+                  title='Total de Carregamentos'
+                  value={totalSnackbar?.total || 0}
+                  isLoading={isLoading}
+                  valueFormatter={formatCurrency}
+                  isLocked={!permissions.dashboard.viewRechargesTotal}
+                  icon={
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      className='h-4 w-4 text-muted-foreground'
+                    >
+                      <rect width='20' height='14' x='2' y='5' rx='2' />
+                      <path d='M2 10h20' />
+                    </svg>
+                  }
+                />
+              )}
+              {permissions.dashboard.viewCamperTotal && (
+                <MetricCard
+                  title='Total de Campistas'
+                  value={totalCampers?.total || 0}
+                  isLoading={isLoading}
+                  icon={
+                    <svg
+                      xmlns='http://www.w3.org/2000/svg'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth='2'
+                      className='h-4 w-4 text-muted-foreground'
+                    >
+                      <path d='M22 12h-4l-3 9L9 3l-3 9H2' />
+                    </svg>
+                  }
+                />
+              )}
             </div>
             <div className='grid grid-cols-1 gap-4 lg:grid-cols-7'>
               {permissions.dashboard.viewOverview && (
