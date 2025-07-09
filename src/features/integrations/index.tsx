@@ -1,23 +1,14 @@
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { WebhookIntegrationCard } from './components/webhook-integration-card'
-import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
-import { useNavigate } from '@tanstack/react-router'
-import { useEffect } from 'react'
 
-export default function IntegrationsFeature() {
-  const permissions = useTeamPermissions()
-  const navigate = useNavigate()
-  useEffect(() => {
-    if (!permissions.dashboard.viewOverview) {
-      navigate({ to: '/' })
-    }
-  }, [permissions, navigate])
-  if (!permissions.dashboard.viewOverview) return null
-
+function IntegrationsContent() {
   return (
     <>
       <Header fixed>
@@ -27,7 +18,6 @@ export default function IntegrationsFeature() {
           <ProfileDropdown />
         </div>
       </Header>
-
       <Main>
         <div className='mb-2 flex items-center justify-between space-y-2 flex-wrap'>
           <div>
@@ -37,7 +27,6 @@ export default function IntegrationsFeature() {
             </p>
           </div>
         </div>
-
         <div className='-mx-4 flex-1 overflow-auto px-4 py-1'>
           <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
             <WebhookIntegrationCard />
@@ -46,4 +35,16 @@ export default function IntegrationsFeature() {
       </Main>
     </>
   )
+}
+
+export function IntegrationsFeature() {
+  const permissions = useTeamPermissions()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!permissions.dashboard.viewOverview) {
+      navigate({ to: '/' })
+    }
+  }, [permissions, navigate])
+  if (!permissions.dashboard.viewOverview) return null
+  return <IntegrationsContent />
 } 
