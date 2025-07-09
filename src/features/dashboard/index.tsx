@@ -17,6 +17,7 @@ import { RecentSales } from './components/recent-sales'
 import { useDashboardMetrics } from './hooks/use-dashboard-metrics'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useUser } from '@/features/auth/hooks/use-user'
 import { useState } from 'react'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -80,9 +81,21 @@ function MetricCard({
 }
 
 export default function Dashboard() {
-  const { totalPayments, totalRegistrations, totalSnackbar, totalCampers, isLoading, error } = useDashboardMetrics()
   const permissions = useTeamPermissions()
+  const { isLoading: userLoading, user } = useUser()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+
+  // Só busca métricas se pelo menos um indicador é permitido e usuário está carregado
+  const shouldFetchMetrics = !userLoading && user && (
+    permissions.dashboard.viewPaymentsTotal ||
+    permissions.dashboard.viewRegistrationsTotal ||
+    permissions.dashboard.viewRechargesTotal ||
+    permissions.dashboard.viewCamperTotal
+  )
+  const { totalPayments, totalRegistrations, totalSnackbar, totalCampers, isLoading, error } = useDashboardMetrics({ enabled: shouldFetchMetrics })
+
+  // Só renderiza após usuário e permissões carregadas
+  if (userLoading || !user) return null
 
   return (
     <>

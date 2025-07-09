@@ -116,6 +116,11 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
   const { teams: dbTeams, isLoading } = useTeamData()
   const permissions = useTeamPermissions()
 
+  // Só gera menu quando usuário e permissões estão carregadas
+  if (user.isLoading || !user.user || !permissions) {
+    return { user: { name: '', email: '', avatar: '' }, teams: [], navGroups: [], isLoading: true }
+  }
+
   const teams = dbTeams.map(team => ({
     name: team.name,
     logo: Command,
