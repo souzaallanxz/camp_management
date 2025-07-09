@@ -4,8 +4,20 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { WebhookIntegrationCard } from './components/webhook-integration-card'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
-function IntegrationsContent() {
+export default function IntegrationsPage() {
+  const permissions = useTeamPermissions()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!permissions.dashboard.viewOverview) {
+      navigate({ to: '/' })
+    }
+  }, [permissions, navigate])
+  if (!permissions.dashboard.viewOverview) return null
+
   return (
     <>
       <Header fixed>
@@ -34,8 +46,4 @@ function IntegrationsContent() {
       </Main>
     </>
   )
-}
-
-export function IntegrationsFeature() {
-  return <IntegrationsContent />
 } 

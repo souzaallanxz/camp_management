@@ -17,6 +17,9 @@ import { toast } from 'sonner'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { type CamperWithActions } from './components/campers-table'
 import { camperService } from './services/camper-service'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 function CampersContent() {
   // Query simplificada para buscar campers e seus saldos
@@ -109,6 +112,14 @@ function CampersContent() {
 }
 
 export function CampersFeature() {
+  const permissions = useTeamPermissions()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!permissions.campers.viewList) {
+      navigate({ to: '/' })
+    }
+  }, [permissions, navigate])
+  if (!permissions.campers.viewList) return null
   return (
     <CamperDialogsProvider>
       <CampersContent />

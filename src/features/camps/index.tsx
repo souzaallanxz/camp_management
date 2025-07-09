@@ -11,6 +11,9 @@ import { useCamps } from './hooks/use-camps'
 import { CampDialogsProvider } from './context/camp-dialogs-context'
 import { CampDialogs } from './components/camp-dialogs'
 import { useCampDialogs } from './context/camp-dialogs-context'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 function CampsContent() {
   const { data: camps, isLoading } = useCamps()
@@ -56,6 +59,14 @@ function CampsContent() {
 }
 
 export default function CampsPage() {
+  const permissions = useTeamPermissions()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!permissions.camps.viewList) {
+      navigate({ to: '/' })
+    }
+  }, [permissions, navigate])
+  if (!permissions.camps.viewList) return null
   return (
     <CampDialogsProvider>
       <CampsContent />

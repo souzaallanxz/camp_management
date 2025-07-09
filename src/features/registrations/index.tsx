@@ -14,6 +14,9 @@ import { columns, type RegistrationWithActions } from './components/registration
 import { RegistrationDialogsProvider } from './context/registration-dialogs-context'
 import { Actions } from './components/registrations-columns'
 import { Registration } from './data/schema'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 // Interface para mapear a resposta da API
 interface ApiRegistration {
@@ -113,6 +116,14 @@ function RegistrationsContent() {
 }
 
 export function RegistrationsFeature() {
+  const permissions = useTeamPermissions()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!permissions.registrations.viewList) {
+      navigate({ to: '/' })
+    }
+  }, [permissions, navigate])
+  if (!permissions.registrations.viewList) return null
   return (
     <RegistrationDialogsProvider>
       <RegistrationsContent />
