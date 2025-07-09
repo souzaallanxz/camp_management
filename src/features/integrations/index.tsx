@@ -8,7 +8,7 @@ import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
-export default function IntegrationsPage() {
+export default function IntegrationsFeature() {
   const permissions = useTeamPermissions()
   const navigate = useNavigate()
   useEffect(() => {
