@@ -37,6 +37,11 @@ export function useTeamPermissions(): FeaturePermissions & { isLoading: boolean 
       snackBar: {
         access: false,
       },
+      staff: {
+        viewList: false,
+        create: false,
+        rechargeCard: false,
+      },
     }
   }
   

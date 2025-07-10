@@ -1,6 +1,6 @@
-import { CampersFeature } from '@/features/campers'
 import { createLazyFileRoute } from '@tanstack/react-router'
 
 export const Route = createLazyFileRoute('/_authenticated/campers/')({
-  component: CampersFeature,
+  component: () =>
+    import('@/features/campers').then((mod) => <mod.default />),
 }) 

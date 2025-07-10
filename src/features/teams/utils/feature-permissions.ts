@@ -31,12 +31,19 @@ interface SnackBarPermissions {
   access: boolean
 }
 
+interface StaffPermissions {
+  viewList: boolean
+  create: boolean
+  rechargeCard: boolean
+}
+
 export interface FeaturePermissions {
   dashboard: DashboardPermissions
   registrations: RegistrationsPermissions
   campers: CampersPermissions
   camps: CampsPermissions
   snackBar: SnackBarPermissions
+  staff: StaffPermissions
 }
 
 // Permissões para o role Cashier
@@ -67,6 +74,11 @@ const CASHIER_ROLE_PERMISSIONS: FeaturePermissions = {
   snackBar: {
     access: true, // Cashier deve ter acesso apenas ao Snackbar
   },
+  staff: {
+    viewList: false,
+    create: false,
+    rechargeCard: false,
+  },
 }
 
 const FREE_TIER_PERMISSIONS: FeaturePermissions = {
@@ -96,6 +108,11 @@ const FREE_TIER_PERMISSIONS: FeaturePermissions = {
   snackBar: {
     access: false,
   },
+  staff: {
+    viewList: true,
+    create: true,
+    rechargeCard: false,
+  },
 }
 
 const PREMIUM_TIER_PERMISSIONS: FeaturePermissions = {
@@ -124,6 +141,11 @@ const PREMIUM_TIER_PERMISSIONS: FeaturePermissions = {
   },
   snackBar: {
     access: true,
+  },
+  staff: {
+    viewList: true,
+    create: true,
+    rechargeCard: true,
   },
 }
 

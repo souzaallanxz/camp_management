@@ -6,6 +6,8 @@ async function main() {
     // Drop all tables in reverse order of dependencies
     await db.execute(sql`DROP TABLE IF EXISTS webhook_events CASCADE`);
     await db.execute(sql`DROP TABLE IF EXISTS snackbar_balance CASCADE`);
+    await db.execute(sql`DROP TABLE IF EXISTS snack_bar_transactions CASCADE`);
+    await db.execute(sql`DROP TABLE IF EXISTS staff CASCADE`);
     await db.execute(sql`DROP TABLE IF EXISTS payments CASCADE`);
     await db.execute(sql`DROP TABLE IF EXISTS campers CASCADE`);
     await db.execute(sql`DROP TABLE IF EXISTS registrations CASCADE`);
@@ -94,6 +96,16 @@ async function main() {
         snack_bar_balance NUMERIC NOT NULL DEFAULT 0.00
       );
 
+      CREATE TABLE staff (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        camp_id UUID NOT NULL REFERENCES camps(id),
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT timezone('utc'::text, now()),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT timezone('utc'::text, now())
+      );
+
       CREATE TABLE payments (
         id BIGINT PRIMARY KEY,
         registration_id UUID NOT NULL REFERENCES registrations(id),
@@ -109,7 +121,8 @@ async function main() {
 
       CREATE TABLE snackbar_balance (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        registration_id UUID NOT NULL REFERENCES registrations(id),
+        registration_id UUID REFERENCES registrations(id),
+        staff_id UUID REFERENCES staff(id),
         amount NUMERIC NOT NULL,
         payment_method VARCHAR(50) NOT NULL,
         phone_number VARCHAR(20),
@@ -119,7 +132,8 @@ async function main() {
 
       CREATE TABLE snack_bar_transactions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        camper_id UUID NOT NULL REFERENCES campers(id),
+        camper_id UUID REFERENCES campers(id),
+        staff_id UUID REFERENCES staff(id),
         amount NUMERIC NOT NULL,
         type VARCHAR(20) NOT NULL DEFAULT 'deduction',
         description TEXT,
@@ -136,7 +150,7 @@ async function main() {
       );
     `);
 
-  } catch (error) {
+  } catch {
     process.exit(1);
   }
 }

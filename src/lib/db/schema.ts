@@ -72,6 +72,17 @@ export const campers = pgTable('campers', {
   snack_bar_balance: numeric('snack_bar_balance').notNull().default('0.00'),
 });
 
+// Nova tabela para staff
+export const staff = pgTable('staff', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  phone: text('phone').notNull(),
+  camp_id: uuid('camp_id').notNull().references(() => camps.id),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const payments = pgTable('payments', {
   id: bigint('id', { mode: 'number' }).primaryKey(),
   registration_id: uuid('registration_id').notNull().references(() => registrations.id),
@@ -87,7 +98,8 @@ export const payments = pgTable('payments', {
 
 export const snackbar_balance = pgTable('snackbar_balance', {
   id: uuid('id').primaryKey().defaultRandom(),
-  registration_id: uuid('registration_id').notNull().references(() => registrations.id),
+  registration_id: uuid('registration_id').references(() => registrations.id),
+  staff_id: uuid('staff_id').references(() => staff.id),
   amount: numeric('amount').notNull(),
   payment_method: varchar('payment_method', { length: 50 }).notNull(),
   phone_number: varchar('phone_number', { length: 20 }),
@@ -97,7 +109,8 @@ export const snackbar_balance = pgTable('snackbar_balance', {
 
 export const snack_bar_transactions = pgTable('snack_bar_transactions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  camper_id: uuid('camper_id').notNull().references(() => campers.id),
+  camper_id: uuid('camper_id').references(() => campers.id),
+  staff_id: uuid('staff_id').references(() => staff.id),
   amount: numeric('amount').notNull(),
   type: varchar('type', { length: 20 }).notNull().default('deduction'), // 'deduction' or 'refund'
   description: text('description'),

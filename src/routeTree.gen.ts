@@ -23,6 +23,7 @@ import { Route as authSignInImport } from './routes/(auth)/sign-in'
 import { Route as authSetupPasswordImport } from './routes/(auth)/setup-password'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as auth500Import } from './routes/(auth)/500'
+import { Route as AuthenticatedStaffIndexImport } from './routes/_authenticated/staff/index'
 import { Route as AuthenticatedSnackBarIndexImport } from './routes/_authenticated/snack-bar/index'
 import { Route as AuthenticatedRegistrationsIndexImport } from './routes/_authenticated/registrations/index'
 import { Route as AuthenticatedIntegrationsIndexImport } from './routes/_authenticated/integrations/index'
@@ -284,6 +285,12 @@ const AuthenticatedAppsIndexLazyRoute = AuthenticatedAppsIndexLazyImport.update(
 ).lazy(() =>
   import('./routes/_authenticated/apps/index.lazy').then((d) => d.Route),
 )
+
+const AuthenticatedStaffIndexRoute = AuthenticatedStaffIndexImport.update({
+  id: '/staff/',
+  path: '/staff/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 const AuthenticatedSnackBarIndexRoute = AuthenticatedSnackBarIndexImport.update(
   {
@@ -616,6 +623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSnackBarIndexImport
       parentRoute: typeof AuthenticatedSnackBarImport
     }
+    '/_authenticated/staff/': {
+      id: '/_authenticated/staff/'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof AuthenticatedStaffIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
     '/_authenticated/apps/': {
       id: '/_authenticated/apps/'
       path: '/apps'
@@ -717,6 +731,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCampersIndexRoute: typeof AuthenticatedCampersIndexRoute
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedRegistrationsIndexRoute: typeof AuthenticatedRegistrationsIndexRoute
+  AuthenticatedStaffIndexRoute: typeof AuthenticatedStaffIndexRoute
   AuthenticatedAppsIndexLazyRoute: typeof AuthenticatedAppsIndexLazyRoute
   AuthenticatedChatsIndexLazyRoute: typeof AuthenticatedChatsIndexLazyRoute
   AuthenticatedHelpCenterIndexLazyRoute: typeof AuthenticatedHelpCenterIndexLazyRoute
@@ -734,6 +749,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCampersIndexRoute: AuthenticatedCampersIndexRoute,
   AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,
   AuthenticatedRegistrationsIndexRoute: AuthenticatedRegistrationsIndexRoute,
+  AuthenticatedStaffIndexRoute: AuthenticatedStaffIndexRoute,
   AuthenticatedAppsIndexLazyRoute: AuthenticatedAppsIndexLazyRoute,
   AuthenticatedChatsIndexLazyRoute: AuthenticatedChatsIndexLazyRoute,
   AuthenticatedHelpCenterIndexLazyRoute: AuthenticatedHelpCenterIndexLazyRoute,
@@ -775,6 +791,7 @@ export interface FileRoutesByFullPath {
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
   '/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
+  '/staff': typeof AuthenticatedStaffIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
   '/chats': typeof AuthenticatedChatsIndexLazyRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexLazyRoute
@@ -811,6 +828,7 @@ export interface FileRoutesByTo {
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
   '/snack-bar': typeof AuthenticatedSnackBarIndexRoute
+  '/staff': typeof AuthenticatedStaffIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
   '/chats': typeof AuthenticatedChatsIndexLazyRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexLazyRoute
@@ -852,6 +870,7 @@ export interface FileRoutesById {
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/registrations/': typeof AuthenticatedRegistrationsIndexRoute
   '/_authenticated/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
+  '/_authenticated/staff/': typeof AuthenticatedStaffIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexLazyRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexLazyRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexLazyRoute
@@ -893,6 +912,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/registrations'
     | '/snack-bar/'
+    | '/staff'
     | '/apps'
     | '/chats'
     | '/help-center'
@@ -928,6 +948,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/registrations'
     | '/snack-bar'
+    | '/staff'
     | '/apps'
     | '/chats'
     | '/help-center'
@@ -967,6 +988,7 @@ export interface FileRouteTypes {
     | '/_authenticated/integrations/'
     | '/_authenticated/registrations/'
     | '/_authenticated/snack-bar/'
+    | '/_authenticated/staff/'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
     | '/_authenticated/help-center/'
@@ -1053,6 +1075,7 @@ export const routeTree = rootRoute
         "/_authenticated/campers/",
         "/_authenticated/integrations/",
         "/_authenticated/registrations/",
+        "/_authenticated/staff/",
         "/_authenticated/apps/",
         "/_authenticated/chats/",
         "/_authenticated/help-center/",
@@ -1176,6 +1199,10 @@ export const routeTree = rootRoute
     "/_authenticated/snack-bar/": {
       "filePath": "_authenticated/snack-bar/index.tsx",
       "parent": "/_authenticated/snack-bar"
+    },
+    "/_authenticated/staff/": {
+      "filePath": "_authenticated/staff/index.tsx",
+      "parent": "/_authenticated"
     },
     "/_authenticated/apps/": {
       "filePath": "_authenticated/apps/index.lazy.tsx",

@@ -11,6 +11,7 @@ import {
   IconWebhook,
   IconBuildingCommunity,
   IconCreditCard,
+  IconUsersGroup,
 } from '@tabler/icons-react'
 import { Command } from 'lucide-react'
 import { type SidebarData, type NavItem } from '../types'
@@ -157,6 +158,11 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
         title: 'Campistas',
         url: '/campers',
         icon: IconTent,
+      })
+      generalItems.push({
+        title: 'Staff',
+        url: '/staff',
+        icon: IconUsersGroup,
       })
       // Only show Users menu item for superadmin and admin roles
       if (user?.role === 'superadmin' || user?.role === 'admin') {

@@ -2868,6 +2868,206 @@ app.get('/api/teams/:id/tier', (async (req: Request, res: Response) => {
   }
 }) as any)
 
+// STAFF ENDPOINTS
+
+// List all staff for the current team
+app.get('/api/staff', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const staff = await sql`
+      SELECT s.*, c.name as camp_name
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY s.created_at DESC
+    `;
+
+    // For each staff member, calculate the correct total_balance
+    const staffWithBalances = await Promise.all(staff.map(async staffMember => {
+      // Get total deposit for this staff member
+      const depositResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_deposit
+        FROM snackbar_balance
+        WHERE staff_id = ${staffMember.id}
+      `;
+      // Get total spent for this staff member
+      const spentResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_spent
+        FROM snack_bar_transactions
+        WHERE staff_id = ${staffMember.id}
+      `;
+      const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+      const totalSpent = Number(spentResult[0]?.total_spent || 0);
+      const total_balance = totalDeposit - totalSpent;
+      return {
+        ...staffMember,
+        total_balance
+      };
+    }));
+    res.json(staffWithBalances);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar staff.' });
+  }
+}) as any);
+
+// Get a single staff member by ID
+app.get('/api/staff/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const staff = await sql`
+      SELECT s.*
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${id} AND c.team_id = ${teamId}
+      LIMIT 1
+    `;
+    if (!staff[0]) {
+      return res.status(404).json({ error: 'Staff member not found' });
+    }
+    res.json(staff[0]);
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar membro do staff.' });
+  }
+}) as any);
+
+// Create a new staff member
+app.post('/api/staff', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { name, email, phone, camp_id } = req.body;
+    if (!name || !email || !phone || !camp_id) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Check if camp belongs to the team
+    const camp = await sql`
+      SELECT id FROM camps WHERE id = ${camp_id} AND team_id = ${teamId}
+    `;
+    if (!camp[0]) {
+      return res.status(400).json({ error: 'Camp does not belong to your team' });
+    }
+    
+    const now = new Date().toISOString();
+    const result = await sql`
+      INSERT INTO staff (name, email, phone, camp_id, created_at, updated_at)
+      VALUES (${name}, ${email}, ${phone}, ${camp_id}, ${now}, ${now})
+      RETURNING *
+    `;
+    res.status(201).json(result[0]);
+  } catch {
+    res.status(500).json({ error: 'Erro ao criar membro do staff.' });
+  }
+}) as any);
+
+// Update a staff member
+app.put('/api/staff/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const { name, email, phone, camp_id } = req.body;
+    
+    const now = new Date().toISOString();
+    const fields = [];
+    if (name !== undefined) fields.push(sql`name = ${name}`);
+    if (email !== undefined) fields.push(sql`email = ${email}`);
+    if (phone !== undefined) fields.push(sql`phone = ${phone}`);
+    if (camp_id !== undefined) fields.push(sql`camp_id = ${camp_id}`);
+    fields.push(sql`updated_at = ${now}`);
+    
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+    
+    const setClause = sql.join(fields, sql`, `);
+    
+    const result = await sql.unsafe(
+      `UPDATE staff SET ${setClause.sql} WHERE id = $1 AND camp_id IN (SELECT id FROM camps WHERE team_id = $2) RETURNING *`,
+      [id, teamId, ...setClause.values]
+    );
+    
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Staff member not found or you do not have permission to update it' });
+    }
+    
+    res.json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar membro do staff.' });
+  }
+}) as any);
+
+// Delete a staff member
+app.delete('/api/staff/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const result = await sql`
+      DELETE FROM staff WHERE id = ${id} AND camp_id IN (SELECT id FROM camps WHERE team_id = ${teamId}) RETURNING *
+    `;
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Staff member not found or you do not have permission to delete it' });
+    }
+    res.status(204).end();
+  } catch {
+    res.status(500).json({ error: 'Erro ao deletar membro do staff.' });
+  }
+}) as any);
+
+// Add snackbar balance for staff
+app.post('/api/staff-snackbar-balance', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { staff_id, amount, payment_method, phone_number } = req.body;
+    
+    if (!staff_id || !amount || !payment_method) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Check if staff member belongs to the team
+    const staffCheck = await sql`
+      SELECT s.id FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staff_id} AND c.team_id = ${teamId}
+    `;
+    
+    if (!staffCheck[0]) {
+      return res.status(400).json({ error: 'Staff member does not belong to your team' });
+    }
+    
+    const now = new Date().toISOString();
+    
+    const result = await sql`
+      INSERT INTO snackbar_balance (
+        staff_id, amount, payment_method, phone_number, created_at, updated_at
+      ) VALUES (
+        ${staff_id}, ${amount}, ${payment_method}, ${phone_number}, ${now}, ${now}
+      ) RETURNING *
+    `;
+    
+    res.status(201).json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Error creating snackbar balance entry for staff' });
+  }
+}) as any);
+
 // Start the server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
