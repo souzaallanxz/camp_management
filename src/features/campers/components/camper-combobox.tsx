@@ -52,7 +52,7 @@ export function CamperCombobox({ value, onValueChange, campers }: CamperCombobox
           aria-expanded={open}
           className="w-full justify-between"
         >
-          {value ? getDisplayName(selectedPerson!) : 'Selecione um campista ou membro do staff...'}
+          {value ? getDisplayName(selectedPerson!) : 'Selecione um campista ou staff...'}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
