@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { DataTableViewOptions } from './data-table-view-options'
 import { DataTableFacetedFilter } from '@/components/data-table/data-table-faceted-filter'
 import { useMemo } from 'react'
-import { type CamperWithActions } from './campers-table'
+import { type StaffWithActions } from './staff-table'
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
@@ -21,7 +21,7 @@ export function DataTableToolbar<TData>({
 
   // Extrair acampamentos únicos dos dados recebidos
   const campFilters = useMemo(() => {
-    const tableData = data as CamperWithActions[];
+    const tableData = data as StaffWithActions[];
     const uniqueCamps = Array.from(new Set(tableData.map(item => item.camp_name).filter(Boolean)));
     return uniqueCamps.map(campName => ({
       label: campName,

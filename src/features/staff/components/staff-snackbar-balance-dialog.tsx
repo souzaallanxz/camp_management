@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { buildApiUrl } from '@/services/api'
+import { getTeamIdHeader } from '@/lib/auth'
 
 interface StaffSnackbarBalanceDialogProps {
   open: boolean
@@ -38,16 +40,16 @@ export function StaffSnackbarBalanceDialog({
 
     setIsLoading(true)
     try {
-      const response = await fetch('/api/staff-snackbar-balance', {
+      const headers = { ...getTeamIdHeader(), 'Content-Type': 'application/json' }
+      const response = await fetch(buildApiUrl('/api/staff-snackbar-balance'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           staff_id: staffId,
           amount: parseFloat(amount),
           payment_method: 'Dinheiro',
         }),
+        credentials: 'include'
       })
 
       if (!response.ok) {

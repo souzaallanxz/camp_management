@@ -23,7 +23,7 @@ function StaffContent() {
   const permissions = useTeamPermissions()
   
   // Query simplificada para buscar staff e seus saldos
-  const { data: staff = [], refetch } = useQuery({
+  const { data: staff = [], refetch, isLoading } = useQuery({
     queryKey: ['staff-with-balance'],
     queryFn: async () => {
       try {
@@ -53,6 +53,15 @@ function StaffContent() {
     onUpgradeClick: () => setShowUpgradeDialog(true),
     total_balance: staffMember.total_balance || 0
   }));
+
+  // Se ainda está carregando, mostrar loading
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Carregando staff...</div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -110,7 +119,9 @@ export default function StaffPage() {
   const permissions = useTeamPermissions()
   
   // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
-  if (permissions.isLoading || !permissions.staff?.viewList) return null
+  if (permissions.isLoading || !permissions.staff?.viewList) {
+    return null
+  }
   
   return (
     <StaffDialogsProvider>
