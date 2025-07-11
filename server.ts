@@ -3064,7 +3064,29 @@ app.post('/api/staff-snackbar-balance', (async (req: Request, res: Response) => 
     
     res.status(201).json(result[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Error creating snackbar balance entry for staff' });
+    console.error('Error creating snackbar balance entry for staff:', error);
+    res.status(500).json({ error: 'Error creating snackbar balance entry for staff', details: error.message });
+  }
+}) as any);
+
+// Debug endpoint to check database schema
+app.get('/api/debug/schema', (async (req: Request, res: Response) => {
+  try {
+    const result = await sql`
+      SELECT 
+        table_name, 
+        column_name, 
+        data_type, 
+        is_nullable
+      FROM information_schema.columns 
+      WHERE table_name IN ('staff', 'snackbar_balance', 'snack_bar_transactions')
+      ORDER BY table_name, ordinal_position
+    `;
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error checking schema:', error);
+    res.status(500).json({ error: 'Error checking schema', details: error.message });
   }
 }) as any);
 
