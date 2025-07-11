@@ -37,4 +37,15 @@ export interface CamperWithBalance {
     camp_id: string
   }
   form_id?: string | null
-} 
+  type?: 'camper'
+}
+
+export interface StaffWithBalance {
+  id: string
+  name: string
+  total_balance: number
+  camp_id: string
+  type: 'staff'
+}
+
+export type PersonWithBalance = CamperWithBalance | StaffWithBalance 

@@ -1,4 +1,5 @@
 import { api, hasTeamId } from '@/lib/api-client'
+import { staffService } from '@/features/staff/services/staff-service'
 import type { 
   SnackBarTransaction, 
   SnackBarTransactionResponse,
@@ -11,6 +12,14 @@ interface CamperResponse {
   snack_bar_balance: number
   registration_id: string
   camp_id: string
+}
+
+interface StaffWithBalance {
+  id: string
+  name: string
+  total_balance: number
+  camp_id: string
+  type: 'staff'
 }
 
 export const snackBarService = {
@@ -45,8 +54,44 @@ export const snackBarService = {
           id: camper.registration_id,
           camp_id: camper.camp_id
         },
-        form_id: camper.form_id ?? null
+        form_id: camper.form_id ?? null,
+        type: 'camper' as const
       }))
+    } catch {
+      return []
+    }
+  },
+
+  async getStaff(): Promise<StaffWithBalance[]> {
+    try {
+      const staff = await staffService.findAll()
+      return staff.map((member) => ({
+        id: member.id,
+        name: member.name,
+        total_balance: Number(member.total_balance) || 0,
+        camp_id: member.camp_id,
+        type: 'staff' as const
+      }))
+    } catch {
+      return []
+    }
+  },
+
+  async getCampersAndStaff(campId?: string): Promise<(CamperWithBalance | StaffWithBalance)[]> {
+    try {
+      // Buscar campistas do acampamento atual
+      const campers = await this.getCampers(campId)
+      
+      // Buscar todos os membros do staff
+      const staff = await this.getStaff()
+      
+      // Combinar os dois arrays
+      const allPeople = [
+        ...campers,
+        ...staff
+      ]
+      
+      return allPeople
     } catch {
       return []
     }
@@ -74,10 +119,16 @@ export const snackBarService = {
     }
     
     try {
-      const response = await api.post('/snackbar-transactions', {
-        camper_id: transaction.camper_id,
-        amount: transaction.amount
-      })
+      // Determinar se é um camper ou staff baseado no tipo
+      const allPeople = await this.getCampersAndStaff()
+      const person = allPeople.find(p => p.id === transaction.camper_id)
+      const isStaff = person?.type === 'staff'
+      
+      const payload = isStaff 
+        ? { staff_id: transaction.camper_id, amount: transaction.amount }
+        : { camper_id: transaction.camper_id, amount: transaction.amount }
+      
+      const response = await api.post('/snackbar-transactions', payload)
       return response.data
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erro ao processar transação'
@@ -91,8 +142,20 @@ export const snackBarService = {
     }
     
     try {
-      const response = await api.get(`/snackbar-transactions/${camper_id}`)
-      return response.data
+      // Determinar se é um camper ou staff baseado no tipo
+      const allPeople = await this.getCampersAndStaff()
+      const person = allPeople.find(p => p.id === camper_id)
+      const isStaff = person?.type === 'staff'
+      
+      if (isStaff) {
+        // Para staff, buscar transações usando staff_id
+        const response = await api.get(`/snackbar-transactions/staff/${camper_id}`)
+        return response.data
+      } else {
+        // Para campers, usar o endpoint existente
+        const response = await api.get(`/snackbar-transactions/${camper_id}`)
+        return response.data
+      }
     } catch {
       return []
     }
@@ -122,9 +185,18 @@ export const snackBarService = {
     }
     
     try {
-      const response = await api.get(`/snackbar-balance/${camperId}`)
-      // A resposta agora contém balance, total_deposit e total_spent
-      return response.data.balance
+      // Determinar se é um camper ou staff baseado no tipo
+      const allPeople = await this.getCampersAndStaff()
+      const person = allPeople.find(p => p.id === camperId)
+      const isStaff = person?.type === 'staff'
+      
+      if (isStaff) {
+        // Para staff, usar o total_balance
+        return (person as StaffWithBalance).total_balance
+      } else {
+        // Para campers, usar o snack_bar_balance
+        return (person as CamperWithBalance).snack_bar_balance
+      }
     } catch {
       return 0
     }

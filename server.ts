@@ -1761,33 +1761,67 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { camper_id, amount } = req.body;
+    const { camper_id, staff_id, amount } = req.body;
     
-    if (!camper_id || !amount) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!amount) {
+      return res.status(400).json({ error: 'Amount is required' });
     }
     
-    // Check if camper belongs to the team
-    const camperCheck = await sql`
-      SELECT ca.id FROM campers ca
-      JOIN registrations r ON ca.registration_id = r.id
-      JOIN camps c ON r.camp_id = c.id
-      WHERE ca.id = ${camper_id}::uuid AND c.team_id = ${teamId}::uuid
-    `;
+    if (!camper_id && !staff_id) {
+      return res.status(400).json({ error: 'Either camper_id or staff_id is required' });
+    }
     
-    if (!camperCheck[0]) {
-      return res.status(400).json({ error: 'Camper does not belong to your team' });
+    if (camper_id && staff_id) {
+      return res.status(400).json({ error: 'Cannot specify both camper_id and staff_id' });
+    }
+    
+    let personCheck;
+    
+    if (camper_id) {
+      // Check if camper belongs to the team
+      personCheck = await sql`
+        SELECT ca.id FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE ca.id = ${camper_id}::uuid AND c.team_id = ${teamId}::uuid
+      `;
+      
+      if (!personCheck[0]) {
+        return res.status(400).json({ error: 'Camper does not belong to your team' });
+      }
+    } else if (staff_id) {
+      // Check if staff member belongs to the team
+      personCheck = await sql`
+        SELECT s.id FROM staff s
+        JOIN camps c ON s.camp_id = c.id
+        WHERE s.id = ${staff_id}::uuid AND c.team_id = ${teamId}::uuid
+      `;
+      
+      if (!personCheck[0]) {
+        return res.status(400).json({ error: 'Staff member does not belong to your team' });
+      }
     }
     
     const now = new Date().toISOString();
     
-    const result = await sql`
-      INSERT INTO snack_bar_transactions (
-        camper_id, amount, created_at
-      ) VALUES (
-        ${camper_id}::uuid, ${amount}, ${now}
-      ) RETURNING *
-    `;
+    let result;
+    if (camper_id) {
+      result = await sql`
+        INSERT INTO snack_bar_transactions (
+          camper_id, amount, created_at
+        ) VALUES (
+          ${camper_id}::uuid, ${amount}, ${now}
+        ) RETURNING *
+      `;
+    } else {
+      result = await sql`
+        INSERT INTO snack_bar_transactions (
+          staff_id, amount, created_at
+        ) VALUES (
+          ${staff_id}::uuid, ${amount}, ${now}
+        ) RETURNING *
+      `;
+    }
     
     res.status(201).json(result[0]);
   } catch (error) {
@@ -1828,6 +1862,38 @@ app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Respo
   }
 }) as any);
 
+// Get transactions for a specific staff member
+app.get('/api/snackbar-transactions/staff/:staffId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { staffId } = req.params;
+    
+    // Check if staff member belongs to the team
+    const staffCheck = await sql`
+      SELECT s.id FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staffId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!staffCheck[0]) {
+      return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
+    }
+    
+    const transactions = await sql`
+      SELECT * FROM snack_bar_transactions
+      WHERE staff_id = ${staffId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    res.json(transactions);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar transactions' });
+  }
+}) as any);
+
 // Get all transactions for a camp
 app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
@@ -1850,21 +1916,40 @@ app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Camp not found or does not belong to your team' });
     }
     
-    const transactions = await sql`
+    // Buscar transações de campistas
+    const camperTransactions = await sql`
       SELECT 
         sbt.id,
         sbt.camper_id,
         sbt.amount,
         sbt.created_at,
-        ca.name as camper_name
+        ca.name as person_name,
+        'camper' as person_type
       FROM snack_bar_transactions sbt
       JOIN campers ca ON sbt.camper_id = ca.id
       JOIN registrations r ON ca.registration_id = r.id
       WHERE r.camp_id = ${camp_id}::uuid
-      ORDER BY sbt.created_at DESC
     `;
     
-    res.json(transactions);
+    // Buscar transações de staff
+    const staffTransactions = await sql`
+      SELECT 
+        sbt.id,
+        sbt.staff_id,
+        sbt.amount,
+        sbt.created_at,
+        s.name as person_name,
+        'staff' as person_type
+      FROM snack_bar_transactions sbt
+      JOIN staff s ON sbt.staff_id = s.id
+      WHERE s.camp_id = ${camp_id}::uuid
+    `;
+    
+    // Combinar e ordenar todas as transações
+    const allTransactions = [...camperTransactions, ...staffTransactions]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    
+    res.json(allTransactions);
   } catch (error) {
     res.status(500).json({ error: 'Error fetching snackbar transactions' });
   }

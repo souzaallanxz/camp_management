@@ -14,28 +14,34 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import type { CamperWithBalance } from '@/features/snack-bar/data/schema'
+import type { PersonWithBalance } from '@/features/snack-bar/data/schema'
 
 interface CamperComboboxProps {
   value: string
   onValueChange: (value: string) => void
-  campers: CamperWithBalance[]
+  campers: PersonWithBalance[]
 }
 
 export function CamperCombobox({ value, onValueChange, campers }: CamperComboboxProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
-  const selectedCamper = campers?.find((camper) => camper.id === value)
+  const selectedPerson = campers?.find((person) => person.id === value)
 
   // Filtrar por nome OU form_id
-  const filteredCampers = campers?.filter((camper) => {
+  const filteredPeople = campers?.filter((person) => {
     const searchLower = search.toLowerCase()
-    return (
-      camper.name.toLowerCase().includes(searchLower) ||
-      (camper.form_id && camper.form_id.toLowerCase().includes(searchLower))
-    )
+    const nameMatch = person.name.toLowerCase().includes(searchLower)
+    const formIdMatch = 'form_id' in person && person.form_id && person.form_id.toLowerCase().includes(searchLower)
+    return nameMatch || formIdMatch
   })
+
+  const getDisplayName = (person: PersonWithBalance) => {
+    const baseName = person.name
+    const formId = 'form_id' in person ? person.form_id : null
+    const type = person.type === 'staff' ? ' (Staff)' : ''
+    return `${baseName}${formId ? ` (${formId})` : ''}${type}`
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -46,21 +52,21 @@ export function CamperCombobox({ value, onValueChange, campers }: CamperCombobox
           aria-expanded={open}
           className="w-full justify-between"
         >
-          {value ? `${selectedCamper?.name}${selectedCamper?.form_id ? ` (${selectedCamper.form_id})` : ''}` : 'Selecione um campista...'}
+          {value ? getDisplayName(selectedPerson!) : 'Selecione um campista ou membro do staff...'}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[300px] p-0">
         <Command>
-          <CommandInput placeholder="Procurar campista por nome ou form_id..." className="h-9" value={search} onValueChange={setSearch} />
-          <CommandEmpty>Nenhum campista encontrado.</CommandEmpty>
+          <CommandInput placeholder="Procurar por nome ou form_id..." className="h-9" value={search} onValueChange={setSearch} />
+          <CommandEmpty>Nenhuma pessoa encontrada.</CommandEmpty>
           <CommandGroup className="max-h-[200px] overflow-auto">
-            {filteredCampers?.map((camper) => (
+            {filteredPeople?.map((person) => (
               <CommandItem
-                key={camper.id}
-                value={`${camper.name}${camper.form_id ? ` (${camper.form_id})` : ''}`}
+                key={person.id}
+                value={getDisplayName(person)}
                 onSelect={() => {
-                  onValueChange(camper.id)
+                  onValueChange(person.id)
                   setOpen(false)
                 }}
                 className="py-2"
@@ -68,12 +74,15 @@ export function CamperCombobox({ value, onValueChange, campers }: CamperCombobox
                 <Check
                   className={cn(
                     'mr-2 h-4 w-4',
-                    value === camper.id ? 'opacity-100' : 'opacity-0'
+                    value === person.id ? 'opacity-100' : 'opacity-0'
                   )}
                 />
-                {camper.name}
-                {camper.form_id && (
-                  <span className="ml-2 text-xs text-muted-foreground">({camper.form_id})</span>
+                {person.name}
+                {'form_id' in person && person.form_id && (
+                  <span className="ml-2 text-xs text-muted-foreground">({person.form_id})</span>
+                )}
+                {person.type === 'staff' && (
+                  <span className="ml-2 text-xs text-blue-600 font-medium">(Staff)</span>
                 )}
               </CommandItem>
             ))}

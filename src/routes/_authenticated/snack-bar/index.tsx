@@ -71,9 +71,9 @@ export default function SnackBarPage() {
     refetchInterval: 5000, // Refetch every 5 seconds
   })
 
-  const { data: campers = [], isLoading: isLoadingCampers } = useQuery({
-    queryKey: ['campers', currentCamp?.id],
-    queryFn: () => snackBarService.getCampers(currentCamp?.id),
+  const { data: campers = [] } = useQuery({
+    queryKey: ['campers-and-staff', currentCamp?.id],
+    queryFn: () => snackBarService.getCampersAndStaff(currentCamp?.id),
     enabled: !!currentCamp?.id,
   })
 
