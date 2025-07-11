@@ -3,12 +3,12 @@ import { useUser } from '@/features/auth/hooks/use-user'
 import { getFeaturePermissions, type FeaturePermissions } from '../utils/feature-permissions'
 
 export function useTeamPermissions(): FeaturePermissions & { isLoading: boolean } {
-  const { data: team, isLoading: teamLoading } = useCurrentTeam()
+  const { data: team } = useCurrentTeam()
   const { role, isLoading: userLoading } = useUser()
   
-  // Se ainda está carregando as informações do usuário ou do team, 
+  // Se ainda está carregando as informações do usuário, 
   // retorna permissões restritivas para evitar mostrar conteúdo incorreto
-  if (userLoading || teamLoading) {
+  if (userLoading) {
     return {
       isLoading: true,
       dashboard: {

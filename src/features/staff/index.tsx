@@ -17,13 +17,13 @@ import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dial
 import { type StaffWithActions } from './components/staff-table'
 import { staffService } from './services/staff-service'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 
 function StaffContent() {
-  const permissions = useTeamPermissions()
-  
   // Query simplificada para buscar staff e seus saldos
-  const { data: staff = [], refetch, isLoading } = useQuery({
+  const { data: staff = [], refetch } = useQuery({
     queryKey: ['staff-with-balance'],
     queryFn: async () => {
       try {
@@ -54,15 +54,6 @@ function StaffContent() {
     total_balance: staffMember.total_balance || 0
   }));
 
-  // Se ainda está carregando, mostrar loading
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Carregando staff...</div>
-      </div>
-    )
-  }
-
   return (
     <>
       <Header fixed>
@@ -83,7 +74,6 @@ function StaffContent() {
           </div>
           <Button 
             onClick={openCreateDialog}
-            disabled={!permissions.staff?.create}
           >
             <IconPlus className='mr-2 h-4 w-4' />
             Novo Membro do Staff
@@ -117,15 +107,24 @@ function StaffContent() {
 
 export default function StaffPage() {
   const permissions = useTeamPermissions()
+  const navigate = useNavigate()
+  
+  useEffect(() => {
+    // Só verificar permissões após carregamento completo
+    if (!permissions.isLoading && !permissions.staff?.viewList) {
+      navigate({ to: '/' })
+    }
+  }, [permissions, navigate])
   
   // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
-  if (permissions.isLoading || !permissions.staff?.viewList) {
-    return null
-  }
+  if (permissions.isLoading || !permissions.staff?.viewList) return null
   
   return (
     <StaffDialogsProvider>
       <StaffContent />
     </StaffDialogsProvider>
   )
-} 
+}
+
+// Named export for router
+export const StaffFeature = StaffPage 

@@ -159,11 +159,13 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
         url: '/campers',
         icon: IconTent,
       })
-      generalItems.push({
-        title: 'Staff',
-        url: '/staff',
-        icon: IconUsersGroup,
-      })
+      if (permissions.staff?.viewList) {
+        generalItems.push({
+          title: 'Staff',
+          url: '/staff',
+          icon: IconUsersGroup,
+        })
+      }
       // Only show Users menu item for superadmin and admin roles
       if (user?.role === 'superadmin' || user?.role === 'admin') {
         generalItems.push({

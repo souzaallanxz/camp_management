@@ -14,7 +14,6 @@ import { formatCurrency } from '@/lib/utils'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
-
 export interface StaffWithActions extends Staff {
   onEdit?: (staff: Staff) => void
   onLoadCard?: (staff: Staff) => void
