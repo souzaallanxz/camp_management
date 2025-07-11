@@ -1829,6 +1829,38 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// Get transactions for a specific staff member
+app.get('/api/snackbar-transactions/staff/:staffId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { staffId } = req.params;
+    
+    // Check if staff member belongs to the team
+    const staffCheck = await sql`
+      SELECT s.id FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staffId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!staffCheck[0]) {
+      return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
+    }
+    
+    const transactions = await sql`
+      SELECT * FROM snack_bar_transactions
+      WHERE staff_id = ${staffId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    res.json(transactions);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar transactions' });
+  }
+}) as any);
+
 // Get transactions for a specific camper
 app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
@@ -1853,38 +1885,6 @@ app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Respo
     const transactions = await sql`
       SELECT * FROM snack_bar_transactions
       WHERE camper_id = ${camperId}::uuid
-      ORDER BY created_at DESC
-    `;
-    
-    res.json(transactions);
-  } catch (error) {
-    res.status(500).json({ error: 'Error fetching snackbar transactions' });
-  }
-}) as any);
-
-// Get transactions for a specific staff member
-app.get('/api/snackbar-transactions/staff/:staffId', (async (req: Request, res: Response) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  try {
-    const { staffId } = req.params;
-    
-    // Check if staff member belongs to the team
-    const staffCheck = await sql`
-      SELECT s.id FROM staff s
-      JOIN camps c ON s.camp_id = c.id
-      WHERE s.id = ${staffId}::uuid AND c.team_id = ${teamId}::uuid
-    `;
-    
-    if (!staffCheck[0]) {
-      return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
-    }
-    
-    const transactions = await sql`
-      SELECT * FROM snack_bar_transactions
-      WHERE staff_id = ${staffId}::uuid
       ORDER BY created_at DESC
     `;
     
