@@ -13,12 +13,44 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { getTeamIdHeader } from '@/lib/auth'
 import { buildApiUrl } from '@/services/api'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { MBWayService } from '@/features/registrations/services/mbway-service'
+import { type PaymentMethod } from '@/features/registrations/data/schema'
 
 interface StaffSnackbarBalanceDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   staffId: string
   onSuccess?: () => void
+}
+
+// Função para salvar o saldo através da API
+async function saveStaffSnackbarBalance(data: {
+  staff_id: string
+  amount: number
+  payment_method: string
+  phone_number?: string | null
+}) {
+  const response = await fetch(buildApiUrl('/api/staff-snackbar-balance'), {
+    method: 'POST',
+    headers: {
+      ...getTeamIdHeader(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to add balance');
+  }
+  
+  return response.json();
 }
 
 export function StaffSnackbarBalanceDialog({ 
@@ -28,41 +60,56 @@ export function StaffSnackbarBalanceDialog({
   onSuccess 
 }: StaffSnackbarBalanceDialogProps) {
   const [amount, setAmount] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('MB Way')
+  const [phoneNumber, setPhoneNumber] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!amount || parseFloat(amount) <= 0) {
-      toast.error('Por favor, insira um valor válido')
-      return
-    }
-
     setIsLoading(true)
-    try {
-      const response = await fetch(buildApiUrl('/api/staff-snackbar-balance'), {
-        method: 'POST',
-        headers: {
-          ...getTeamIdHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          staff_id: staffId,
-          amount: parseFloat(amount),
-          payment_method: 'Dinheiro',
-        }),
-      })
 
-      if (!response.ok) {
-        throw new Error('Failed to add balance')
+    try {
+      const numericAmount = Number(amount)
+      
+      if (numericAmount <= 0) {
+        toast.error('O valor do carregamento deve ser maior que 0')
+        setIsLoading(false)
+        return
       }
 
-      toast.success('Saldo carregado com sucesso!')
+      // If payment method is MB Way, trigger the payment request first
+      if (paymentMethod === 'MB Way') {
+        try {
+          await MBWayService.requestPayment({
+            mobileNumber: phoneNumber,
+            amount: numericAmount,
+            description: `Carregamento Cartão Staff - ${staffId}`,
+            orderId: `${staffId}-${Date.now()}`,
+          })
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+          toast.error(`Erro MB Way: ${errorMessage}`)
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // Salvar através da API
+      await saveStaffSnackbarBalance({
+        staff_id: staffId,
+        amount: numericAmount,
+        payment_method: paymentMethod,
+        phone_number: phoneNumber || null,
+      })
+
+      toast.success('Carregamento realizado com sucesso!')
       setAmount('')
+      setPhoneNumber('')
       onOpenChange(false)
       onSuccess?.()
-    } catch {
-      toast.error('Erro ao carregar saldo')
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Erro ao realizar carregamento: ${errorMessage}`)
     } finally {
       setIsLoading(false)
     }
@@ -72,7 +119,7 @@ export function StaffSnackbarBalanceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Carregar saldo</DialogTitle>
+          <DialogTitle>Carregar Cartão</DialogTitle>
           <DialogDescription>
             Adicione saldo para o membro do staff.
           </DialogDescription>
@@ -80,21 +127,55 @@ export function StaffSnackbarBalanceDialog({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="amount">Valor (€)</Label>
+            <Label htmlFor="amount">Valor</Label>
             <Input
               id="amount"
               type="number"
-              step="0.01"
-              min="0"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
+              required
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="paymentMethod">Método de Pagamento</Label>
+            <Select
+              value={paymentMethod}
+              onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um método de pagamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MB Way">MB Way</SelectItem>
+                <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
+                <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                <SelectItem value="Multibanco">Multibanco</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {paymentMethod === 'MB Way' && (
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Número de Telefone</Label>
+              <Input
+                id="phoneNumber"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="9XXXXXXXX"
+                required
+              />
+            </div>
+          )}
+
           <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Carregando...' : 'Carregar saldo'}
+              {isLoading ? 'Processando...' : 'Confirmar'}
             </Button>
           </DialogFooter>
         </form>
