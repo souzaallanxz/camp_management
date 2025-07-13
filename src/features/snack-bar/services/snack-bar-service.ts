@@ -124,9 +124,12 @@ export const snackBarService = {
       const person = allPeople.find(p => p.id === transaction.camper_id)
       const isStaff = person?.type === 'staff'
       
+      // Garantir que o amount seja um número
+      const amount = Number(transaction.amount)
+      
       const payload = isStaff 
-        ? { staff_id: transaction.camper_id, amount: transaction.amount }
-        : { camper_id: transaction.camper_id, amount: transaction.amount }
+        ? { staff_id: transaction.camper_id, amount: amount }
+        : { camper_id: transaction.camper_id, amount: amount }
       
       const response = await api.post('/snackbar-transactions', payload)
       return response.data

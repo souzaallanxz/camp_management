@@ -1811,6 +1811,8 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   try {
     const { camper_id, staff_id, amount } = req.body;
     
+    console.log('Creating snackbar transaction:', { camper_id, staff_id, amount, teamId });
+    
     if (!amount) {
       return res.status(400).json({ error: 'Amount is required' });
     }
@@ -1854,6 +1856,7 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     
     let result;
     if (camper_id) {
+      console.log('Creating transaction for camper:', camper_id);
       result = await sql`
         INSERT INTO snack_bar_transactions (
           camper_id, amount, created_at
@@ -1862,6 +1865,7 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
         ) RETURNING *
       `;
     } else {
+      console.log('Creating transaction for staff:', staff_id);
       result = await sql`
         INSERT INTO snack_bar_transactions (
           staff_id, amount, created_at
@@ -1871,9 +1875,11 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       `;
     }
     
+    console.log('Transaction created successfully:', result[0]);
     res.status(201).json(result[0]);
   } catch (error) {
-    res.status(500).json({ error: 'Error creating snackbar transaction' });
+    console.error('Error creating snackbar transaction:', error);
+    res.status(500).json({ error: 'Error creating snackbar transaction', details: error.message });
   }
 }) as any);
 
