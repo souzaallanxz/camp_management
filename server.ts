@@ -1723,9 +1723,9 @@ app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) 
   try {
     const { camperId } = req.params;
     
-    // Get total deposit for this camper's registration
-    const depositResult = await sql`
-      SELECT COALESCE(SUM(sb.amount), 0) as total_deposit
+    // Get total balance from snackbar_balance (including negative amounts for liquidations)
+    const balanceResult = await sql`
+      SELECT COALESCE(SUM(sb.amount), 0) as total_balance
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
@@ -1733,21 +1733,11 @@ app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) 
       WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
     `;
     
-    // Get total spent for this camper
-    const spentResult = await sql`
-      SELECT COALESCE(SUM(amount), 0) as total_spent
-      FROM snack_bar_transactions
-      WHERE camper_id = ${camperId}::uuid
-    `;
-    
-    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
-    const totalSpent = Number(spentResult[0]?.total_spent || 0);
-    const balance = totalDeposit - totalSpent;
+    const balance = Number(balanceResult[0]?.total_balance || 0);
     
     res.json({
       balance,
-      total_deposit: totalDeposit,
-      total_spent: totalSpent
+      total_balance: balance
     });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching snackbar balance' });
@@ -1928,10 +1918,31 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       return res.status(400).json({ error: 'Camper has no balance to liquidate' });
     }
     
-    // Create a transaction to liquidate the entire balance
+    // Get the registration_id for this camper
+    const registrationResult = await sql`
+      SELECT ca.registration_id FROM campers ca
+      WHERE ca.id = ${camperId}::uuid
+    `;
+    
+    if (!registrationResult[0]?.registration_id) {
+      return res.status(400).json({ error: 'Camper does not have a registration' });
+    }
+    
+    const registrationId = registrationResult[0].registration_id;
+    
+    // Create a negative balance entry to liquidate the entire balance
     const now = new Date().toISOString();
     
-    const result = await sql`
+    const balanceResult = await sql`
+      INSERT INTO snackbar_balance (
+        registration_id, amount, payment_method, phone_number, created_at, updated_at
+      ) VALUES (
+        ${registrationId}, -${currentBalance}, 'Liquidação', null, ${now}, ${now}
+      ) RETURNING *
+    `;
+    
+    // Also create a transaction record for tracking
+    const transactionResult = await sql`
       INSERT INTO snack_bar_transactions (
         camper_id, amount, created_at, is_liquidated
       ) VALUES (
@@ -1943,7 +1954,8 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       message: 'Balance liquidated successfully',
       liquidated_amount: currentBalance,
       camper_name: camperCheck[0].name,
-      transaction: result[0]
+      balance_entry: balanceResult[0],
+      transaction: transactionResult[0]
     });
   } catch (error) {
     console.error('Error liquidating snackbar balance:', error);
