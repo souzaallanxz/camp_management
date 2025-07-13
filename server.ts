@@ -3130,44 +3130,27 @@ app.put('/api/staff/:id', (async (req: Request, res: Response) => {
     
     const now = new Date().toISOString();
     
-    // Build the update query dynamically
-    const updateFields = [];
-    const updateValues = [];
+    // Build the update query using template literals
+    let updateQuery = sql`UPDATE staff SET updated_at = ${now}`;
     
     if (name !== undefined) {
-      updateFields.push('name = $' + (updateValues.length + 1));
-      updateValues.push(name);
+      updateQuery = sql`${updateQuery}, name = ${name}`;
     }
     if (email !== undefined) {
-      updateFields.push('email = $' + (updateValues.length + 1));
-      updateValues.push(email);
+      updateQuery = sql`${updateQuery}, email = ${email}`;
     }
     if (phone !== undefined) {
-      updateFields.push('phone = $' + (updateValues.length + 1));
-      updateValues.push(phone);
+      updateQuery = sql`${updateQuery}, phone = ${phone}`;
     }
     if (camp_id !== undefined) {
-      updateFields.push('camp_id = $' + (updateValues.length + 1));
-      updateValues.push(camp_id);
+      updateQuery = sql`${updateQuery}, camp_id = ${camp_id}`;
     }
     
-    updateFields.push('updated_at = $' + (updateValues.length + 1));
-    updateValues.push(now);
-    
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-    
-    const setClause = updateFields.join(', ');
-    const query = `
-      UPDATE staff 
-      SET ${setClause} 
-      WHERE id = $${updateValues.length + 1} 
-      AND camp_id IN (SELECT id FROM camps WHERE team_id = $${updateValues.length + 2}) 
+    const result = await sql`
+      ${updateQuery}
+      WHERE id = ${id} AND camp_id IN (SELECT id FROM camps WHERE team_id = ${teamId})
       RETURNING *
     `;
-    
-    const result = await sql.unsafe(query, [...updateValues, id, teamId]);
     
     if (!result[0]) {
       return res.status(404).json({ error: 'Staff member not found or you do not have permission to update it' });
