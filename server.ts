@@ -1932,12 +1932,13 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
     
     // Create a negative balance entry to liquidate the entire balance
     const now = new Date().toISOString();
+    const negativeAmount = -currentBalance;
     
     const balanceResult = await sql`
       INSERT INTO snackbar_balance (
         registration_id, amount, payment_method, phone_number, created_at, updated_at
       ) VALUES (
-        ${registrationId}, -${currentBalance}, 'Liquidação', null, ${now}, ${now}
+        ${registrationId}, ${negativeAmount}, 'Liquidação', null, ${now}, ${now}
       ) RETURNING *
     `;
     
