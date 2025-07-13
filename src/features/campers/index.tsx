@@ -13,6 +13,7 @@ import { CamperDialogsProvider, useCamperDialogs } from './context/camper-dialog
 import { CamperDetails } from './components/camper-details'
 import { useState } from 'react'
 import { CamperSnackbarBalanceDialog } from './components/camper-snackbar-balance-dialog'
+import { LiquidateSnackbarDialog } from './components/liquidate-snackbar-dialog'
 import { toast } from 'sonner'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { type CamperWithActions } from './components/campers-table'
@@ -37,8 +38,10 @@ function CampersContent() {
 
   const { openCreateDialog, selectedCamperId, openEditDialog, closeEditDialog } = useCamperDialogs()
   const [showSnackbarBalanceDialog, setShowSnackbarBalanceDialog] = useState(false)
+  const [showLiquidateDialog, setShowLiquidateDialog] = useState(false)
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
   const [selectedCamperForBalance, setSelectedCamperForBalance] = useState<string | null>(null)
+  const [selectedCamperForLiquidate, setSelectedCamperForLiquidate] = useState<{ id: string; name: string; balance: number } | null>(null)
 
   const handleLoadCard = (camper: Camper) => {
     if (!camper.registration_id) {
@@ -49,13 +52,29 @@ function CampersContent() {
     setShowSnackbarBalanceDialog(true)
   }
 
+  const handleLiquidateSnackbar = (camper: Camper) => {
+    const balance = Number(camper.snack_bar_balance) || 0
+    if (balance <= 0) {
+      toast.error('Este campista não tem saldo disponível para liquidar')
+      return
+    }
+    
+    setSelectedCamperForLiquidate({
+      id: camper.id,
+      name: camper.name,
+      balance: balance
+    })
+    setShowLiquidateDialog(true)
+  }
+
   // Adicionar as funções de ação para cada campista
   const campersWithActions: CamperWithActions[] = (Array.isArray(campers) ? campers : []).map(camper => ({
     ...camper,
     onEdit: () => openEditDialog(camper.id),
     onLoadCard: () => handleLoadCard(camper),
     onUpgradeClick: () => setShowUpgradeDialog(true),
-    total_balance: camper.total_balance || 0
+    onLiquidateSnackbar: () => handleLiquidateSnackbar(camper),
+    total_balance: 0
   }));
 
   return (
@@ -106,6 +125,14 @@ function CampersContent() {
       <TierUpgradeDialog
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
+      />
+      <LiquidateSnackbarDialog
+        open={showLiquidateDialog}
+        onOpenChange={setShowLiquidateDialog}
+        camperId={selectedCamperForLiquidate?.id || ''}
+        camperName={selectedCamperForLiquidate?.name || ''}
+        currentBalance={selectedCamperForLiquidate?.balance || 0}
+        onSuccess={refetch}
       />
     </>
   )

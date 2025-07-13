@@ -1883,6 +1883,74 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// Liquidate snackbar balance for a camper
+app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camperId } = req.params;
+    
+    // Check if camper belongs to the team
+    const camperCheck = await sql`
+      SELECT ca.id, ca.name FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!camperCheck[0]) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+    
+    // Get current balance for this camper
+    const depositResult = await sql`
+      SELECT COALESCE(SUM(sb.amount), 0) as total_deposit
+      FROM snackbar_balance sb
+      JOIN registrations r ON sb.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      JOIN campers ca ON r.id = ca.registration_id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    const spentResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}::uuid
+    `;
+    
+    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+    const currentBalance = totalDeposit - totalSpent;
+    
+    if (currentBalance <= 0) {
+      return res.status(400).json({ error: 'Camper has no balance to liquidate' });
+    }
+    
+    // Create a transaction to liquidate the entire balance
+    const now = new Date().toISOString();
+    
+    const result = await sql`
+      INSERT INTO snack_bar_transactions (
+        camper_id, amount, created_at
+      ) VALUES (
+        ${camperId}::uuid, ${currentBalance}, ${now}
+      ) RETURNING *
+    `;
+    
+    res.status(200).json({
+      message: 'Balance liquidated successfully',
+      liquidated_amount: currentBalance,
+      camper_name: camperCheck[0].name,
+      transaction: result[0]
+    });
+  } catch (error) {
+    console.error('Error liquidating snackbar balance:', error);
+    res.status(500).json({ error: 'Error liquidating snackbar balance', details: error.message });
+  }
+}) as any);
+
 // Get transactions for a specific staff member
 app.get('/api/snackbar-transactions/staff/:staffId', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);

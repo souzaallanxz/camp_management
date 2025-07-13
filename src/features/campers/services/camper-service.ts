@@ -155,5 +155,36 @@ export const camperService = {
     } catch {
       return false;
     }
+  },
+
+  async liquidateSnackbarBalance(id: string): Promise<{ success: boolean; message?: string; liquidated_amount?: number }> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(`${API_BASE_URL}/snackbar-balance/${id}/liquidate`, {
+        method: 'POST',
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        return { 
+          success: false, 
+          message: errorData.error || 'Erro ao liquidar saldo do snackbar' 
+        };
+      }
+      
+      const data = await response.json();
+      return { 
+        success: true, 
+        message: data.message,
+        liquidated_amount: data.liquidated_amount
+      };
+    } catch {
+      return { 
+        success: false, 
+        message: 'Erro de conexão ao liquidar saldo do snackbar' 
+      };
+    }
   }
 };

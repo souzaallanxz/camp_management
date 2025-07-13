@@ -3,7 +3,7 @@ import { type Camper } from '../data/schema'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
 import LongText from '@/components/long-text'
 import { Button } from '@/components/ui/button'
-import { IconEdit, IconDotsVertical, IconCreditCard } from '@tabler/icons-react'
+import { IconEdit, IconDotsVertical, IconCreditCard, IconCash } from '@tabler/icons-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ export interface CamperWithActions extends Omit<Camper, 'camp'> {
   onEdit?: (camper: Camper) => void
   onLoadCard?: (camper: Camper) => void
   onUpgradeClick?: () => void
+  onLiquidateSnackbar?: (camper: Camper) => void
   snack_bar_balance?: string | number
   total_balance: number
   camp?: string | { name?: string }
@@ -134,6 +135,17 @@ export const columns: ColumnDef<CamperWithActions>[] = [
                 )}
               </Tooltip>
             </TooltipProvider>
+            
+            <DropdownMenuItem
+              onClick={() => camper.onLiquidateSnackbar?.(camper as Camper)}
+              className='flex items-center'
+              disabled={!camper.snack_bar_balance || Number(camper.snack_bar_balance) <= 0}
+            >
+              Liquidar Snackbar
+              <DropdownMenuShortcut>
+                <IconCash size={16} />
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )
