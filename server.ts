@@ -1895,8 +1895,8 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
     }
     
     // Get current balance for this camper
-    const depositResult = await sql`
-      SELECT COALESCE(SUM(sb.amount), 0) as total_deposit
+    const balanceResult = await sql`
+      SELECT COALESCE(SUM(sb.amount), 0) as total_balance
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
@@ -1904,15 +1904,7 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
     `;
     
-    const spentResult = await sql`
-      SELECT COALESCE(SUM(amount), 0) as total_spent
-      FROM snack_bar_transactions
-      WHERE camper_id = ${camperId}::uuid
-    `;
-    
-    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
-    const totalSpent = Number(spentResult[0]?.total_spent || 0);
-    const currentBalance = totalDeposit - totalSpent;
+    const currentBalance = Number(balanceResult[0]?.total_balance || 0);
     
     if (currentBalance <= 0) {
       return res.status(400).json({ error: 'Camper has no balance to liquidate' });
@@ -1930,10 +1922,12 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
     
     const registrationId = registrationResult[0].registration_id;
     
-    // Create a negative balance entry to liquidate the entire balance
+    // Create a balance entry that zeros out the current balance
     const now = new Date().toISOString();
     const negativeAmount = -currentBalance;
     
+    // Add a negative amount to zero out the current balance
+    // This ensures the total balance becomes 0
     const balanceResult = await sql`
       INSERT INTO snackbar_balance (
         registration_id, amount, payment_method, phone_number, created_at, updated_at
