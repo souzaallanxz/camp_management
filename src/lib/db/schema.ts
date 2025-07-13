@@ -114,6 +114,7 @@ export const snack_bar_transactions = pgTable('snack_bar_transactions', {
   amount: numeric('amount').notNull(),
   type: varchar('type', { length: 20 }).notNull().default('deduction'), // 'deduction' or 'refund'
   description: text('description'),
+  is_liquidated: boolean('is_liquidated').notNull().default(false),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

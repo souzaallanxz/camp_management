@@ -1859,18 +1859,18 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       console.log('Creating transaction for camper:', camper_id);
       result = await sql`
         INSERT INTO snack_bar_transactions (
-          camper_id, amount, created_at
+          camper_id, amount, created_at, is_liquidated
         ) VALUES (
-          ${camper_id}::uuid, ${amount}, ${now}
+          ${camper_id}::uuid, ${amount}, ${now}, false
         ) RETURNING *
       `;
     } else {
       console.log('Creating transaction for staff:', staff_id);
       result = await sql`
         INSERT INTO snack_bar_transactions (
-          staff_id, amount, created_at
+          staff_id, amount, created_at, is_liquidated
         ) VALUES (
-          ${staff_id}::uuid, ${amount}, ${now}
+          ${staff_id}::uuid, ${amount}, ${now}, false
         ) RETURNING *
       `;
     }
@@ -1933,9 +1933,9 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
     
     const result = await sql`
       INSERT INTO snack_bar_transactions (
-        camper_id, amount, created_at
+        camper_id, amount, created_at, is_liquidated
       ) VALUES (
-        ${camperId}::uuid, ${currentBalance}, ${now}
+        ${camperId}::uuid, ${currentBalance}, ${now}, true
       ) RETURNING *
     `;
     

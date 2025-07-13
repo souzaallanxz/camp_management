@@ -14,6 +14,7 @@ export const snackBarTransactionResponseSchema = z.object({
   id: z.string(),
   camper_id: z.string(),
   amount: z.number(),
+  is_liquidated: z.boolean().optional(),
   created_at: z.string(),
   camper: z.object({
     id: z.string(),

@@ -51,15 +51,17 @@ export async function createTransaction(transaction: Omit<SnackBarTransaction, '
         amount,
         type,
         description,
-        created_at
-      ) VALUES ($1, $2, $3, $4, $5)
+        created_at,
+        is_liquidated
+      ) VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *`,
       [
         transaction.camper_id,
         transaction.amount,
         transaction.type,
         transaction.description,
-        new Date().toISOString()
+        new Date().toISOString(),
+        false
       ]
     )
 

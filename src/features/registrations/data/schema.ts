@@ -86,6 +86,7 @@ export const snackBarTransactionSchema = z.object({
   amount: z.number(),
   type: z.enum(['credit', 'debit']),
   description: z.string().optional().nullable(),
+  is_liquidated: z.boolean().default(false),
   created_at: z.string().or(z.date())
 })
 
