@@ -3118,24 +3118,56 @@ app.put('/api/staff/:id', (async (req: Request, res: Response) => {
     const { id } = req.params;
     const { name, email, phone, camp_id } = req.body;
     
-    const now = new Date().toISOString();
-    const fields = [];
-    if (name !== undefined) fields.push(sql`name = ${name}`);
-    if (email !== undefined) fields.push(sql`email = ${email}`);
-    if (phone !== undefined) fields.push(sql`phone = ${phone}`);
-    if (camp_id !== undefined) fields.push(sql`camp_id = ${camp_id}`);
-    fields.push(sql`updated_at = ${now}`);
+    // Check if camp_id is provided and belongs to the team
+    if (camp_id !== undefined) {
+      const campCheck = await sql`
+        SELECT id FROM camps WHERE id = ${camp_id} AND team_id = ${teamId}
+      `;
+      if (!campCheck[0]) {
+        return res.status(400).json({ error: 'Camp does not belong to your team' });
+      }
+    }
     
-    if (fields.length === 0) {
+    const now = new Date().toISOString();
+    
+    // Build the update query dynamically
+    const updateFields = [];
+    const updateValues = [];
+    
+    if (name !== undefined) {
+      updateFields.push('name = $' + (updateValues.length + 1));
+      updateValues.push(name);
+    }
+    if (email !== undefined) {
+      updateFields.push('email = $' + (updateValues.length + 1));
+      updateValues.push(email);
+    }
+    if (phone !== undefined) {
+      updateFields.push('phone = $' + (updateValues.length + 1));
+      updateValues.push(phone);
+    }
+    if (camp_id !== undefined) {
+      updateFields.push('camp_id = $' + (updateValues.length + 1));
+      updateValues.push(camp_id);
+    }
+    
+    updateFields.push('updated_at = $' + (updateValues.length + 1));
+    updateValues.push(now);
+    
+    if (updateFields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
     
-    const setClause = sql.join(fields, sql`, `);
+    const setClause = updateFields.join(', ');
+    const query = `
+      UPDATE staff 
+      SET ${setClause} 
+      WHERE id = $${updateValues.length + 1} 
+      AND camp_id IN (SELECT id FROM camps WHERE team_id = $${updateValues.length + 2}) 
+      RETURNING *
+    `;
     
-    const result = await sql.unsafe(
-      `UPDATE staff SET ${setClause.sql} WHERE id = $1 AND camp_id IN (SELECT id FROM camps WHERE team_id = $2) RETURNING *`,
-      [id, teamId, ...setClause.values]
-    );
+    const result = await sql.unsafe(query, [...updateValues, id, teamId]);
     
     if (!result[0]) {
       return res.status(404).json({ error: 'Staff member not found or you do not have permission to update it' });
@@ -3143,6 +3175,7 @@ app.put('/api/staff/:id', (async (req: Request, res: Response) => {
     
     res.json(result[0]);
   } catch (error) {
+    console.error('Error updating staff member:', error);
     res.status(500).json({ error: 'Erro ao atualizar membro do staff.' });
   }
 }) as any);
