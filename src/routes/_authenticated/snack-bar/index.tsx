@@ -56,25 +56,32 @@ export default function SnackBarPage() {
     queryKey: ['camper-balance', selectedCamperId],
     queryFn: () => snackBarService.getCamperBalance(selectedCamperId),
     enabled: !!selectedCamperId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - cache for longer since it's only updated on selection
+    gcTime: 10 * 60 * 1000, // 10 minutes
   })
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['camper-transactions', selectedCamperId],
     queryFn: () => snackBarService.getCamperTransactions(selectedCamperId),
     enabled: !!selectedCamperId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - cache for longer since it's only updated on selection
+    gcTime: 10 * 60 * 1000, // 10 minutes
   })
 
   const { data: allTransactions = [] } = useQuery({
     queryKey: ['all-transactions', currentCamp?.id],
     queryFn: () => snackBarService.getAllTransactions(currentCamp?.id),
     enabled: !!currentCamp?.id,
-    refetchInterval: 5000, // Refetch every 5 seconds
+    staleTime: 5 * 60 * 1000, // 5 minutes - cache for longer since it's only updated on selection
+    gcTime: 10 * 60 * 1000, // 10 minutes
   })
 
   const { data: campers = [] } = useQuery({
     queryKey: ['campers-and-staff', currentCamp?.id],
     queryFn: () => snackBarService.getCampersAndStaff(currentCamp?.id),
     enabled: !!currentCamp?.id,
+    staleTime: 10 * 60 * 1000, // 10 minutes - list changes very rarely
+    gcTime: 15 * 60 * 1000, // 15 minutes
   })
 
   const mutation = useMutation({
@@ -84,7 +91,7 @@ export default function SnackBarPage() {
     onSuccess: () => {
       toast.success('Compra realizada com sucesso!')
 
-      // Invalidate all relevant queries
+      // Invalidate only the necessary queries
       queryClient.invalidateQueries({
         queryKey: ['camper-balance', selectedCamperId],
       })
@@ -92,7 +99,7 @@ export default function SnackBarPage() {
         queryKey: ['camper-transactions', selectedCamperId],
       })
       queryClient.invalidateQueries({
-        queryKey: ['all-transactions'],
+        queryKey: ['all-transactions', currentCamp?.id],
       })
 
       // Reset form and selected camper
