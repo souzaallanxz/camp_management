@@ -166,8 +166,18 @@ export const snackBarService = {
       return
     }
     
-    // Get current balance
-    const balanceResponse = await api.get(`/snackbar-balance/${transaction.camper_id}`)
+    // Determinar se é um camper ou staff baseado no tipo
+    const allPeople = await this.getCampersAndStaff()
+    const person = allPeople.find(p => p.id === transaction.camper_id)
+    const isStaff = person?.type === 'staff'
+    
+    // Get current balance using the appropriate endpoint
+    let balanceResponse
+    if (isStaff) {
+      balanceResponse = await api.get(`/snackbar-balance/staff/${transaction.camper_id}`)
+    } else {
+      balanceResponse = await api.get(`/snackbar-balance/${transaction.camper_id}`)
+    }
     const currentBalance = balanceResponse.data.balance
     
     // Verify if has sufficient balance

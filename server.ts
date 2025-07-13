@@ -1754,6 +1754,54 @@ app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) 
   }
 }) as any);
 
+// Get snackbar balance for a staff member
+app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { staffId } = req.params;
+    
+    // Check if staff member belongs to the team
+    const staffCheck = await sql`
+      SELECT s.id FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staffId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!staffCheck[0]) {
+      return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
+    }
+    
+    // Get total deposit for this staff member
+    const depositResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_deposit
+      FROM snackbar_balance
+      WHERE staff_id = ${staffId}::uuid
+    `;
+    
+    // Get total spent for this staff member
+    const spentResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE staff_id = ${staffId}::uuid
+    `;
+    
+    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+    const balance = totalDeposit - totalSpent;
+    
+    res.json({
+      balance,
+      total_deposit: totalDeposit,
+      total_spent: totalSpent
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar balance for staff' });
+  }
+}) as any);
+
 // Create a new snackbar transaction
 app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
