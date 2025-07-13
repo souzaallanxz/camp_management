@@ -1,12 +1,13 @@
-import { Button } from '@/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { camperService } from '../services/camper-service'
@@ -52,52 +53,49 @@ export function LiquidateSnackbarDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Liquidar Saldo do Snackbar</DialogTitle>
-          <DialogDescription>
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-lg font-semibold">
+            Liquidar Saldo do Snackbar
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-muted-foreground">
             Tem a certeza que deseja liquidar todo o saldo disponível do campista?
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          <div className="p-4 bg-muted rounded-lg">
-            <div className="text-sm text-muted-foreground mb-2">Campista</div>
-            <div className="font-medium">{camperName}</div>
-          </div>
-          
-          <div className="p-4 bg-muted rounded-lg">
-            <div className="text-sm text-muted-foreground mb-2">Saldo Atual</div>
-            <div className={`text-2xl font-bold ${currentBalance > 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCurrency(currentBalance)}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="py-3 space-y-3">
+          <div className="rounded-lg border p-4 space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Campista</span>
+              <span className="text-sm font-medium">{camperName}</span>
+            </div>
+            <div className="flex justify-between items-center pt-2 border-t">
+              <span className="text-sm text-muted-foreground">Saldo Atual</span>
+              <span className={`text-sm font-semibold ${currentBalance > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(currentBalance)}
+              </span>
             </div>
           </div>
           
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
             <div className="text-sm text-yellow-800">
               <strong>Atenção:</strong> Esta ação irá liquidar todo o saldo disponível e não pode ser desfeita.
             </div>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading}
-          >
-            Cancelar
-          </Button>
-          <Button
+        <AlertDialogFooter>
+          <AlertDialogCancel className="h-9">Cancelar</AlertDialogCancel>
+          <AlertDialogAction
             onClick={handleLiquidate}
             disabled={isLoading || currentBalance <= 0}
-            className="bg-red-600 hover:bg-red-700"
+            className="h-9 bg-red-600 hover:bg-red-700"
           >
             {isLoading ? 'A liquidar...' : 'Liquidar Saldo'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 } 
