@@ -1413,6 +1413,82 @@ app.post('/api/registrations', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// Get a single registration by ID
+app.get('/api/registrations/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    
+    // Get registration with camp details
+    const registrationResult = await sql`
+      SELECT 
+        r.id,
+        r.form_id,
+        r.name,
+        r.email,
+        r.contact,
+        r.status,
+        r.created_at,
+        r.updated_at,
+        r.user_id,
+        r.camp_id,
+        r.onboarding_status,
+        r.snack_bar_balance,
+        r.id_number,
+        r.sns_number,
+        r.date_of_birth,
+        r.dietary_restrictions,
+        r.guardian_name,
+        r.guardian_email,
+        r.guardian_phone,
+        r.request_id,
+        c.name as camp_name,
+        c.start_date as camp_start_date,
+        c.end_date as camp_end_date,
+        c.price as camp_price
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${id}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (registrationResult.length === 0) {
+      return res.status(404).json({ error: 'Registration not found or you do not have permission to access it' });
+    }
+    
+    const registration = registrationResult[0];
+    
+    // Get total paid amount separately
+    const totalPaidResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_paid
+      FROM payments 
+      WHERE registration_id = ${id}::uuid AND payment_status = 'confirmed'
+    `;
+    
+    const totalPaid = parseFloat(totalPaidResult[0]?.total_paid || '0');
+    const campPrice = parseFloat(registration.camp_price || '0');
+    
+    // Determine status based on total paid vs camp price
+    let status = 'unpaid';
+    if (totalPaid >= campPrice || (campPrice > 0 && (campPrice - totalPaid) < 1)) {
+      status = 'paid';
+    } else if (totalPaid > 0) {
+      status = 'partial';
+    }
+    
+    res.json({
+      ...registration,
+      total_paid: totalPaid,
+      camp_price: campPrice,
+      status: status
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar inscrição.' });
+  }
+}) as any);
+
 // Update a registration
 app.put('/api/registrations/:id', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
@@ -1673,7 +1749,7 @@ app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { registration_id, amount, payment_method, phone_number } = req.body;
+    const { registration_id, amount, payment_method, phone_number, request_id } = req.body;
     
     if (!registration_id || !amount || !payment_method) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -1694,9 +1770,9 @@ app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
     
     const result = await sql`
       INSERT INTO snackbar_balance (
-        registration_id, amount, payment_method, phone_number, created_at, updated_at
+        registration_id, amount, payment_method, phone_number, request_id, created_at, updated_at
       ) VALUES (
-        ${registration_id}, ${amount}, ${payment_method}, ${phone_number}, ${now}, ${now}
+        ${registration_id}, ${amount}, ${payment_method}, ${phone_number}, ${request_id || null}, ${now}, ${now}
       ) RETURNING *
     `;
     
@@ -2719,12 +2795,10 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
 app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
   try {
     const { teamId } = req.params;
-    
-    
+    const { request_id } = req.query; // request_id agora é query parameter
     
     const {
       email,
-      request_id,
       amount,
       payment_method,
       payment_date,
@@ -2737,7 +2811,7 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
     // Validação dos campos obrigatórios
     const errors: string[] = [];
     if (!amount) errors.push('amount is required');
-    if (!email && !request_id) errors.push('email or request_id is required');
+    if (!email && !request_id) errors.push('email or request_id query parameter is required');
     if (errors.length > 0) {
       return res.status(400).json({ error: 'Validation failed', details: errors });
     }
@@ -2748,17 +2822,95 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
       return res.status(404).json({ error: 'Team not found' });
     }
 
-    // Buscar registration
-    let registration;
+    const now = new Date().toISOString();
+    let registration = null;
+    let result = null;
+
+    // Lógica baseada no tipo de request_id
     if (request_id) {
-      const regResult = await sql`
-        SELECT r.*, c.price as camp_price FROM registrations r
-        LEFT JOIN camps c ON r.camp_id = c.id
-        WHERE r.request_id = ${request_id} AND c.team_id = ${teamId}
-        ORDER BY r.created_at DESC LIMIT 1
-      `;
-      registration = regResult[0];
+      const requestIdStr = request_id as string;
+      
+      if (requestIdStr.startsWith('R')) {
+        // UPDATE na tabela payments - confirmar pagamento existente
+        const paymentUpdate = await sql`
+          UPDATE payments 
+          SET payment_status = 'confirmed', updated_at = ${now}
+          WHERE request_id = ${request_id} AND registration_id IN (
+            SELECT r.id FROM registrations r
+            JOIN camps c ON r.camp_id = c.id
+            WHERE c.team_id = ${teamId}::uuid
+          )
+          RETURNING *
+        `;
+        
+        if (paymentUpdate.length === 0) {
+          return res.status(404).json({ error: 'Payment not found or does not belong to your team' });
+        }
+        
+        result = paymentUpdate[0];
+        
+        // Buscar registration para resposta
+        const regResult = await sql`
+          SELECT r.* FROM registrations r
+          WHERE r.id = ${result.registration_id}
+        `;
+        registration = regResult[0];
+        
+      } else if (requestIdStr.startsWith('S')) {
+        // UPDATE na tabela snackbar_balance - confirmar pagamento existente
+        const snackbarUpdate = await sql`
+          UPDATE snackbar_balance 
+          SET payment_status = 'confirmed', updated_at = ${now}
+          WHERE request_id = ${request_id} AND registration_id IN (
+            SELECT r.id FROM registrations r
+            JOIN camps c ON r.camp_id = c.id
+            WHERE c.team_id = ${teamId}::uuid
+          )
+          RETURNING *
+        `;
+        
+        if (snackbarUpdate.length === 0) {
+          return res.status(404).json({ error: 'Snackbar payment not found or does not belong to your team' });
+        }
+        
+        result = snackbarUpdate[0];
+        
+        // Buscar registration para resposta
+        const regResult = await sql`
+          SELECT r.* FROM registrations r
+          WHERE r.id = ${result.registration_id}
+        `;
+        registration = regResult[0];
+        
+      } else {
+        // INSERT na tabela payments - novo pagamento
+        // Buscar registration por request_id
+        const regResult = await sql`
+          SELECT r.*, c.price as camp_price FROM registrations r
+          LEFT JOIN camps c ON r.camp_id = c.id
+          WHERE r.request_id = ${request_id} AND c.team_id = ${teamId}
+          ORDER BY r.created_at DESC LIMIT 1
+        `;
+        registration = regResult[0];
+        
+        if (!registration) {
+          return res.status(404).json({ error: 'Registration not found' });
+        }
+        
+        // Criar novo pagamento
+        const paymentInsert = await sql`
+          INSERT INTO payments (
+            registration_id, payment_method, amount, payment_date, payment_status, payment_link, phone_number, request_id, created_at, updated_at
+          ) VALUES (
+            ${registration.id}, 'MB Way', ${amount}, ${payment_date || now}, 'confirmed', null, ${phone_number || null}, ${request_id}, ${now}, ${now}
+          ) RETURNING *
+        `;
+        
+        result = paymentInsert[0];
+      }
+      
     } else if (email) {
+      // Buscar registration por email
       const regResult = await sql`
         SELECT r.*, c.price as camp_price FROM registrations r
         LEFT JOIN camps c ON r.camp_id = c.id
@@ -2766,20 +2918,26 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
         ORDER BY r.created_at DESC LIMIT 1
       `;
       registration = regResult[0];
+      
+      if (!registration) {
+        return res.status(404).json({ error: 'Registration not found' });
+      }
+      
+      // Criar novo pagamento
+      const paymentInsert = await sql`
+        INSERT INTO payments (
+          registration_id, payment_method, amount, payment_date, payment_status, payment_link, phone_number, request_id, created_at, updated_at
+        ) VALUES (
+          ${registration.id}, ${payment_method || 'webhook'}, ${amount}, ${payment_date || now}, ${payment_status || 'confirmed'}, ${payment_link || null}, ${phone_number || null}, ${request_id || null}, ${now}, ${now}
+        ) RETURNING *
+      `;
+      
+      result = paymentInsert[0];
     }
+
     if (!registration) {
       return res.status(404).json({ error: 'Registration not found' });
     }
-
-    // Criar pagamento
-    const now = new Date().toISOString();
-    await sql`
-      INSERT INTO payments (
-        registration_id, payment_method, amount, payment_date, payment_status, payment_link, phone_number, request_id, created_at, updated_at
-      ) VALUES (
-        ${registration.id}, ${payment_method || 'webhook'}, ${amount}, ${payment_date || now}, ${payment_status || 'confirmed'}, ${payment_link || null}, ${phone_number || null}, ${request_id || null}, ${now}, ${now}
-      )
-    `;
 
     // Atualizar status do registro se enviado
     let updatedRegistration = registration;
@@ -2803,15 +2961,19 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
         id: updatedRegistration.id,
         total_amount_paid: totalPaid,
         status: updatedRegistration.status,
-        // ... outros campos se necessário
+        email: updatedRegistration.email,
+        name: updatedRegistration.name
       },
       payment: {
         amount: Number(amount),
         total_paid: totalPaid,
-        status: updatedRegistration.status
+        status: updatedRegistration.status,
+        payment_method: result?.payment_method || 'MB Way',
+        payment_status: result?.payment_status || 'confirmed'
       }
     });
   } catch (error) {
+    console.error('Error processing payment webhook:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -3317,7 +3479,7 @@ app.post('/api/staff-snackbar-balance', (async (req: Request, res: Response) => 
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { staff_id, amount, payment_method, phone_number } = req.body;
+    const { staff_id, amount, payment_method, phone_number, request_id } = req.body;
     
     if (!staff_id || !amount || !payment_method) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -3338,9 +3500,9 @@ app.post('/api/staff-snackbar-balance', (async (req: Request, res: Response) => 
     
     const result = await sql`
       INSERT INTO snackbar_balance (
-        staff_id, amount, payment_method, phone_number, created_at, updated_at
+        staff_id, amount, payment_method, phone_number, request_id, created_at, updated_at
       ) VALUES (
-        ${staff_id}, ${amount}, ${payment_method}, ${phone_number}, ${now}, ${now}
+        ${staff_id}, ${amount}, ${payment_method}, ${phone_number}, ${request_id || null}, ${now}, ${now}
       ) RETURNING *
     `;
     

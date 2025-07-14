@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { PaymentMethod } from '../data/schema'
 import { MBWayService } from '../services/mbway-service'
 import { api } from '@/lib/api-client'
+import { registrationService } from '../services/registration-service'
 
 interface SnackbarBalanceFormProps {
   registrationId: string
@@ -25,6 +26,7 @@ async function saveSnackbarBalance(data: {
   amount: number
   payment_method: string
   phone_number?: string | null
+  request_id?: string | null
 }) {
   const response = await api.post('/snackbar-balance', data);
   return response.data;
@@ -36,6 +38,20 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
   const [amount, setAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('MB Way')
   const [phoneNumber, setPhoneNumber] = useState('')
+  const [registration, setRegistration] = useState<{ form_id?: string } | null>(null)
+
+  useEffect(() => {
+    async function loadRegistration() {
+      try {
+        const data = await registrationService.getRegistrationById(registrationId)
+        setRegistration(data)
+      } catch {
+        // Registration load failed, but we can continue
+      }
+    }
+
+    loadRegistration()
+  }, [registrationId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,12 +91,19 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
         }
       }
 
+      // Gerar request_id se for MB Way
+      let requestId = null
+      if (paymentMethod === 'MB Way' && registration?.form_id) {
+        requestId = `S${registration.form_id}`
+      }
+
       // Salvar através da API em vez de db.query
       await saveSnackbarBalance({
         registration_id: registrationId,
         amount: numericAmount,
         payment_method: paymentMethod,
         phone_number: phoneNumber || null,
+        request_id: requestId
       })
 
       toast({

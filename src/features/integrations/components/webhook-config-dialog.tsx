@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { webhookService } from '../services/webhook-service'
 import { toast } from 'sonner'
 import { Copy, FileText, Settings } from 'lucide-react'
+import crypto from 'crypto'
 
 interface WebhookConfigDialogProps {
   open: boolean
@@ -69,7 +70,7 @@ export function WebhookConfigDialog({ open, onOpenChange, onSave }: WebhookConfi
   const handleRegenerateApiKey = async () => {
     setLoading(true)
     try {
-      const newApiKey = webhookService.generateApiKey()
+      const newApiKey = crypto.randomUUID()
       const updatedConfig = {
         ...config,
         apiKey: newApiKey
@@ -328,12 +329,12 @@ export function WebhookConfigDialog({ open, onOpenChange, onSave }: WebhookConfi
                   {config.paymentWebhookUrl ? (
                     <div className="flex items-center gap-2 mt-1">
                       <code className="bg-muted px-2 py-1 rounded text-xs flex-1 break-all">
-                        {config.paymentWebhookUrl}
+                        {config.paymentWebhookUrl}?request_id=SEU_REQUEST_ID
                       </code>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => copyToClipboard(config.paymentWebhookUrl!, 'URL copiada!')}
+                        onClick={() => copyToClipboard(config.paymentWebhookUrl! + '?request_id=SEU_REQUEST_ID', 'URL copiada!')}
                       >
                         <Copy className="w-4 h-4" />
                       </Button>
@@ -349,11 +350,17 @@ export function WebhookConfigDialog({ open, onOpenChange, onSave }: WebhookConfi
                 </div>
                 
                 <div>
+                  <Label className="text-sm font-medium">Parâmetros de Query:</Label>
+                  <ul className="text-xs text-muted-foreground mt-1 list-disc list-inside">
+                    <li><code>request_id</code> - ID único da requisição (obrigatório)</li>
+                  </ul>
+                </div>
+                
+                <div>
                   <Label className="text-sm font-medium">Payload exemplo:</Label>
                   <div className="mt-2 relative">
                     <pre className="bg-muted p-3 rounded text-xs overflow-x-auto">
 {`{
-  "request_id": "req_abc123def456",
   "amount": 150.00,
   "payment_method": "MB Way",
   "payment_status": "confirmed",
@@ -366,7 +373,6 @@ export function WebhookConfigDialog({ open, onOpenChange, onSave }: WebhookConfi
                       size="sm"
                       className="absolute top-2 right-2"
                       onClick={() => copyToClipboard(`{
-  "request_id": "req_abc123def456",
   "amount": 150.00,
   "payment_method": "MB Way",
   "payment_status": "confirmed",
@@ -384,18 +390,45 @@ export function WebhookConfigDialog({ open, onOpenChange, onSave }: WebhookConfi
                   <Label className="text-sm font-medium">Campos obrigatórios:</Label>
                   <ul className="text-xs text-muted-foreground mt-1 list-disc list-inside">
                     <li><code>amount</code> - Valor do pagamento</li>
-                    <li><code>request_id</code> ou <code>email</code> - Para identificar a inscrição</li>
                   </ul>
                 </div>
                 
                 <div>
                   <Label className="text-sm font-medium">Como funciona:</Label>
                   <ol className="text-xs text-muted-foreground mt-1 list-decimal list-inside space-y-1">
-                    <li>Primeiro, crie uma inscrição usando o webhook de inscrições</li>
-                    <li>O sistema retorna um <code>request_id</code> único</li>
-                    <li>Use esse <code>request_id</code> no webhook de pagamentos para associar o pagamento à inscrição</li>
-                    <li>Alternativamente, use o <code>email</code> para encontrar a inscrição mais recente</li>
+                    <li>O <code>request_id</code> é passado como parâmetro de query na URL</li>
+                    <li>O sistema processa o pagamento baseado no prefixo do <code>request_id</code>:</li>
+                    <ul className="ml-4 mt-1 space-y-1">
+                      <li><code>R</code> - Confirma pagamento existente na tabela <code>payments</code></li>
+                      <li><code>S</code> - Confirma pagamento existente na tabela <code>snackbar_balance</code></li>
+                      <li>Outros prefixos - Cria novo pagamento na tabela <code>payments</code></li>
+                    </ul>
+                    <li>O sistema retorna os detalhes do pagamento processado</li>
                   </ol>
+                </div>
+                
+                <div>
+                  <Label className="text-sm font-medium">Exemplos de uso:</Label>
+                  <div className="mt-2 space-y-2">
+                    <div>
+                      <Label className="text-xs font-medium">Confirmar pagamento de inscrição:</Label>
+                      <code className="bg-muted px-2 py-1 rounded text-xs block mt-1">
+                        POST /api/webhooks/payments/{'{teamId}'}?request_id=R123456
+                      </code>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium">Confirmar carregamento de snackbar:</Label>
+                      <code className="bg-muted px-2 py-1 rounded text-xs block mt-1">
+                        POST /api/webhooks/payments/{'{teamId}'}?request_id=S789012
+                      </code>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium">Novo pagamento:</Label>
+                      <code className="bg-muted px-2 py-1 rounded text-xs block mt-1">
+                        POST /api/webhooks/payments/{'{teamId}'}?request_id=PAY_ABC123
+                      </code>
+                    </div>
+                  </div>
                 </div>
               </div>
 

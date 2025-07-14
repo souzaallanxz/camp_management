@@ -60,6 +60,7 @@ export const paymentSchema = z.object({
   amount: z.number(),
   payment_link: z.string().nullable(),
   phone_number: z.string().nullable(),
+  request_id: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string()
 })
@@ -70,10 +71,12 @@ export const registrationListSchema = z.array(registrationSchema)
 
 export const snackbarBalanceSchema = z.object({
   id: z.string().uuid(),
-  registration_id: z.string().uuid(),
+  registration_id: z.string().uuid().optional(),
+  staff_id: z.string().uuid().optional(),
   amount: z.number(),
   payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro', 'Multibanco']),
   phone_number: z.string().nullable(),
+  request_id: z.string().nullable(),
   created_at: z.string().transform((str) => new Date(str)),
   updated_at: z.string().transform((str) => new Date(str))
 })

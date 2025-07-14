@@ -20,6 +20,7 @@ export interface CreatePaymentData {
   payment_date: string;
   phone_number: string | null;
   payment_link: string | null;
+  request_id?: string | null;
 }
 
 class PaymentService {

@@ -55,32 +55,54 @@ Este sistema permite configurar webhooks para receber notificações em tempo re
 
 ### 2. Webhook para Pagamentos
 
-**Endpoint**: `POST /webhooks/payments/{userId}`
+**Endpoint**: `POST /webhooks/payments/{teamId}?request_id={request_id}`
+
+**Query Parameters**:
+- `request_id` (opcional): ID do request para identificar o registro
+
+**Lógica Baseada no Tipo de request_id**:
+
+#### **request_id começa com "R"**
+- **Ação**: Confirma pagamento existente na tabela `payments`
+- **Campo atualizado**: `payment_status = 'confirmed'`
+
+#### **request_id começa com "S"**
+- **Ação**: Confirma pagamento existente na tabela `snackbar_balance`
+- **Campo atualizado**: `payment_status = 'confirmed'`
+
+#### **request_id não começa com "R" nem "S"**
+- **Ação**: Cria novo pagamento na tabela `payments`
+- **Valores padrão**: `payment_method = 'MB Way'`, `payment_status = 'confirmed'`, `payment_link = null`
 
 **Payload Esperado**:
 ```json
 {
-  "registration_id": "uuid-do-registro",
-  "amount": 50.00,
-  "status": "paid"
-}
-```
-
-**Ou identificando por email**:
-```json
-{
   "email": "joao@email.com",
   "amount": 50.00,
+  "payment_method": "MB Way",
+  "payment_date": "2024-01-15T10:30:00Z",
+  "payment_status": "confirmed",
+  "payment_link": "https://payment-link.com",
+  "phone_number": "+351912345678",
   "status": "paid"
 }
 ```
 
 **Campos Obrigatórios**:
 - `amount`: Valor do pagamento
-- `registration_id` OU `email`: Para identificar o registro
+- `email` OU `request_id` (query parameter): Para identificar o registro
 
 **Campos Opcionais**:
+- `payment_method`: Método de pagamento (ex: "MB Way", "Cartão", etc.)
+- `payment_date`: Data do pagamento (formato ISO)
+- `payment_status`: Status do pagamento ("not confirmed", "confirmed")
+- `payment_link`: Link do pagamento
+- `phone_number`: Número de telefone
 - `status`: Novo status do registro
+
+**Estados do Payment Status**:
+- `"not confirmed"`: Pagamento não confirmado (padrão para novos registos)
+- `"confirmed"`: Pagamento confirmado
 
 ## Configuração no Frontend
 
@@ -146,12 +168,15 @@ console.log('Webhooks ativos:', {
     "id": "uuid-do-registro",
     "total_amount_paid": 50.00,
     "status": "paid",
-    // ... outros campos
+    "email": "joao@email.com",
+    "name": "João Silva"
   },
   "payment": {
     "amount": 50.00,
     "total_paid": 50.00,
-    "status": "paid"
+    "status": "paid",
+    "payment_method": "MB Way",
+    "payment_status": "not confirmed"
   }
 }
 ```
@@ -225,11 +250,36 @@ curl -X POST https://your-hookdeck-url.com \
 ### 2. Usando curl para Payment
 
 ```bash
+# Confirmar pagamento existente (request_id começa com "R")
+curl -X POST "https://your-hookdeck-url.com?request_id=R123456" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 50.00
+  }'
+
+# Confirmar pagamento de snackbar (request_id começa com "S")
+curl -X POST "https://your-hookdeck-url.com?request_id=S789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 10.00
+  }'
+
+# Criar novo pagamento (request_id não começa com "R" nem "S")
+curl -X POST "https://your-hookdeck-url.com?request_id=PAY_123456" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 50.00,
+    "phone_number": "+351912345678"
+  }'
+
+# Com email no body
 curl -X POST https://your-hookdeck-url.com \
   -H "Content-Type: application/json" \
   -d '{
     "email": "joao@email.com",
     "amount": 50.00,
+    "payment_method": "MB Way",
+    "payment_status": "not confirmed",
     "status": "paid"
   }'
 ```

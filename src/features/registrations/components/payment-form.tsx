@@ -115,13 +115,22 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
 
       // Only proceed with payment creation if we get here
       console.log('Chamando paymentService.createPayment')
+      
+      // Gerar request_id se for MB Way
+      // Formato: "R" + form_id (ex: "R123456")
+      let requestId = null
+      if (paymentMethod === 'MB Way' && registration?.form_id) {
+        requestId = `R${registration.form_id}`
+      }
+      
       await paymentService.createPayment({
         registration_id: registrationId,
         amount: numericAmount,
         payment_method: paymentMethod,
         payment_date: new Date().toISOString(),
         payment_link: null,
-        phone_number: paymentMethod === 'MB Way' ? phoneNumber : null
+        phone_number: paymentMethod === 'MB Way' ? phoneNumber : null,
+        request_id: requestId
       })
       console.log('Pagamento criado com sucesso')
       toast({

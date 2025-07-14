@@ -36,6 +36,7 @@ async function saveStaffSnackbarBalance(data: {
   amount: number
   payment_method: string
   phone_number?: string | null
+  request_id?: string | null
 }) {
   const response = await fetch(buildApiUrl('/api/staff-snackbar-balance'), {
     method: 'POST',
@@ -94,12 +95,21 @@ export function StaffSnackbarBalanceDialog({
         }
       }
 
+      // Gerar request_id se for MB Way
+      // Formato: "S" + primeiros 5 dígitos do staff_id
+      let requestId = null
+      if (paymentMethod === 'MB Way' && staffId) {
+        const staffIdStr = staffId.replace(/-/g, '') // Remove hífens
+        requestId = `S${staffIdStr.substring(0, 5)}`
+      }
+
       // Salvar através da API
       await saveStaffSnackbarBalance({
         staff_id: staffId,
         amount: numericAmount,
         payment_method: paymentMethod,
         phone_number: phoneNumber || null,
+        request_id: requestId
       })
 
       toast.success('Carregamento realizado com sucesso!')
