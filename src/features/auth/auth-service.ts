@@ -126,15 +126,35 @@ export async function updateCurrentUserProfile(profileData: { name: string; lang
   return await response.json()
 }
 
+// Store for auth state change listeners
+const authStateListeners: Array<(event: AuthChangeEvent, session: Session | null) => void> = []
+
+// Function to notify all listeners
+function notifyAuthStateChange(event: AuthChangeEvent, session: Session | null) {
+  authStateListeners.forEach(listener => {
+    try {
+      listener(event, session)
+    } catch {
+      // Silently handle errors in auth state change listeners
+    }
+  })
+}
+
 export function onAuthStateChange(callback: (event: AuthChangeEvent, session: Session | null) => void) {
-  // In a real app, you'd set up event listeners for auth state changes
-  // For now, we're not implementing real-time updates
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _callback = callback // Store callback to avoid linter error
+  // Add the callback to our listeners
+  authStateListeners.push(callback)
+  
+  // Return cleanup function
   return () => {
-    // Cleanup function
+    const index = authStateListeners.indexOf(callback)
+    if (index > -1) {
+      authStateListeners.splice(index, 1)
+    }
   }
 }
+
+// Export the notify function so it can be called from other parts of the app
+export { notifyAuthStateChange }
 
 export async function signUp({ email, password, name }: SignUpCredentials) {
   const response = await fetch(buildApiUrl('/api/auth/sign-up'), {
