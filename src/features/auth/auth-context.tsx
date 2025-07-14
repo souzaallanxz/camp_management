@@ -6,7 +6,7 @@ import {
   useEffect,
 } from 'react'
 import { User } from './auth-service'
-import { signIn, signUp, signOut, getCurrentUser, onAuthStateChange, notifyAuthStateChange } from './auth-service'
+import { signIn, signUp, signOut, getCurrentUser, onAuthStateChange } from './auth-service'
 import type { SignInCredentials, SignUpCredentials } from './types'
 import { toast } from '@/hooks/use-toast'
 
@@ -53,18 +53,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem('team_id', currentUser.team_id)
           localStorage.setItem('teamId', currentUser.team_id)
         }
-        
-        // Notificar mudança de estado de autenticação
-        if (currentUser) {
-          notifyAuthStateChange('SIGNED_IN', {
-            user: currentUser,
-            token: localStorage.getItem('token') || ''
-          })
-        }
       } catch {
         // User is not authenticated, that's okay
         setUser(null)
-        notifyAuthStateChange('SIGNED_OUT', null)
       } finally {
         setIsLoading(false)
       }
@@ -95,9 +86,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('team_id', session.user.team_id)
         localStorage.setItem('teamId', session.user.team_id)
       }
-      
-      // Notificar mudança de estado de autenticação
-      notifyAuthStateChange('SIGNED_IN', session)
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -122,9 +110,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('teamId', response.session.user.team_id)
       }
       
-      // Notificar mudança de estado de autenticação
-      notifyAuthStateChange('SIGNED_IN', response.session)
-      
       return response
     } catch (error) {
       toast({
@@ -143,9 +128,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Remove token from localStorage
       localStorage.removeItem('token')
-      
-      // Notificar mudança de estado de autenticação
-      notifyAuthStateChange('SIGNED_OUT', null)
     } catch (error) {
       toast({
         variant: 'destructive',

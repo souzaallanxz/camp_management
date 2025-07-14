@@ -46,7 +46,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       }
       const shouldShowOnboarding = !team;
       setShowOnboarding(shouldShowOnboarding);
-    } catch {
+    } catch (error) {
       setTeam(null);
       setShowOnboarding(true);
       localStorage.removeItem('teamId');
@@ -66,15 +66,6 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       fetchTeam()
     }
   }, [user, isAuthLoading])
-
-  // Reset team when user changes
-  useEffect(() => {
-    if (!user) {
-      setTeam(null)
-      setShowOnboarding(false)
-      setIsLoading(false)
-    }
-  }, [user])
 
   // Ensure dialog stays open if no team
   useEffect(() => {
@@ -125,7 +116,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 export function useTeam() {
   const context = useContext(TeamContext)
   if (!context) {
-    // Silently return default values if used outside provider
+    console.warn('useTeam must be used within a TeamProvider')
     return {
       data: null,
       isLoading: true,
