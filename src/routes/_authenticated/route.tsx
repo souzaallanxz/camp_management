@@ -7,6 +7,8 @@ import { AppSidebar } from '@/components/layout/app-sidebar'
 import SkipToMain from '@/components/skip-to-main'
 import { TeamProvider } from '@/features/teams/context/team-context'
 import { getCurrentUser } from '@/features/auth/auth-service'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async () => {
@@ -15,17 +17,45 @@ export const Route = createFileRoute('/_authenticated')({
     } catch {
       throw redirect({
         to: '/sign-in',
-        search: {
-          redirect: window.location.pathname,
-        },
       })
     }
   },
   component: RouteComponent,
 })
 
+function LayoutSkeleton() {
+  return (
+    <div className='flex h-screen w-screen bg-background'>
+      <div className='w-64 min-w-[16rem] border-r p-4 flex flex-col'>
+        <Skeleton className='h-10 w-40 mb-4' />
+        <div className='flex-1 space-y-4'>
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className='h-8 w-32' />
+          ))}
+        </div>
+        <Skeleton className='h-10 w-32 mt-4' />
+      </div>
+      <div className='flex-1 flex flex-col p-8'>
+        <Skeleton className='h-10 w-1/3 mb-6' />
+        <div className='flex-1 space-y-4'>
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className='h-24 w-full' />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function RouteComponent() {
   const defaultOpen = Cookies.get('sidebar:state') !== 'false'
+  const permissions = useTeamPermissions()
+
+  // Bloquear renderização enquanto carrega permissões, usuário ou team
+  if (permissions.isLoading) {
+    return <LayoutSkeleton />
+  }
+
   return (
     <TeamProvider>
       <SearchProvider>
