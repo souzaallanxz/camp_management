@@ -1077,21 +1077,13 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
 
     // For each camper, calculate the correct snack_bar_balance
     const camperBalances = await Promise.all(campers.map(async camper => {
-      // Get total deposit for this registration
-      const depositResult = await sql`
-        SELECT COALESCE(SUM(amount), 0) as total_deposit
+      // Get total balance from snackbar_balance (always up to date)
+      const balanceResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_balance
         FROM snackbar_balance
         WHERE registration_id = ${camper.registration_id}
       `;
-      // Get total spent for this camper
-      const spentResult = await sql`
-        SELECT COALESCE(SUM(amount), 0) as total_spent
-        FROM snack_bar_transactions
-        WHERE camper_id = ${camper.id}
-      `;
-      const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
-      const totalSpent = Number(spentResult[0]?.total_spent || 0);
-      const snack_bar_balance = totalDeposit - totalSpent;
+      const snack_bar_balance = Number(balanceResult[0]?.total_balance || 0);
       return {
         ...camper,
         camp: { name: camper.camp_name },
@@ -1847,6 +1839,60 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     let result;
     if (camper_id) {
       console.log('Creating transaction for camper:', camper_id);
+      
+      // Get the registration_id for this camper
+      const registrationResult = await sql`
+        SELECT ca.registration_id FROM campers ca
+        WHERE ca.id = ${camper_id}::uuid
+      `;
+      
+      if (!registrationResult[0]?.registration_id) {
+        return res.status(400).json({ error: 'Camper does not have a registration' });
+      }
+      
+      const registrationId = registrationResult[0].registration_id;
+      
+      // Get current balance from snackbar_balance
+      const balanceResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_balance
+        FROM snackbar_balance
+        WHERE registration_id = ${registrationId}
+      `;
+      
+      const currentBalance = Number(balanceResult[0]?.total_balance || 0);
+      
+      if (currentBalance < amount) {
+        return res.status(400).json({ error: 'Insufficient balance' });
+      }
+      
+      // Get all snackbar_balance records for this registration, ordered by created_at (oldest first)
+      const balanceRecords = await sql`
+        SELECT id, amount, created_at
+        FROM snackbar_balance
+        WHERE registration_id = ${registrationId}
+        ORDER BY created_at ASC
+      `;
+      
+      let remainingAmount = amount;
+      
+      // Deduct from oldest records first (FIFO)
+      for (const record of balanceRecords) {
+        if (remainingAmount <= 0) break;
+        
+        const deductAmount = Math.min(remainingAmount, Number(record.amount));
+        
+        if (deductAmount > 0) {
+          await sql`
+            UPDATE snackbar_balance
+            SET amount = amount - ${deductAmount}, updated_at = NOW()
+            WHERE id = ${record.id}
+          `;
+          
+          remainingAmount -= deductAmount;
+        }
+      }
+      
+      // Create the transaction record
       result = await sql`
         INSERT INTO snack_bar_transactions (
           camper_id, amount, created_at, is_liquidated
@@ -1922,12 +1968,24 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
     
     const registrationId = registrationResult[0].registration_id;
     
-    // Update all snackbar_balance records for this camper to amount = 0
-    const updateResult = await sql`
-      UPDATE snackbar_balance 
-      SET amount = 0, updated_at = NOW()
+    // Get all snackbar_balance records for this registration, ordered by created_at (oldest first)
+    const balanceRecords = await sql`
+      SELECT id, amount, created_at
+      FROM snackbar_balance
       WHERE registration_id = ${registrationId}
+      ORDER BY created_at ASC
     `;
+    
+    // Deduct all amounts from oldest records first (FIFO)
+    for (const record of balanceRecords) {
+      if (Number(record.amount) > 0) {
+        await sql`
+          UPDATE snackbar_balance
+          SET amount = 0, updated_at = NOW()
+          WHERE id = ${record.id}
+        `;
+      }
+    }
     
     // Create a transaction record with the total liquidated amount
     const now = new Date().toISOString();
@@ -1943,7 +2001,7 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       message: 'Balance liquidated successfully',
       liquidated_amount: currentBalance,
       camper_name: camperCheck[0].name,
-      updated_records: updateResult,
+      updated_records_count: balanceRecords.length,
       transaction: transactionResult[0]
     });
   } catch (error) {
