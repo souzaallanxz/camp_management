@@ -75,16 +75,18 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
       }
 
       // Gerar request_id se for MB Way
-      // Formato: "R" + form_id + YYYYMMDD (ex: "R12345620240613")
+      // Formato: "R" + form_id + dia + mes + hora + minuto (máx 15 dígitos)
       let requestId = null
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const dateStr = `${yyyy}${mm}${dd}`;
-      
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const suffix = `${dd}${mm}${hh}${min}`;
       if (paymentMethod === 'MB Way' && registration?.form_id) {
-        requestId = `R${registration.form_id}${dateStr}`
+        // Garante que o request_id não ultrapassa 15 caracteres
+        const base = `R${registration.form_id}`;
+        requestId = (base + suffix).substring(0, 15);
       }
 
       // If payment method is MB Way, trigger the payment request first

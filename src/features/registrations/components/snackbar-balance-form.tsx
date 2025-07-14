@@ -70,6 +70,20 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
         return
       }
 
+      // Gerar request_id se for MB Way
+      // Formato: "S" + form_id + dia + mes + hora + minuto (máx 15 dígitos)
+      let requestId = null
+      if (paymentMethod === 'MB Way' && registration?.form_id) {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const suffix = `${dd}${mm}${hh}${min}`;
+        const base = `S${registration.form_id}`;
+        requestId = (base + suffix).substring(0, 15);
+      }
+
       // If payment method is MB Way, trigger the payment request first
       if (paymentMethod === 'MB Way') {
         try {
@@ -77,7 +91,7 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
             mobileNumber: phoneNumber,
             amount: numericAmount,
             description: `Carregamento Cartão - ${registrationId}`,
-            orderId: `${registrationId}-${Date.now()}`,
+            orderId: requestId,
           })
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
@@ -89,12 +103,6 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
           setLoading(false)
           return
         }
-      }
-
-      // Gerar request_id se for MB Way
-      let requestId = null
-      if (paymentMethod === 'MB Way' && registration?.form_id) {
-        requestId = `S${registration.form_id}`
       }
 
       // Salvar através da API em vez de db.query

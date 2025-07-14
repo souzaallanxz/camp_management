@@ -2258,7 +2258,9 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
   const destination = await destinationResponse.json()
 
   // 2. Criar Source
-  const sourceUrl = `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}`
+  const sourceUrl = type === 'payments'
+    ? `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}?x-hookdeck-allow-methods=get`
+    : `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}`
   const sourceSanitizedName = `source-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
   const sourcePayload = {
     name: sourceSanitizedName,
@@ -2846,13 +2848,23 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
         
       } else if (requestIdStr.startsWith('S')) {
         // UPDATE na tabela snackbar_balance - confirmar pagamento existente
+        // Considera tanto campers (registration_id) quanto staff (staff_id)
         const snackbarUpdate = await sql`
           UPDATE snackbar_balance 
           SET payment_status = 'confirmed', updated_at = ${now}
-          WHERE request_id = ${request_id} AND registration_id IN (
-            SELECT r.id FROM registrations r
-            JOIN camps c ON r.camp_id = c.id
-            WHERE c.team_id = ${teamId}::uuid
+          WHERE request_id = ${request_id} AND (
+            -- Caso seja de camper, valida o registration_id
+            (registration_id IS NOT NULL AND registration_id IN (
+              SELECT r.id FROM registrations r
+              JOIN camps c ON r.camp_id = c.id
+              WHERE c.team_id = ${teamId}::uuid
+            ))
+            -- Caso seja de staff, valida o staff_id
+            OR (staff_id IS NOT NULL AND staff_id IN (
+              SELECT s.id FROM staff s
+              JOIN camps c ON s.camp_id = c.id
+              WHERE c.team_id = ${teamId}::uuid
+            ))
           )
           RETURNING *
         `;
@@ -2863,12 +2875,28 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
         
         result = snackbarUpdate[0];
         
-        // Buscar registration para resposta
-        const regResult = await sql`
-          SELECT r.* FROM registrations r
-          WHERE r.id = ${result.registration_id}
-        `;
-        registration = regResult[0];
+        // Buscar registration ou staff para resposta
+        if (result.registration_id) {
+          // É um camper
+          const regResult = await sql`
+            SELECT r.* FROM registrations r
+            WHERE r.id = ${result.registration_id}
+          `;
+          registration = regResult[0];
+        } else if (result.staff_id) {
+          // É um staff
+          const staffResult = await sql`
+            SELECT s.* FROM staff s
+            WHERE s.id = ${result.staff_id}
+          `;
+          // Criar um objeto similar ao registration para manter compatibilidade
+          registration = staffResult[0] ? {
+            id: staffResult[0].id,
+            name: staffResult[0].name,
+            email: staffResult[0].email,
+            status: 'confirmed'
+          } : null;
+        }
         
       } else {
         // INSERT na tabela payments - novo pagamento

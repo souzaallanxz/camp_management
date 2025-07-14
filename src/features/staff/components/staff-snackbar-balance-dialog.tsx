@@ -78,6 +78,20 @@ export function StaffSnackbarBalanceDialog({
         return
       }
 
+      // Gerar request_id se for MB Way
+      // Formato: "S" + primeiros 5 dígitos do staff_id + dia + mes + hora + minuto (máx 15 dígitos)
+      let requestId = null
+      if (paymentMethod === 'MB Way' && staffId) {
+        const staffIdStr = staffId.replace(/-/g, '') // Remove hífens
+        const dd = String(new Date().getDate()).padStart(2, '0');
+        const mm = String(new Date().getMonth() + 1).padStart(2, '0');
+        const hh = String(new Date().getHours()).padStart(2, '0');
+        const min = String(new Date().getMinutes()).padStart(2, '0');
+        const suffix = `${dd}${mm}${hh}${min}`;
+        const base = `S${staffIdStr.substring(0, 5)}`;
+        requestId = (base + suffix).substring(0, 15);
+      }
+
       // If payment method is MB Way, trigger the payment request first
       if (paymentMethod === 'MB Way') {
         try {
@@ -85,7 +99,7 @@ export function StaffSnackbarBalanceDialog({
             mobileNumber: phoneNumber,
             amount: numericAmount,
             description: `Carregamento Cartão Staff - ${staffId}`,
-            orderId: `${staffId}-${Date.now()}`,
+            orderId: requestId,
           })
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
@@ -93,19 +107,6 @@ export function StaffSnackbarBalanceDialog({
           setIsLoading(false)
           return
         }
-      }
-
-      // Gerar request_id se for MB Way
-      // Formato: "S" + primeiros 5 dígitos do staff_id + YYYYMMDD
-      let requestId = null
-      if (paymentMethod === 'MB Way' && staffId) {
-        const staffIdStr = staffId.replace(/-/g, '') // Remove hífens
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        const dateStr = `${yyyy}${mm}${dd}`;
-        requestId = `S${staffIdStr.substring(0, 5)}${dateStr}`
       }
 
       // Salvar através da API
