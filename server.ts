@@ -2793,25 +2793,10 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
 });
 
 // Recebe webhooks de pagamentos
-app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
+app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
   try {
     const { teamId } = req.params;
-    const { request_id, amount: queryAmount, phone_number: queryPhoneNumber } = req.query; // agora também lê amount e phone_number da query
-    
-    const {
-      email,
-      amount: bodyAmount,
-      payment_method,
-      payment_date,
-      payment_status,
-      payment_link,
-      phone_number: bodyPhoneNumber,
-      status
-    } = req.body;
-
-    // amount e phone_number: prioridade para query, depois body
-    const amount = queryAmount !== undefined ? queryAmount : bodyAmount;
-    const phone_number = queryPhoneNumber !== undefined ? queryPhoneNumber : bodyPhoneNumber;
+    const { request_id, amount, phone_number, email, payment_method, payment_date, payment_status, payment_link, status } = req.query;
 
     // Validação dos campos obrigatórios
     const errors: string[] = [];
