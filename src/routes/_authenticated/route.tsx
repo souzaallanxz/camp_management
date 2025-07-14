@@ -49,35 +49,40 @@ function LayoutSkeleton() {
 
 function RouteComponent() {
   const defaultOpen = Cookies.get('sidebar:state') !== 'false'
-  const permissions = useTeamPermissions()
+  return (
+    <TeamProvider>
+      <AuthenticatedLayout defaultOpen={defaultOpen} />
+    </TeamProvider>
+  )
+}
 
-  // Bloquear renderização enquanto carrega permissões, usuário ou team
+function AuthenticatedLayout({ defaultOpen }: { defaultOpen: boolean }) {
+  const permissions = useTeamPermissions();
+
   if (permissions.isLoading) {
-    return <LayoutSkeleton />
+    return <LayoutSkeleton />;
   }
 
   return (
-    <TeamProvider>
-      <SearchProvider>
-        <SidebarProvider defaultOpen={defaultOpen}>
-          <SkipToMain />
-          <AppSidebar />
-          <div
-            id="content"
-            className={cn(
-              'max-w-full w-full ml-auto',
-              'peer-data-[state=collapsed]:w-[calc(100%-var(--sidebar-width-icon)-1rem)]',
-              'peer-data-[state=expanded]:w-[calc(100%-var(--sidebar-width))]',
-              'transition-[width] ease-linear duration-200',
-              'h-svh flex flex-col',
-              'group-data-[scroll-locked=1]/body:h-full',
-              'group-data-[scroll-locked=1]/body:has-[main.fixed-main]:h-svh',
-            )}
-          >
-            <Outlet />
-          </div>
-        </SidebarProvider>
-      </SearchProvider>
-    </TeamProvider>
-  )
+    <SearchProvider>
+      <SidebarProvider defaultOpen={defaultOpen}>
+        <SkipToMain />
+        <AppSidebar />
+        <div
+          id="content"
+          className={cn(
+            'max-w-full w-full ml-auto',
+            'peer-data-[state=collapsed]:w-[calc(100%-var(--sidebar-width-icon)-1rem)]',
+            'peer-data-[state=expanded]:w-[calc(100%-var(--sidebar-width))]',
+            'transition-[width] ease-linear duration-200',
+            'h-svh flex flex-col',
+            'group-data-[scroll-locked=1]/body:h-full',
+            'group-data-[scroll-locked=1]/body:has-[main.fixed-main]:h-svh',
+          )}
+        >
+          <Outlet />
+        </div>
+      </SidebarProvider>
+    </SearchProvider>
+  );
 }
