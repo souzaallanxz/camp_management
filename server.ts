@@ -1922,21 +1922,15 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
     
     const registrationId = registrationResult[0].registration_id;
     
-    // Create a balance entry that zeros out the current balance
-    const now = new Date().toISOString();
-    const negativeAmount = -currentBalance;
-    
-    // Add a negative amount to zero out the current balance
-    // This ensures the total balance becomes 0
-    const balanceResult = await sql`
-      INSERT INTO snackbar_balance (
-        registration_id, amount, payment_method, phone_number, created_at, updated_at
-      ) VALUES (
-        ${registrationId}, ${negativeAmount}, 'Liquidação', null, ${now}, ${now}
-      ) RETURNING *
+    // Update all snackbar_balance records for this camper to amount = 0
+    const updateResult = await sql`
+      UPDATE snackbar_balance 
+      SET amount = 0, updated_at = NOW()
+      WHERE registration_id = ${registrationId}
     `;
     
-    // Also create a transaction record for tracking
+    // Create a transaction record with the total liquidated amount
+    const now = new Date().toISOString();
     const transactionResult = await sql`
       INSERT INTO snack_bar_transactions (
         camper_id, amount, created_at, is_liquidated
@@ -1949,7 +1943,7 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       message: 'Balance liquidated successfully',
       liquidated_amount: currentBalance,
       camper_name: camperCheck[0].name,
-      balance_entry: balanceResult[0],
+      updated_records: updateResult,
       transaction: transactionResult[0]
     });
   } catch (error) {
