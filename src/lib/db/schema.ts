@@ -94,6 +94,7 @@ export const payments = pgTable('payments', {
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   phone_number: text('phone_number'),
   payment_status: paymentStatusEnum('payment_status').notNull().default('not confirmed'),
+  request_id: text('request_id'),
 });
 
 export const snackbar_balance = pgTable('snackbar_balance', {

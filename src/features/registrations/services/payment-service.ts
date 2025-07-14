@@ -9,6 +9,7 @@ export interface Payment {
   payment_date: string;
   phone_number: string | null;
   payment_link: string | null;
+  request_id: string | null;
   created_at: string;
   updated_at: string;
 }

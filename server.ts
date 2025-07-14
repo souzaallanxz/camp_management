@@ -1688,6 +1688,7 @@ app.get('/api/payments', (async (req: Request, res: Response) => {
         p.phone_number,
         p.payment_link,
         p.payment_status,
+        p.request_id,
         p.created_at,
         p.updated_at
       FROM payments p
@@ -1714,7 +1715,7 @@ app.post('/api/payments', (async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { registration_id, payment_method, amount, payment_date, phone_number, payment_link } = req.body;
+    const { registration_id, payment_method, amount, payment_date, phone_number, payment_link, request_id } = req.body;
     if (!registration_id || !payment_method || !amount || !payment_date) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -1731,9 +1732,9 @@ app.post('/api/payments', (async (req: Request, res: Response) => {
     const paymentStatus = payment_method === 'MB Way' ? 'not confirmed' : 'confirmed';
     const result = await sql`
       INSERT INTO payments (
-        registration_id, payment_method, amount, payment_date, phone_number, payment_link, payment_status, created_at, updated_at
+        registration_id, payment_method, amount, payment_date, phone_number, payment_link, payment_status, request_id, created_at, updated_at
       ) VALUES (
-        ${registration_id}, ${payment_method}, ${amount}, ${payment_date}, ${phone_number}, ${payment_link}, ${paymentStatus}, ${now}, ${now}
+        ${registration_id}, ${payment_method}, ${amount}, ${payment_date}, ${phone_number}, ${payment_link}, ${paymentStatus}, ${request_id || null}, ${now}, ${now}
       ) RETURNING *
     `;
     res.json(result[0]);
@@ -2795,18 +2796,22 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
 app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
   try {
     const { teamId } = req.params;
-    const { request_id } = req.query; // request_id agora é query parameter
+    const { request_id, amount: queryAmount, phone_number: queryPhoneNumber } = req.query; // agora também lê amount e phone_number da query
     
     const {
       email,
-      amount,
+      amount: bodyAmount,
       payment_method,
       payment_date,
       payment_status,
       payment_link,
-      phone_number,
+      phone_number: bodyPhoneNumber,
       status
     } = req.body;
+
+    // amount e phone_number: prioridade para query, depois body
+    const amount = queryAmount !== undefined ? queryAmount : bodyAmount;
+    const phone_number = queryPhoneNumber !== undefined ? queryPhoneNumber : bodyPhoneNumber;
 
     // Validação dos campos obrigatórios
     const errors: string[] = [];
@@ -2897,12 +2902,12 @@ app.post('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =
           return res.status(404).json({ error: 'Registration not found' });
         }
         
-        // Criar novo pagamento
+        // Criar novo pagamento com os valores default e os da query
         const paymentInsert = await sql`
           INSERT INTO payments (
             registration_id, payment_method, amount, payment_date, payment_status, payment_link, phone_number, request_id, created_at, updated_at
           ) VALUES (
-            ${registration.id}, 'MB Way', ${amount}, ${payment_date || now}, 'confirmed', null, ${phone_number || null}, ${request_id}, ${now}, ${now}
+            ${registration.id}, 'MB Way', ${amount}, ${now}, 'confirmed', null, ${phone_number || null}, ${request_id}, ${now}, ${now}
           ) RETURNING *
         `;
         

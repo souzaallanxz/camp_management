@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/use-toast'
 import { PaymentMethod } from '../data/schema'
 import { paymentService } from '../services/payment-service'
 import { MBWayService } from '../services/mbway-service'
-import { registrationService, Registration } from '../services/registration-service'
+import { registrationService, ApiRegistration } from '../services/registration-service'
 
 interface PaymentFormProps {
   registrationId: string
@@ -21,10 +21,8 @@ interface PaymentFormProps {
 }
 
 // Tipo estendido para compatibilidade com o código legado
-interface ExtendedRegistration extends Registration {
-  form_id?: string;
-  email?: string;
-  name?: string;
+interface ExtendedRegistration extends ApiRegistration {
+  camperName?: string;
 }
 
 export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentFormProps) {
@@ -39,7 +37,9 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
     async function loadRegistration() {
       try {
         const data = await registrationService.getRegistrationById(registrationId)
-        setRegistration(data as unknown as ExtendedRegistration)
+        console.log('Debug - Registration carregada:', data)
+        console.log('Debug - form_id da API:', data.form_id)
+        setRegistration(data as ExtendedRegistration)
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to load registration'
         toast({
@@ -74,6 +74,19 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
         return
       }
 
+      // Gerar request_id se for MB Way
+      // Formato: "R" + form_id + YYYYMMDD (ex: "R12345620240613")
+      let requestId = null
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}${mm}${dd}`;
+      
+      if (paymentMethod === 'MB Way' && registration?.form_id) {
+        requestId = `R${registration.form_id}${dateStr}`
+      }
+
       // If payment method is MB Way, trigger the payment request first
       if (paymentMethod === 'MB Way') {
         if (!registration) {
@@ -93,7 +106,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
             mobileNumber: phoneNumber,
             amount: numericAmount,
             description: `Pagamento de inscrição - ${registration.camperName || 'Campista'}`,
-            orderId: registration.form_id || `${registrationId}-${Date.now()}`,
+            orderId: requestId,
             email: registration.email || '',
           })
           console.log('MBWayService.requestPayment OK')
@@ -115,13 +128,6 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
 
       // Only proceed with payment creation if we get here
       console.log('Chamando paymentService.createPayment')
-      
-      // Gerar request_id se for MB Way
-      // Formato: "R" + form_id (ex: "R123456")
-      let requestId = null
-      if (paymentMethod === 'MB Way' && registration?.form_id) {
-        requestId = `R${registration.form_id}`
-      }
       
       await paymentService.createPayment({
         registration_id: registrationId,

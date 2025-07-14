@@ -96,11 +96,16 @@ export function StaffSnackbarBalanceDialog({
       }
 
       // Gerar request_id se for MB Way
-      // Formato: "S" + primeiros 5 dígitos do staff_id
+      // Formato: "S" + primeiros 5 dígitos do staff_id + YYYYMMDD
       let requestId = null
       if (paymentMethod === 'MB Way' && staffId) {
         const staffIdStr = staffId.replace(/-/g, '') // Remove hífens
-        requestId = `S${staffIdStr.substring(0, 5)}`
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}${mm}${dd}`;
+        requestId = `S${staffIdStr.substring(0, 5)}${dateStr}`
       }
 
       // Salvar através da API
