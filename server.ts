@@ -2226,8 +2226,6 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
   const baseUrl = 'https://camp-management-1.onrender.com'
   const webhookUrl = `${baseUrl}/api/webhooks/${type}/${teamId}`
 
-
-
   // 1. Criar Destination
   const timestamp = Date.now()
   const sanitizedName = `webhook-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
@@ -2235,7 +2233,7 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
     name: sanitizedName,
     config: {
       url: webhookUrl,
-      method: 'POST',
+      method: type === 'payments' ? 'GET' : 'POST',
       headers: {
         'Content-Type': 'application/json'
       }
