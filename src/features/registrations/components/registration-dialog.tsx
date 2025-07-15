@@ -124,6 +124,20 @@ export function RegistrationDialog({
                                  ? data.payment_method 
                                  : 'Dinheiro'; // Valor padrão seguro
             
+            // Gerar request_id se for MB Way
+            // Formato: "R" + form_id + dia + mes + hora + minuto (máx 15 dígitos)
+            let requestId = null
+            if (paymentMethod === 'MB Way' && data.form_id) {
+              const now = new Date();
+              const dd = String(now.getDate()).padStart(2, '0');
+              const mm = String(now.getMonth() + 1).padStart(2, '0');
+              const hh = String(now.getHours()).padStart(2, '0');
+              const min = String(now.getMinutes()).padStart(2, '0');
+              const suffix = `${dd}${mm}${hh}${min}`;
+              const base = `R${data.form_id}`;
+              requestId = (base + suffix).substring(0, 15);
+            }
+            
             const payment = await paymentService.createPayment({
               registration_id: registration.id,
               payment_method: paymentMethod,
@@ -131,6 +145,7 @@ export function RegistrationDialog({
               payment_date: new Date().toISOString(),
               phone_number: data.phone_number || null,
               payment_link: null,
+              request_id: requestId
             });
 
             // Se o método de pagamento for MB Way, faz o pedido de pagamento
@@ -140,7 +155,7 @@ export function RegistrationDialog({
                   mobileNumber: data.phone_number,
                   amount: data.amount,
                   description: `Pagamento de inscrição - ${data.name}`,
-                  orderId: data.form_id || String(payment.id || '0'),
+                  orderId: requestId,
                   email: data.email,
                 })
                 

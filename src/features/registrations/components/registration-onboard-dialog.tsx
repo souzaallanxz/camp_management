@@ -100,14 +100,42 @@ export function RegistrationOnboardDialog({
     try {
       setLoading(true)
 
-      // If payment method is MB Way, trigger the payment request first
+      // Gerar request_id se for MB Way
+      // Formato: "R" + form_id + dia + mes + hora + minuto (máx 15 dígitos)
+      let requestId = null
+      if (paymentMethod === 'MB Way' && registration.form_id) {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const suffix = `${dd}${mm}${hh}${min}`;
+        const base = `R${registration.form_id}`;
+        requestId = (base + suffix).substring(0, 15);
+        
+        // Debug log
+        toast.success(`Request ID gerado: ${requestId}`);
+      }
+
+      // Criar o pagamento PRIMEIRO (para garantir que o request_id seja salvo)
+      await paymentService.createPayment({
+        registration_id: registration.id,
+        amount: remainingAmount,
+        payment_method: paymentMethod,
+        payment_date: new Date().toISOString(),
+        payment_link: null,
+        phone_number: paymentMethod === 'MB Way' ? phoneNumber : null,
+        request_id: requestId
+      })
+
+      // If payment method is MB Way, trigger the payment request AFTER saving
       if (paymentMethod === 'MB Way') {
         try {
           await MBWayService.requestPayment({
             mobileNumber: phoneNumber,
             amount: remainingAmount,
             description: `Pagamento de inscrição - ${registration.name}`,
-            orderId: registration.form_id || `${registration.id}-${Date.now()}`,
+            orderId: requestId,
             email: registration.email
           })
 
@@ -119,16 +147,6 @@ export function RegistrationOnboardDialog({
           return
         }
       }
-
-      // Criar o pagamento
-      await paymentService.createPayment({
-        registration_id: registration.id,
-        amount: remainingAmount,
-        payment_method: paymentMethod,
-        payment_date: new Date().toISOString(),
-        payment_link: null,
-        phone_number: paymentMethod === 'MB Way' ? phoneNumber : null
-      })
       
       // Criar o camper
       await createCamper()

@@ -37,8 +37,6 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
     async function loadRegistration() {
       try {
         const data = await registrationService.getRegistrationById(registrationId)
-        console.log('Debug - Registration carregada:', data)
-        console.log('Debug - form_id da API:', data.form_id)
         setRegistration(data as ExtendedRegistration)
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to load registration'
@@ -54,17 +52,14 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
   }, [registrationId, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log('Form submit triggered')
     e.preventDefault()
     setLoading(true)
 
     try {
       const numericAmount = Number(amount)
-      console.log('numericAmount:', numericAmount)
       
       // Não cria pagamento se o valor for 0
       if (numericAmount <= 0) {
-        console.log('Valor inválido')
         toast({
           variant: 'destructive',
           title: 'Error',
@@ -87,12 +82,28 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
         // Garante que o request_id não ultrapassa 15 caracteres
         const base = `R${registration.form_id}`;
         requestId = (base + suffix).substring(0, 15);
+        
+        // Debug log
+        toast({
+          title: 'Debug',
+          description: `Request ID gerado: ${requestId}`,
+        });
       }
 
-      // If payment method is MB Way, trigger the payment request first
+      // Salvar na base de dados PRIMEIRO (para garantir que o request_id seja salvo)
+      await paymentService.createPayment({
+        registration_id: registrationId,
+        amount: numericAmount,
+        payment_method: paymentMethod,
+        payment_date: new Date().toISOString(),
+        payment_link: null,
+        phone_number: paymentMethod === 'MB Way' ? phoneNumber : null,
+        request_id: requestId
+      })
+
+      // If payment method is MB Way, trigger the payment request AFTER saving
       if (paymentMethod === 'MB Way') {
         if (!registration) {
-          console.log('Registration não carregada')
           toast({
             variant: 'destructive',
             title: 'Error',
@@ -103,7 +114,6 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
         }
 
         try {
-          console.log('Chamando MBWayService.requestPayment')
           await MBWayService.requestPayment({
             mobileNumber: phoneNumber,
             amount: numericAmount,
@@ -111,13 +121,11 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
             orderId: requestId,
             email: registration.email || '',
           })
-          console.log('MBWayService.requestPayment OK')
           toast({
             title: 'MB Way',
             description: 'Pedido MB Way enviado. Por favor, confirme o pagamento na sua app.',
           })
         } catch (error) {
-          console.log('Erro MBWay:', error)
           toast({
             variant: 'destructive',
             title: 'Erro MB Way',
@@ -127,27 +135,12 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
           return
         }
       }
-
-      // Only proceed with payment creation if we get here
-      console.log('Chamando paymentService.createPayment')
-      
-      await paymentService.createPayment({
-        registration_id: registrationId,
-        amount: numericAmount,
-        payment_method: paymentMethod,
-        payment_date: new Date().toISOString(),
-        payment_link: null,
-        phone_number: paymentMethod === 'MB Way' ? phoneNumber : null,
-        request_id: requestId
-      })
-      console.log('Pagamento criado com sucesso')
       toast({
         title: 'Success',
         description: 'Payment created successfully',
       })
       onSuccess()
     } catch (error) {
-      console.log('Erro geral:', error)
       const message = error instanceof Error ? error.message : 'Failed to create payment'
       toast({
         variant: 'destructive',
@@ -223,7 +216,7 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={loading} onClick={() => console.log('Botão Criar Pagamento clicado')}>
+        <Button type="submit" disabled={loading}>
           {loading ? 'A processar...' : 'Criar Pagamento'}
         </Button>
       </div>
