@@ -84,7 +84,16 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
         requestId = (base + suffix).substring(0, 15);
       }
 
-      // If payment method is MB Way, trigger the payment request first
+      // Salvar através da API PRIMEIRO (para garantir que o request_id seja salvo)
+      await saveSnackbarBalance({
+        registration_id: registrationId,
+        amount: numericAmount,
+        payment_method: paymentMethod,
+        phone_number: phoneNumber || null,
+        request_id: requestId
+      })
+
+      // If payment method is MB Way, trigger the payment request AFTER saving
       if (paymentMethod === 'MB Way') {
         try {
           await MBWayService.requestPayment({
@@ -104,15 +113,6 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
           return
         }
       }
-
-      // Salvar através da API em vez de db.query
-      await saveSnackbarBalance({
-        registration_id: registrationId,
-        amount: numericAmount,
-        payment_method: paymentMethod,
-        phone_number: phoneNumber || null,
-        request_id: requestId
-      })
 
       toast({
         title: 'Sucesso',
