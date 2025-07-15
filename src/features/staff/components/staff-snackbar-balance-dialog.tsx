@@ -92,7 +92,7 @@ export function StaffSnackbarBalanceDialog({
         requestId = (base + suffix).substring(0, 15);
         
         // Debug log
-        toast.info(`Request ID gerado: ${requestId}`);
+        toast.success(`Request ID gerado: ${requestId}`);
       }
 
       // Salvar através da API PRIMEIRO (para garantir que o request_id seja salvo)

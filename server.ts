@@ -1769,11 +1769,14 @@ app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
     
     const now = new Date().toISOString();
     
+    // Determinar payment_status baseado no método de pagamento
+    const paymentStatus = payment_method === 'MB Way' ? 'not confirmed' : 'confirmed';
+    
     const result = await sql`
       INSERT INTO snackbar_balance (
-        registration_id, amount, payment_method, phone_number, request_id, created_at, updated_at
+        registration_id, amount, payment_method, phone_number, request_id, payment_status, created_at, updated_at
       ) VALUES (
-        ${registration_id}, ${amount}, ${payment_method}, ${phone_number}, ${request_id || null}, ${now}, ${now}
+        ${registration_id}, ${amount}, ${payment_method}, ${phone_number}, ${request_id || null}, ${paymentStatus}, ${now}, ${now}
       ) RETURNING *
     `;
     
@@ -3514,11 +3517,14 @@ app.post('/api/staff-snackbar-balance', (async (req: Request, res: Response) => 
     
     const now = new Date().toISOString();
     
+    // Determinar payment_status baseado no método de pagamento
+    const paymentStatus = payment_method === 'MB Way' ? 'not confirmed' : 'confirmed';
+    
     const result = await sql`
       INSERT INTO snackbar_balance (
-        staff_id, amount, payment_method, phone_number, request_id, created_at, updated_at
+        staff_id, amount, payment_method, phone_number, request_id, payment_status, created_at, updated_at
       ) VALUES (
-        ${staff_id}, ${amount}, ${payment_method}, ${phone_number}, ${request_id || null}, ${now}, ${now}
+        ${staff_id}, ${amount}, ${payment_method}, ${phone_number}, ${request_id || null}, ${paymentStatus}, ${now}, ${now}
       ) RETURNING *
     `;
     

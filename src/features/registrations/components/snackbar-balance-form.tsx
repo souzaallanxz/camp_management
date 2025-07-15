@@ -82,6 +82,12 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
         const suffix = `${dd}${mm}${hh}${min}`;
         const base = `S${registration.form_id}`;
         requestId = (base + suffix).substring(0, 15);
+        
+        // Debug log
+        toast({
+          title: 'Debug',
+          description: `Request ID gerado: ${requestId}`,
+        });
       }
 
       // Salvar através da API PRIMEIRO (para garantir que o request_id seja salvo)
