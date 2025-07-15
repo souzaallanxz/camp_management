@@ -2900,13 +2900,26 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
         
       } else {
         // INSERT na tabela payments - novo pagamento
-        // Buscar registration por request_id
-        const regResult = await sql`
-          SELECT r.*, c.price as camp_price FROM registrations r
-          LEFT JOIN camps c ON r.camp_id = c.id
-          WHERE r.request_id = ${request_id} AND c.team_id = ${teamId}
-          ORDER BY r.created_at DESC LIMIT 1
-        `;
+        // Buscar registration por request_id ou por ID se request_id for numérico
+        let regResult;
+        if (request_id && !isNaN(Number(request_id))) {
+          // Se request_id for numérico, tratar como ID da registration
+          regResult = await sql`
+            SELECT r.*, c.price as camp_price FROM registrations r
+            LEFT JOIN camps c ON r.camp_id = c.id
+            WHERE r.id = ${request_id}::uuid AND c.team_id = ${teamId}::uuid
+            ORDER BY r.created_at DESC LIMIT 1
+          `;
+        } else {
+          // Buscar por request_id (se existir) ou por email/outros critérios
+          regResult = await sql`
+            SELECT r.*, c.price as camp_price FROM registrations r
+            LEFT JOIN camps c ON r.camp_id = c.id
+            WHERE (r.request_id = ${request_id} OR r.request_id IS NULL) 
+              AND c.team_id = ${teamId}::uuid
+            ORDER BY r.created_at DESC LIMIT 1
+          `;
+        }
         registration = regResult[0];
         
         if (!registration) {
