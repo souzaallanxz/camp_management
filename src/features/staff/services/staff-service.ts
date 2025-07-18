@@ -15,6 +15,7 @@ export interface Staff {
   created_at: string;
   updated_at: string;
   total_balance?: number;
+  payment_status?: string;
 }
 
 // Interface específica para criar staff

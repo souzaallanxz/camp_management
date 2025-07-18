@@ -192,9 +192,9 @@ export const snackBarService = {
     await this.createTransaction(transaction)
   },
 
-  async getCamperBalance(camperId: string) {
+  async getCamperBalance(camperId: string): Promise<{ balance: number; payment_status: string }> {
     if (!camperId) {
-      return 0
+      return { balance: 0, payment_status: 'confirmed' }
     }
     
     try {
@@ -205,13 +205,21 @@ export const snackBarService = {
       
       if (isStaff) {
         // Para staff, usar o total_balance
-        return (person as StaffWithBalance).total_balance
+        const balance = (person as StaffWithBalance).total_balance
+        // For staff, we need to get payment_status from the API
+        const response = await api.get(`/snackbar-balance/staff/${camperId}`)
+        const payment_status = response.data.payment_status || 'confirmed'
+        return { balance, payment_status }
       } else {
         // Para campers, usar o snack_bar_balance
-        return (person as CamperWithBalance).snack_bar_balance
+        const balance = (person as CamperWithBalance).snack_bar_balance
+        // For campers, we need to get payment_status from the API
+        const response = await api.get(`/snackbar-balance/${camperId}`)
+        const payment_status = response.data.payment_status || 'confirmed'
+        return { balance, payment_status }
       }
     } catch {
-      return 0
+      return { balance: 0, payment_status: 'confirmed' }
     }
   },
 

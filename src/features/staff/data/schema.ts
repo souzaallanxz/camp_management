@@ -10,6 +10,7 @@ export const staffSchema = z.object({
   created_at: z.string().or(z.date()),
   updated_at: z.string().or(z.date()),
   total_balance: z.number().or(z.string()).default(0),
+  payment_status: z.string().optional(),
 })
 
 export type Staff = z.infer<typeof staffSchema>

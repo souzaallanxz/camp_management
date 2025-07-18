@@ -1075,19 +1075,27 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
       `;
     }
 
-    // For each camper, calculate the correct snack_bar_balance
+    // For each camper, calculate the correct snack_bar_balance and payment status
     const camperBalances = await Promise.all(campers.map(async camper => {
-      // Get total balance from snackbar_balance (always up to date)
+      // Get total balance and payment status from snackbar_balance
       const balanceResult = await sql`
-        SELECT COALESCE(SUM(amount), 0) as total_balance
+        SELECT 
+          COALESCE(SUM(amount), 0) as total_balance,
+          CASE 
+            WHEN COUNT(*) = 0 THEN 'confirmed'
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
         FROM snackbar_balance
         WHERE registration_id = ${camper.registration_id}
       `;
       const snack_bar_balance = Number(balanceResult[0]?.total_balance || 0);
+      const payment_status = balanceResult[0]?.payment_status || 'confirmed';
       return {
         ...camper,
         camp: { name: camper.camp_name },
-        snack_bar_balance
+        snack_bar_balance,
+        payment_status
       };
     }));
     res.json(camperBalances);
@@ -1795,9 +1803,15 @@ app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) 
   try {
     const { camperId } = req.params;
     
-    // Get total balance from snackbar_balance (including negative amounts for liquidations)
+    // Get total balance and payment status from snackbar_balance (including negative amounts for liquidations)
     const balanceResult = await sql`
-      SELECT COALESCE(SUM(sb.amount), 0) as total_balance
+      SELECT 
+        COALESCE(SUM(sb.amount), 0) as total_balance,
+        CASE 
+          WHEN COUNT(*) = 0 THEN 'confirmed'
+          WHEN COUNT(*) = COUNT(CASE WHEN sb.payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
@@ -1806,10 +1820,12 @@ app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) 
     `;
     
     const balance = Number(balanceResult[0]?.total_balance || 0);
+    const payment_status = balanceResult[0]?.payment_status || 'confirmed';
     
     res.json({
       balance,
-      total_balance: balance
+      total_balance: balance,
+      payment_status
     });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching snackbar balance' });
@@ -1836,9 +1852,15 @@ app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Respo
       return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
     }
     
-    // Get total deposit for this staff member
+    // Get total deposit and payment status for this staff member
     const depositResult = await sql`
-      SELECT COALESCE(SUM(amount), 0) as total_deposit
+      SELECT 
+        COALESCE(SUM(amount), 0) as total_deposit,
+        CASE 
+          WHEN COUNT(*) = 0 THEN 'confirmed'
+          WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
       FROM snackbar_balance
       WHERE staff_id = ${staffId}::uuid
     `;
@@ -1853,11 +1875,13 @@ app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Respo
     const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
     const totalSpent = Number(spentResult[0]?.total_spent || 0);
     const balance = totalDeposit - totalSpent;
+    const payment_status = depositResult[0]?.payment_status || 'confirmed';
     
     res.json({
       balance,
       total_deposit: totalDeposit,
-      total_spent: totalSpent
+      total_spent: totalSpent,
+      payment_status
     });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching snackbar balance for staff' });
@@ -1932,17 +1956,29 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       
       const registrationId = registrationResult[0].registration_id;
       
-      // Get current balance from snackbar_balance
+      // Get current balance and payment status from snackbar_balance
       const balanceResult = await sql`
-        SELECT COALESCE(SUM(amount), 0) as total_balance
+        SELECT 
+          COALESCE(SUM(amount), 0) as total_balance,
+          CASE 
+            WHEN COUNT(*) = 0 THEN 'confirmed'
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
         FROM snackbar_balance
         WHERE registration_id = ${registrationId}
       `;
       
       const currentBalance = Number(balanceResult[0]?.total_balance || 0);
+      const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
       
       if (currentBalance < amount) {
         return res.status(400).json({ error: 'Insufficient balance' });
+      }
+      
+      // Verificar se o payment_status é 'confirmed'
+      if (paymentStatus !== 'confirmed') {
+        return res.status(400).json({ error: 'Cannot use balance that is not confirmed' });
       }
       
       // Get all snackbar_balance records for this registration, ordered by created_at (oldest first)
@@ -1982,6 +2018,42 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       `;
     } else {
       console.log('Creating transaction for staff:', staff_id);
+      
+      // Get current balance and payment status for staff
+      const balanceResult = await sql`
+        SELECT 
+          COALESCE(SUM(amount), 0) as total_deposit,
+          CASE 
+            WHEN COUNT(*) = 0 THEN 'confirmed'
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE staff_id = ${staff_id}::uuid
+      `;
+      
+      const totalDeposit = Number(balanceResult[0]?.total_deposit || 0);
+      const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
+      
+      // Get total spent for this staff member
+      const spentResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_spent
+        FROM snack_bar_transactions
+        WHERE staff_id = ${staff_id}::uuid
+      `;
+      
+      const totalSpent = Number(spentResult[0]?.total_spent || 0);
+      const currentBalance = totalDeposit - totalSpent;
+      
+      if (currentBalance < amount) {
+        return res.status(400).json({ error: 'Insufficient balance' });
+      }
+      
+      // Verificar se o payment_status é 'confirmed'
+      if (paymentStatus !== 'confirmed') {
+        return res.status(400).json({ error: 'Cannot use balance that is not confirmed' });
+      }
+      
       result = await sql`
         INSERT INTO snack_bar_transactions (
           staff_id, amount, created_at, is_liquidated
@@ -2020,9 +2092,15 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
     }
     
-    // Get current balance for this camper
+    // Get current balance and payment status for this camper
     const balanceResult = await sql`
-      SELECT COALESCE(SUM(sb.amount), 0) as total_balance
+      SELECT 
+        COALESCE(SUM(sb.amount), 0) as total_balance,
+        CASE 
+          WHEN COUNT(*) = 0 THEN 'confirmed'
+          WHEN COUNT(*) = COUNT(CASE WHEN sb.payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
@@ -2031,9 +2109,15 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
     `;
     
     const currentBalance = Number(balanceResult[0]?.total_balance || 0);
+    const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
     
     if (currentBalance <= 0) {
       return res.status(400).json({ error: 'Camper has no balance to liquidate' });
+    }
+    
+    // Verificar se o payment_status é 'confirmed' para permitir liquidação
+    if (paymentStatus !== 'confirmed') {
+      return res.status(400).json({ error: 'Cannot liquidate balance that is not confirmed' });
     }
     
     // Get the registration_id for this camper
@@ -3332,11 +3416,17 @@ app.get('/api/staff', (async (req: Request, res: Response) => {
       ORDER BY s.created_at DESC
     `;
 
-    // For each staff member, calculate the correct total_balance
+    // For each staff member, calculate the correct total_balance and payment status
     const staffWithBalances = await Promise.all(staff.map(async staffMember => {
-      // Get total deposit for this staff member
+      // Get total deposit and payment status for this staff member
       const depositResult = await sql`
-        SELECT COALESCE(SUM(amount), 0) as total_deposit
+        SELECT 
+          COALESCE(SUM(amount), 0) as total_deposit,
+          CASE 
+            WHEN COUNT(*) = 0 THEN 'confirmed'
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
         FROM snackbar_balance
         WHERE staff_id = ${staffMember.id}
       `;
@@ -3349,9 +3439,11 @@ app.get('/api/staff', (async (req: Request, res: Response) => {
       const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
       const totalSpent = Number(spentResult[0]?.total_spent || 0);
       const total_balance = totalDeposit - totalSpent;
+      const payment_status = depositResult[0]?.payment_status || 'confirmed';
       return {
         ...staffMember,
-        total_balance
+        total_balance,
+        payment_status
       };
     }));
     res.json(staffWithBalances);

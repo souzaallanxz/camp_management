@@ -19,6 +19,7 @@ export const camperSchema = z.object({
   guardian_email: z.string().email('Email inválido').optional().nullable(),
   guardian_phone: z.string().optional().nullable(),
   snack_bar_balance: z.number().or(z.string()).default(0),
+  payment_status: z.string().optional(),
 })
 
 export type Camper = z.infer<typeof camperSchema>

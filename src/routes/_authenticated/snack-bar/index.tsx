@@ -52,7 +52,7 @@ export default function SnackBarPage() {
     queryFn: () => snackBarService.getCurrentCamp(),
   })
 
-  const { data: balance = 0 } = useQuery({
+  const { data: balanceData = { balance: 0, payment_status: 'confirmed' } } = useQuery({
     queryKey: ['camper-balance', selectedCamperId],
     queryFn: () => snackBarService.getCamperBalance(selectedCamperId),
     enabled: !!selectedCamperId,
@@ -149,10 +149,16 @@ export default function SnackBarPage() {
     if (!selectedCamperId) return
 
     const amount = Number(data.amount)
-    const numericBalance = typeof balance === 'number' ? balance : parseFloat(String(balance)) || 0
+    const numericBalance = balanceData.balance
     
     if (amount > numericBalance) {
       toast.error('Saldo insuficiente')
+      return
+    }
+
+    // Verificar se o payment_status é 'confirmed'
+    if (balanceData.payment_status !== 'confirmed') {
+      toast.error('Não é possível usar saldo que ainda não foi confirmado')
       return
     }
 
@@ -166,9 +172,10 @@ export default function SnackBarPage() {
 
   const amount = form.watch('amount')
   const amountNumber = Number(amount)
-  const numericBalance = typeof balance === 'number' ? balance : parseFloat(String(balance)) || 0
+  const numericBalance = balanceData.balance
   const isAmountValid =
     !isNaN(amountNumber) && amountNumber > 0 && amountNumber <= numericBalance
+  const isPaymentConfirmed = balanceData.payment_status === 'confirmed'
 
   // If no access to snack bar, show upgrade dialog or redirect
   if (!permissions.snackBar.access) {
@@ -307,10 +314,21 @@ export default function SnackBarPage() {
                         </p>
                       </div>
                       <Separator className="my-4" />
-                      <div
-                        className={`text-2xl font-bold ${balance > 0 ? 'text-green-600' : 'text-red-600'}`}
-                      >
-                        € {typeof balance === 'number' ? balance.toFixed(2) : '0.00'}
+                      <div className="space-y-2">
+                        <div
+                          className={`text-2xl font-bold ${
+                            balanceData.balance > 0 
+                              ? (balanceData.payment_status === 'confirmed' ? 'text-green-600' : 'text-yellow-600')
+                              : 'text-red-600'
+                          }`}
+                        >
+                          € {balanceData.balance.toFixed(2)}
+                        </div>
+                        {balanceData.balance > 0 && balanceData.payment_status !== 'confirmed' && (
+                          <div className="text-sm text-yellow-600 font-medium">
+                            ⚠️ Saldo aguarda confirmação de pagamento
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -361,15 +379,18 @@ export default function SnackBarPage() {
                           disabled={
                             !selectedCamperId ||
                             mutation.isPending ||
-                            balance <= 0 ||
-                            !isAmountValid
+                            balanceData.balance <= 0 ||
+                            !isAmountValid ||
+                            !isPaymentConfirmed
                           }
                         >
                           {mutation.isPending
                             ? 'A debitar...'
-                            : balance <= 0
+                            : balanceData.balance <= 0
                               ? 'Sem saldo disponível'
-                              : 'Debitar valor'}
+                              : !isPaymentConfirmed
+                                ? 'Saldo não confirmado'
+                                : 'Debitar valor'}
                         </Button>
                       </form>
                     </div>

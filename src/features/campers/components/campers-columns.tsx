@@ -23,6 +23,7 @@ export interface CamperWithActions extends Omit<Camper, 'camp'> {
   snack_bar_balance?: string | number
   total_balance: number
   camp?: string | { name?: string }
+  payment_status?: string
 }
 
 export const columns: ColumnDef<CamperWithActions>[] = [
@@ -70,8 +71,20 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     ),
     cell: ({ row }) => {
       const balance = Number(row.original.snack_bar_balance) || 0
+      const payment_status = row.original.payment_status || 'confirmed'
+      
+      // New color logic based on balance and payment status
+      let colorClass = 'text-red-600' // Default: red for balance = 0
+      if (balance > 0) {
+        if (payment_status === 'confirmed') {
+          colorClass = 'text-green-600' // Green: balance > 0 and confirmed
+        } else {
+          colorClass = 'text-yellow-600' // Yellow: balance > 0 and not confirmed
+        }
+      }
+      
       return (
-        <div className={`font-medium ${balance > 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <div className={`font-medium ${colorClass}`}>
           {formatCurrency(balance)}
         </div>
       )
