@@ -36,6 +36,7 @@ export interface CamperWithActions extends Camper {
   payment_status?: string;
   totalLoaded?: number;
   totalSpent?: number;
+  totalLiquidated?: number;
 }
 
 interface DataTableProps {

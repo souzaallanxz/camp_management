@@ -1093,7 +1093,7 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
             AND payment_status = 'confirmed'
         `;
         
-        // Get total spent from snack_bar_transactions
+        // Get total spent from snack_bar_transactions (non-liquidated)
         const spentResult = await sql`
           SELECT COALESCE(SUM(amount), 0) as total_spent
           FROM snack_bar_transactions
@@ -1101,8 +1101,17 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
             AND is_liquidated = false
         `;
         
+        // Get total liquidated from snack_bar_transactions (liquidated)
+        const liquidatedResult = await sql`
+          SELECT COALESCE(SUM(amount), 0) as total_liquidated
+          FROM snack_bar_transactions
+          WHERE camper_id = ${camper.id}
+            AND is_liquidated = true
+        `;
+        
         const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
         const totalSpent = Number(spentResult[0]?.total_spent || 0);
+        const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
         const snack_bar_balance = totalLoaded - totalSpent;
         const payment_status = balanceResult[0]?.payment_status || 'confirmed';
         
@@ -1119,6 +1128,7 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
           payment_status,
           totalLoaded,
           totalSpent,
+          totalLiquidated,
           form_id: formIdResult[0]?.form_id || null
         };
       } catch (error) {
@@ -1129,7 +1139,8 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
           snack_bar_balance: 0,
           payment_status: 'confirmed',
           totalLoaded: 0,
-          totalSpent: 0
+          totalSpent: 0,
+          totalLiquidated: 0
         };
       }
     }));
@@ -2334,6 +2345,48 @@ app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     
     res.json(allTransactions);
   } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar transactions' });
+  }
+}) as any);
+
+// Get snackbar transactions for a specific camper
+app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camperId } = req.params;
+    
+    // Check if camper belongs to the team
+    const camperCheck = await sql`
+      SELECT ca.id FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!camperCheck[0]) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+    
+    const transactions = await sql`
+      SELECT 
+        id,
+        camper_id,
+        amount,
+        description,
+        is_liquidated,
+        created_at,
+        updated_at
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    res.json(transactions);
+  } catch (error) {
+    console.error('Error fetching snackbar transactions for camper:', error);
     res.status(500).json({ error: 'Error fetching snackbar transactions' });
   }
 }) as any);

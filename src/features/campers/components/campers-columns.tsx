@@ -26,6 +26,7 @@ export interface CamperWithActions extends Omit<Camper, 'camp'> {
   payment_status?: string
   totalLoaded?: number
   totalSpent?: number
+  totalLiquidated?: number
 }
 
 export const columns: ColumnDef<CamperWithActions>[] = [
@@ -110,6 +111,21 @@ export const columns: ColumnDef<CamperWithActions>[] = [
           {difference < 0 && (
             <IconAlertTriangle className="h-4 w-4 text-yellow-500" />
           )}
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: 'totalLiquidated',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Saldo Liquidado" />
+    ),
+    cell: ({ row }) => {
+      const totalLiquidated = Number(row.original.totalLiquidated) || 0
+      
+      return (
+        <div className="font-medium text-black">
+          {formatCurrency(totalLiquidated)}
         </div>
       )
     },

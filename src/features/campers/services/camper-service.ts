@@ -27,6 +27,7 @@ export interface Camper {
   payment_status?: string;
   totalLoaded?: number;
   totalSpent?: number;
+  totalLiquidated?: number;
   camp_name?: string;
 }
 
