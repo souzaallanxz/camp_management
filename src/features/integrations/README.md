@@ -113,11 +113,9 @@ import { webhookService } from '../services/webhook-service'
 
 // Ativar webhook para registrations
 const config = await webhookService.enableWebhook('registrations')
-console.log('URL do webhook:', config.registrationWebhookUrl)
 
 // Ativar webhook para pagamentos
 const config = await webhookService.enableWebhook('payments')
-console.log('URL do webhook:', config.paymentWebhookUrl)
 ```
 
 ### 2. Desativar Webhook
@@ -131,14 +129,7 @@ const config = await webhookService.disableWebhook('registrations')
 
 ```typescript
 const config = webhookService.loadConfig()
-console.log('Webhooks ativos:', {
-  registrations: config.registrationWebhook,
-  payments: config.paymentWebhook,
-  urls: {
-    registrations: config.registrationWebhookUrl,
-    payments: config.paymentWebhookUrl
-  }
-})
+
 ```
 
 ## Estrutura da Resposta

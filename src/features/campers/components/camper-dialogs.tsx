@@ -39,7 +39,7 @@ export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
       form_id: '',
       name: '',
       email: '',
-      contact: '',
+      contact: null,
       camp: '',
       additional_notes: '',
     },
@@ -51,7 +51,7 @@ export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
       const camperData: CreateManualCamperData = {
         name: data.name,
         email: data.email,
-        contact: data.contact,
+        contact: data.contact || null,
         camp: data.camp,
         form_id: data.form_id || null,
         additional_notes: data.additional_notes || null
@@ -114,7 +114,7 @@ export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="contact">Contato</Label>
+            <Label htmlFor="contact">Contato (opcional)</Label>
             <Input
               id="contact"
               {...form.register('contact')}

@@ -9,33 +9,32 @@ export interface Camper {
   id: string;
   name: string;
   email: string;
-  phone: string;
-  city: string;
-  birthday: string;
-  emergencyContact: string;
-  emergencyPhone: string;
-  identificationDocument: string;
-  guardianName: string;
-  guardianPhone: string;
-  allergies: string;
-  medications: string;
-  foodRestrictions: string;
-  observations: string;
-  pictureAuthorization: boolean;
-  shirtSize: string;
-  isMinor: boolean;
-  user_id: string | null;
-  team_id: string;
-  lastCamp?: string;
-  createdAt: string;
-  updatedAt: string;
+  contact?: string | null;
+  registration_id?: string;
+  form_id?: string | null;
+  camp?: string | { name?: string };
+  additional_notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  id_number?: string | null;
+  sns_number?: string | null;
+  date_of_birth?: string | null;
+  dietary_restrictions?: string | null;
+  guardian_name?: string | null;
+  guardian_email?: string | null;
+  guardian_phone?: string | null;
+  snack_bar_balance?: number | string;
+  payment_status?: string;
+  totalLoaded?: number;
+  totalSpent?: number;
+  camp_name?: string;
 }
 
 // Interface específica para criar campers que corresponde aos campos do backend
 export interface CreateCamperData {
   name: string;
   email: string;
-  contact: string;
+  contact?: string | null;
   registration_id: string;
   camp?: string;
   form_id?: string | null;
@@ -46,12 +45,34 @@ export interface CreateCamperData {
 export interface CreateManualCamperData {
   name: string;
   email: string;
-  contact: string;
+  contact?: string | null;
   registration_id?: string;
   camp?: string;
   form_id?: string | null;
   additional_notes?: string | null;
 }
+
+interface SnackbarTransaction {
+  id: string;
+  camper_id: string;
+  amount: number;
+  description?: string;
+  is_liquidated: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SnackbarBalanceRecord {
+  id: string;
+  amount: number;
+  payment_method: string;
+  payment_status: string;
+  phone_number?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+
 
 export const camperService = {
   async findAll(): Promise<Camper[]> {
@@ -66,6 +87,25 @@ export const camperService = {
         return [];
       }
       
+      return await response.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async findAllWithSnackbarData(): Promise<(Camper & { totalLoaded?: number; totalSpent?: number })[]> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(`${API_BASE_URL}/campers`, { 
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        return [];
+      }
+      
+      // O endpoint já retorna os dados com totalLoaded e totalSpent
       return await response.json();
     } catch {
       return [];
@@ -185,6 +225,79 @@ export const camperService = {
         success: false, 
         message: 'Erro de conexão ao liquidar saldo do snackbar' 
       };
+    }
+  },
+
+  async getSnackbarTransactions(camperId: string): Promise<SnackbarTransaction[]> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(`${API_BASE_URL}/snackbar-transactions/${camperId}`, { 
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        return [];
+      }
+      
+      return await response.json();
+    } catch {
+      return [];
+    }
+  },
+
+  async getSnackbarTotalSpent(camperId: string): Promise<number> {
+    try {
+      const transactions = await this.getSnackbarTransactions(camperId);
+      
+      // Calcular total de compras (apenas transações não liquidadas)
+      const totalSpent = transactions
+        .filter(transaction => !transaction.is_liquidated)
+        .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+      
+      return totalSpent;
+    } catch {
+      return 0;
+    }
+  },
+
+  async getSnackbarTotalLoaded(camperId: string): Promise<number> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(`${API_BASE_URL}/snackbar-balance/camper/${camperId}`, { 
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        return 0;
+      }
+      
+      const data = await response.json();
+      // Calcular total carregado somando todos os registros de snackbar_balance
+      const totalLoaded = data.reduce((sum: number, record: SnackbarBalanceRecord) => sum + Number(record.amount), 0);
+      
+      return totalLoaded;
+    } catch {
+      return 0;
+    }
+  },
+
+  async getSnackbarBalanceRecords(camperId: string): Promise<SnackbarBalanceRecord[]> {
+    try {
+      const headers = { ...getTeamIdHeader() };
+      const response = await fetch(`${API_BASE_URL}/snackbar-balance/camper/${camperId}`, { 
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        return [];
+      }
+      
+      return await response.json();
+    } catch {
+      return [];
     }
   }
 };

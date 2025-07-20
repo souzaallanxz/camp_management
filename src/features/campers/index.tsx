@@ -28,7 +28,7 @@ function CampersContent() {
     queryKey: ['campers-with-balance'],
     queryFn: async () => {
       try {
-        return await camperService.findAll();
+        return await camperService.findAllWithSnackbarData();
       } catch {
         // Em caso de erro, retornar array vazio
         return [];
@@ -74,7 +74,9 @@ function CampersContent() {
     onLoadCard: () => handleLoadCard(camper),
     onUpgradeClick: () => setShowUpgradeDialog(true),
     onLiquidateSnackbar: () => handleLiquidateSnackbar(camper),
-    total_balance: 0
+    total_balance: 0,
+    totalLoaded: camper.totalLoaded || 0,
+    totalSpent: camper.totalSpent || 0
   }));
 
   return (

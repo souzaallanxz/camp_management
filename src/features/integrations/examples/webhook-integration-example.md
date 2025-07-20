@@ -13,7 +13,6 @@ Primeiro, ative o webhook para registrations na página de integrações:
 ```typescript
 // No frontend do sistema de gestão
 const config = await webhookService.enableWebhook('registrations')
-console.log('URL para usar:', config.registrationWebhookUrl)
 // Resultado: https://hkdk.events/abc123def456
 ```
 

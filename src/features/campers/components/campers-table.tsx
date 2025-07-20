@@ -28,8 +28,14 @@ import { columns as defaultColumns } from './campers-columns'
 export interface CamperWithActions extends Camper {
   onEdit?: (camper: Camper) => void
   onLoadCard?: (camper: Camper) => void
+  onUpgradeClick?: () => void
+  onLiquidateSnackbar?: (camper: Camper) => void
   total_balance: number
   camp_name?: string;
+  snack_bar_balance?: string | number;
+  payment_status?: string;
+  totalLoaded?: number;
+  totalSpent?: number;
 }
 
 interface DataTableProps {

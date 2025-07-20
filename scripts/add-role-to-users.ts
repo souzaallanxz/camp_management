@@ -8,7 +8,6 @@ const sql = neon(process.env.VITE_NEON_DB_URL!)
 
 async function addRoleToUsers() {
   try {
-    console.log('Adding role column to users table...')
     
     // Add role column to users table if it doesn't exist
     await sql`
@@ -21,10 +20,9 @@ async function addRoleToUsers() {
           RAISE NOTICE 'Role column already exists in users table';
         END IF;
       END
-      $$;
+      $$; 
     `
 
-    console.log('Role column added successfully!')
     
     // Verify the column was added
     const columns = await sql`
@@ -32,26 +30,16 @@ async function addRoleToUsers() {
       FROM information_schema.columns 
       WHERE table_name = 'users' AND column_name = 'role'
     `
-    
-    if (columns.length > 0) {
-      console.log('Role column verification:')
-      console.table(columns)
-    } else {
-      console.log('Role column not found after addition')
-    }
 
   } catch (error) {
-    console.error('Error adding role column:', error)
     process.exit(1)
   }
 }
 
 addRoleToUsers()
   .then(() => {
-    console.log('Script completed successfully')
     process.exit(0)
   })
   .catch((error) => {
-    console.error('Script failed:', error)
     process.exit(1)
   }) 

@@ -56,7 +56,7 @@ export function RegistrationOnboardDialog({
     const camperData: CreateCamperData = {
       name: registration.name,
       email: registration.email,
-      contact: registration.contact,
+      contact: registration.contact || null,
       registration_id: registration.id,
       camp: registration.camp?.name || 'Campo',
       form_id: registration.form_id || null,

@@ -88,7 +88,7 @@ async function main() {
         form_id TEXT,
         name TEXT NOT NULL,
         email TEXT NOT NULL,
-        contact TEXT NOT NULL,
+        contact TEXT,
         camp TEXT NOT NULL,
         additional_notes TEXT,
         created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT timezone('utc'::text, now()),

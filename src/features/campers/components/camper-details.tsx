@@ -7,6 +7,83 @@ import { toast } from 'sonner'
 import { Camper, updateCamperSchema } from '../data/schema'
 import { Separator } from '@/components/ui/separator'
 import { camperService } from '../services/camper-service'
+import { DataTable } from '@/components/ui/data-table'
+import { type ColumnDef } from '@tanstack/react-table'
+import { format } from 'date-fns'
+import { formatCurrency } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+
+interface SnackbarBalanceRecord {
+  id: string;
+  amount: number;
+  payment_method: string;
+  payment_status: string;
+  phone_number?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const snackbarBalanceColumns: ColumnDef<SnackbarBalanceRecord>[] = [
+  {
+    accessorKey: 'created_at',
+    header: 'Data',
+    size: 180,
+    cell: ({ row }) => format(new Date(row.original.created_at), 'dd/MM/yyyy HH:mm'),
+  },
+  {
+    accessorKey: 'amount',
+    header: () => <div className="text-right">Valor</div>,
+    size: 100,
+    cell: ({ row }) => {
+      const amount = row.original.amount
+      const formattedAmount = typeof amount === 'number' 
+        ? amount.toFixed(2) 
+        : parseFloat(String(amount))?.toFixed(2) || '0.00'
+      
+      return (
+        <div className="text-right tabular-nums font-medium">
+          € {formattedAmount}
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: 'payment_method',
+    header: 'Método de Pagamento',
+    size: 150,
+    cell: ({ row }) => {
+      const paymentMethod = row.original.payment_method
+      
+      return (
+        <div className="flex items-center">
+          <span className="text-sm">{paymentMethod}</span>
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: 'payment_status',
+    header: 'Status',
+    size: 100,
+    cell: ({ row }) => {
+      const paymentStatus = row.original.payment_status
+      
+      return (
+        <div className="flex items-center">
+          {paymentStatus === 'confirmed' ? (
+            <Badge variant="default" className="text-xs">
+              Confirmado
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-xs">
+              Pendente
+            </Badge>
+          )}
+        </div>
+      )
+    },
+  },
+]
 
 interface CamperDetailsProps {
   camperId: string | null
@@ -19,6 +96,9 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
   const [camper, setCamper] = useState<Camper | null>(null)
   const [isEditing, setIsEditing] = useState(true)
   const [formData, setFormData] = useState<Partial<Camper>>({})
+  const [snackbarBalanceRecords, setSnackbarBalanceRecords] = useState<SnackbarBalanceRecord[]>([])
+  const [totalSpent, setTotalSpent] = useState(0)
+  const [totalLoaded, setTotalLoaded] = useState(0)
 
   useEffect(() => {
     async function loadCamper() {
@@ -26,9 +106,18 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
 
       setLoading(true)
       try {
-        const data = await camperService.findById(camperId)
+        const [data, balanceRecords, total, loaded] = await Promise.all([
+          camperService.findById(camperId),
+          camperService.getSnackbarBalanceRecords(camperId),
+          camperService.getSnackbarTotalSpent(camperId),
+          camperService.getSnackbarTotalLoaded(camperId)
+        ])
+        
         setCamper(data)
         setFormData(data)
+        setSnackbarBalanceRecords(balanceRecords)
+        setTotalSpent(total)
+        setTotalLoaded(loaded)
         setIsEditing(true)
       } catch {
         toast.error('Failed to load camper details')
@@ -159,6 +248,46 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
               )}
             </div>
           </form>
+
+          {/* Snackbar Transactions Section */}
+          <div className="mt-8">
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium leading-none">Histórico de Carregamentos Snackbar</h3>
+              <div className="text-sm text-muted-foreground">
+                Visualize o histórico de carregamentos de cartão de snackbar deste campista.
+              </div>
+            </div>
+            <Separator className="my-4" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="grid grid-cols-3 gap-4 w-full">
+                  <div>
+                    <p className="text-sm font-medium">Total Carregado</p>
+                    <p className="text-2xl font-bold text-black">{formatCurrency(totalLoaded)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Total Gasto</p>
+                    <p className="text-2xl font-bold text-red-600">{formatCurrency(totalSpent)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Saldo Disponível</p>
+                    <p className={`text-2xl font-bold ${(totalLoaded - totalSpent) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {formatCurrency(totalLoaded - totalSpent)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="max-h-[400px] overflow-auto">
+                <DataTable 
+                  columns={snackbarBalanceColumns} 
+                  data={snackbarBalanceRecords}
+                  emptyMessage="Sem carregamentos para exibir"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </SheetContent>
     </Sheet>

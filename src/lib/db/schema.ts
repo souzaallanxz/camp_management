@@ -64,7 +64,7 @@ export const campers = pgTable('campers', {
   form_id: text('form_id'),
   name: text('name').notNull(),
   email: text('email').notNull(),
-  contact: text('contact').notNull(),
+  contact: text('contact'),
   camp: text('camp').notNull(),
   additional_notes: text('additional_notes'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

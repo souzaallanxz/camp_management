@@ -1074,33 +1074,69 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
         ORDER BY ca.created_at DESC
       `;
     }
+    
 
-    // For each camper, calculate the correct snack_bar_balance and payment status
-    const camperBalances = await Promise.all(campers.map(async camper => {
-      // Get total balance and payment status from snackbar_balance
-      const balanceResult = await sql`
-        SELECT 
-          COALESCE(SUM(amount), 0) as total_balance,
-          CASE 
-            WHEN COUNT(*) = 0 THEN 'confirmed'
-            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
-            ELSE 'not confirmed'
-          END as payment_status
-        FROM snackbar_balance
-        WHERE registration_id = ${camper.registration_id}
-      `;
-      const snack_bar_balance = Number(balanceResult[0]?.total_balance || 0);
-      const payment_status = balanceResult[0]?.payment_status || 'confirmed';
-      return {
-        ...camper,
-        camp: { name: camper.camp_name },
-        snack_bar_balance,
-        payment_status
-      };
+    // For each camper, calculate the correct snack_bar_balance, payment status, total loaded and total spent
+    const camperBalances = await Promise.all(campers.map(async (camper: any) => {
+      try {
+        // Get total balance and payment status from snackbar_balance (confirmed payments only)
+        const balanceResult = await sql`
+          SELECT 
+            COALESCE(SUM(amount), 0) as total_loaded,
+            CASE 
+              WHEN COUNT(*) = 0 THEN 'confirmed'
+              WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+              ELSE 'not confirmed'
+            END as payment_status
+          FROM snackbar_balance
+          WHERE registration_id = ${camper.registration_id}
+            AND payment_status = 'confirmed'
+        `;
+        
+        // Get total spent from snack_bar_transactions
+        const spentResult = await sql`
+          SELECT COALESCE(SUM(amount), 0) as total_spent
+          FROM snack_bar_transactions
+          WHERE camper_id = ${camper.id}
+            AND is_liquidated = false
+        `;
+        
+        const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
+        const totalSpent = Number(spentResult[0]?.total_spent || 0);
+        const snack_bar_balance = totalLoaded - totalSpent;
+        const payment_status = balanceResult[0]?.payment_status || 'confirmed';
+        
+        // Get form_id from registration
+        const formIdResult = await sql`
+          SELECT r.form_id FROM registrations r
+          WHERE r.id = ${camper.registration_id}
+        `;
+        
+        return {
+          ...camper,
+          camp: { name: camper.camp_name },
+          snack_bar_balance,
+          payment_status,
+          totalLoaded,
+          totalSpent,
+          form_id: formIdResult[0]?.form_id || null
+        };
+      } catch (error) {
+        console.error(`Error processing camper ${camper.id}:`, error);
+        return {
+          ...camper,
+          camp: { name: camper.camp_name },
+          snack_bar_balance: 0,
+          payment_status: 'confirmed',
+          totalLoaded: 0,
+          totalSpent: 0
+        };
+      }
     }));
     res.json(camperBalances);
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar campistas.' });
+    console.error('Error fetching campers:', error);
+    res.status(500).json({ error: 'Erro ao buscar campistas.', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 }) as any);
 
@@ -1137,7 +1173,7 @@ app.post('/api/campers', (async (req: Request, res: Response) => {
   }
   try {
     const { name, email, contact, registration_id, form_id, camp, additional_notes } = req.body;
-    if (!name || !email || !contact) {
+    if (!name || !email) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
@@ -1156,7 +1192,7 @@ app.post('/api/campers', (async (req: Request, res: Response) => {
     const now = new Date().toISOString();
     const result = await sql`
       INSERT INTO campers (name, email, contact, registration_id, form_id, camp, additional_notes, created_at, updated_at)
-      VALUES (${name}, ${email}, ${contact}, ${registration_id}, ${form_id}, ${camp}, ${additional_notes}, ${now}, ${now})
+      VALUES (${name}, ${email}, ${contact || null}, ${registration_id}, ${form_id}, ${camp}, ${additional_notes}, ${now}, ${now})
       RETURNING *
     `;
     res.status(201).json(result[0]);
@@ -1760,6 +1796,9 @@ app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
   try {
     const { registration_id, amount, payment_method, phone_number, request_id } = req.body;
     
+    // Debug log
+    console.log('Snackbar balance request:', { registration_id, amount, payment_method, phone_number, request_id });
+    
     if (!registration_id || !amount || !payment_method) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -1897,7 +1936,6 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   try {
     const { camper_id, staff_id, amount } = req.body;
     
-    console.log('Creating snackbar transaction:', { camper_id, staff_id, amount, teamId });
     
     if (!amount) {
       return res.status(400).json({ error: 'Amount is required' });
@@ -1942,7 +1980,6 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
     
     let result;
     if (camper_id) {
-      console.log('Creating transaction for camper:', camper_id);
       
       // Get the registration_id for this camper
       const registrationResult = await sql`
@@ -1956,10 +1993,10 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       
       const registrationId = registrationResult[0].registration_id;
       
-      // Get current balance and payment status from snackbar_balance
+      // Get total loaded from snackbar_balance (confirmed payments only)
       const balanceResult = await sql`
         SELECT 
-          COALESCE(SUM(amount), 0) as total_balance,
+          COALESCE(SUM(amount), 0) as total_loaded,
           CASE 
             WHEN COUNT(*) = 0 THEN 'confirmed'
             WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
@@ -1967,9 +2004,20 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
           END as payment_status
         FROM snackbar_balance
         WHERE registration_id = ${registrationId}
+          AND payment_status = 'confirmed'
       `;
       
-      const currentBalance = Number(balanceResult[0]?.total_balance || 0);
+      // Get total spent from snack_bar_transactions
+      const spentResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_spent
+        FROM snack_bar_transactions
+        WHERE camper_id = ${camper_id}
+          AND is_liquidated = false
+      `;
+      
+      const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
+      const totalSpent = Number(spentResult[0]?.total_spent || 0);
+      const currentBalance = totalLoaded - totalSpent;
       const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
       
       if (currentBalance < amount) {
@@ -1981,32 +2029,8 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Cannot use balance that is not confirmed' });
       }
       
-      // Get all snackbar_balance records for this registration, ordered by created_at (oldest first)
-      const balanceRecords = await sql`
-        SELECT id, amount, created_at
-        FROM snackbar_balance
-        WHERE registration_id = ${registrationId}
-        ORDER BY created_at ASC
-      `;
-      
-      let remainingAmount = amount;
-      
-      // Deduct from oldest records first (FIFO)
-      for (const record of balanceRecords) {
-        if (remainingAmount <= 0) break;
-        
-        const deductAmount = Math.min(remainingAmount, Number(record.amount));
-        
-        if (deductAmount > 0) {
-          await sql`
-            UPDATE snackbar_balance
-            SET amount = amount - ${deductAmount}, updated_at = NOW()
-            WHERE id = ${record.id}
-          `;
-          
-          remainingAmount -= deductAmount;
-        }
-      }
+      // No need to deduct from snackbar_balance - just create the transaction
+      // The balance will be calculated dynamically (total loaded - total spent)
       
       // Create the transaction record
       result = await sql`
@@ -2017,7 +2041,6 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
         ) RETURNING *
       `;
     } else {
-      console.log('Creating transaction for staff:', staff_id);
       
       // Get current balance and payment status for staff
       const balanceResult = await sql`
@@ -2063,7 +2086,6 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       `;
     }
     
-    console.log('Transaction created successfully:', result[0]);
     res.status(201).json(result[0]);
   } catch (error) {
     console.error('Error creating snackbar transaction:', error);
@@ -2092,10 +2114,10 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
     }
     
-    // Get current balance and payment status for this camper
+    // Get total loaded from snackbar_balance (confirmed payments only)
     const balanceResult = await sql`
       SELECT 
-        COALESCE(SUM(sb.amount), 0) as total_balance,
+        COALESCE(SUM(sb.amount), 0) as total_loaded,
         CASE 
           WHEN COUNT(*) = 0 THEN 'confirmed'
           WHEN COUNT(*) = COUNT(CASE WHEN sb.payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
@@ -2105,10 +2127,22 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       JOIN registrations r ON sb.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
       JOIN campers ca ON r.id = ca.registration_id
-      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+      WHERE ca.id = ${camperId}::uuid 
+        AND c.team_id = ${teamId}::uuid
+        AND sb.payment_status = 'confirmed'
     `;
     
-    const currentBalance = Number(balanceResult[0]?.total_balance || 0);
+    // Get total spent from snack_bar_transactions
+    const spentResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}
+        AND is_liquidated = false
+    `;
+    
+    const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+    const currentBalance = totalLoaded - totalSpent;
     const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
     
     if (currentBalance <= 0) {
@@ -2132,24 +2166,8 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
     
     const registrationId = registrationResult[0].registration_id;
     
-    // Get all snackbar_balance records for this registration, ordered by created_at (oldest first)
-    const balanceRecords = await sql`
-      SELECT id, amount, created_at
-      FROM snackbar_balance
-      WHERE registration_id = ${registrationId}
-      ORDER BY created_at ASC
-    `;
-    
-    // Deduct all amounts from oldest records first (FIFO)
-    for (const record of balanceRecords) {
-      if (Number(record.amount) > 0) {
-        await sql`
-          UPDATE snackbar_balance
-          SET amount = 0, updated_at = NOW()
-          WHERE id = ${record.id}
-        `;
-      }
-    }
+    // No need to update snackbar_balance records - just create a liquidation transaction
+    // The balance will be calculated dynamically (total loaded - total spent)
     
     // Create a transaction record with the total liquidated amount
     const now = new Date().toISOString();
@@ -2165,7 +2183,6 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       message: 'Balance liquidated successfully',
       liquidated_amount: currentBalance,
       camper_name: camperCheck[0].name,
-      updated_records_count: balanceRecords.length,
       transaction: transactionResult[0]
     });
   } catch (error) {
@@ -2206,8 +2223,8 @@ app.get('/api/snackbar-transactions/staff/:staffId', (async (req: Request, res: 
   }
 }) as any);
 
-// Get transactions for a specific camper
-app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Response) => {
+// Get snackbar balance records for a specific camper
+app.get('/api/snackbar-balance/camper/:camperId', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
@@ -2227,15 +2244,36 @@ app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Respo
       return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
     }
     
-    const transactions = await sql`
-      SELECT * FROM snack_bar_transactions
-      WHERE camper_id = ${camperId}::uuid
+    // Get the registration_id for this camper
+    const registrationResult = await sql`
+      SELECT ca.registration_id FROM campers ca
+      WHERE ca.id = ${camperId}::uuid
+    `;
+    
+    if (!registrationResult[0]?.registration_id) {
+      return res.status(404).json({ error: 'Camper does not have a registration' });
+    }
+    
+    const registrationId = registrationResult[0].registration_id;
+    
+    // Get all snackbar balance records for this registration
+    const balanceRecords = await sql`
+      SELECT 
+        id,
+        amount,
+        payment_method,
+        payment_status,
+        phone_number,
+        created_at,
+        updated_at
+      FROM snackbar_balance
+      WHERE registration_id = ${registrationId}
       ORDER BY created_at DESC
     `;
     
-    res.json(transactions);
+    res.json(balanceRecords);
   } catch (error) {
-    res.status(500).json({ error: 'Error fetching snackbar transactions' });
+    res.status(500).json({ error: 'Error fetching snackbar balance records' });
   }
 }) as any);
 
@@ -3645,6 +3683,42 @@ app.get('/api/debug/schema', (async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error checking schema:', error);
     res.status(500).json({ error: 'Error checking schema', details: error.message });
+  }
+}) as any);
+
+// Get snackbar balance records for a specific camper
+app.get('/api/snackbar-balance/camper/:camperId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camperId } = req.params;
+    
+    // Check if camper belongs to the team
+    const camperCheck = await sql`
+      SELECT ca.id, ca.registration_id FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!camperCheck[0]) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+    
+    const registrationId = camperCheck[0].registration_id;
+    
+    // Get all snackbar_balance records for this registration
+    const balanceRecords = await sql`
+      SELECT * FROM snackbar_balance
+      WHERE registration_id = ${registrationId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    res.json(balanceRecords);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar balance records' });
   }
 }) as any);
 

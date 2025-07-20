@@ -4,6 +4,6 @@ import { camperService } from '../services/camper-service'
 export function useCampers() {
   return useQuery({
     queryKey: ['campers'],
-    queryFn: () => camperService.findAll(),
+    queryFn: () => camperService.findAllWithSnackbarData(),
   })
 } 

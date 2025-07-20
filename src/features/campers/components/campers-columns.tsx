@@ -3,7 +3,7 @@ import { type Camper } from '../data/schema'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
 import LongText from '@/components/long-text'
 import { Button } from '@/components/ui/button'
-import { IconEdit, IconDotsVertical, IconCreditCard, IconCash } from '@tabler/icons-react'
+import { IconEdit, IconDotsVertical, IconCreditCard, IconCash, IconAlertTriangle } from '@tabler/icons-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,8 @@ export interface CamperWithActions extends Omit<Camper, 'camp'> {
   total_balance: number
   camp?: string | { name?: string }
   payment_status?: string
+  totalLoaded?: number
+  totalSpent?: number
 }
 
 export const columns: ColumnDef<CamperWithActions>[] = [
@@ -65,27 +67,49 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     }
   },
   {
-    accessorKey: 'snack_bar_balance',
+    accessorKey: 'totalLoaded',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Saldo" />
+      <DataTableColumnHeader column={column} title="Saldo Carregado" />
     ),
     cell: ({ row }) => {
-      const balance = Number(row.original.snack_bar_balance) || 0
+      const totalLoaded = Number(row.original.totalLoaded) || 0
       const payment_status = row.original.payment_status || 'confirmed'
       
-      // New color logic based on balance and payment status
-      let colorClass = 'text-red-600' // Default: red for balance = 0
-      if (balance > 0) {
+      // Color logic based on payment status
+      let colorClass = 'text-gray-600' // Default: gray
+      if (totalLoaded > 0) {
         if (payment_status === 'confirmed') {
-          colorClass = 'text-green-600' // Green: balance > 0 and confirmed
+          colorClass = 'text-green-600' // Green: confirmed payments
         } else {
-          colorClass = 'text-yellow-600' // Yellow: balance > 0 and not confirmed
+          colorClass = 'text-yellow-600' // Yellow: not confirmed payments
         }
       }
       
       return (
         <div className={`font-medium ${colorClass}`}>
-          {formatCurrency(balance)}
+          {formatCurrency(totalLoaded)}
+        </div>
+      )
+    },
+  },
+  {
+    accessorKey: 'totalSpent',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Saldo Utilizado" />
+    ),
+    cell: ({ row }) => {
+      const totalSpent = Number(row.original.totalSpent) || 0
+      const totalLoaded = row.original.totalLoaded || 0
+      const difference = totalLoaded - totalSpent
+      
+      return (
+        <div className="flex items-center gap-2">
+          <div className="font-medium text-red-600">
+            {formatCurrency(totalSpent)}
+          </div>
+          {difference < 0 && (
+            <IconAlertTriangle className="h-4 w-4 text-yellow-500" />
+          )}
         </div>
       )
     },

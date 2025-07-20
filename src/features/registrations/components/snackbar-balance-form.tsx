@@ -86,8 +86,15 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
         // Debug log
         toast({
           title: 'Debug',
-          description: `Request ID gerado: ${requestId}`,
+          description: `Request ID gerado: ${requestId} (form_id: ${registration.form_id})`,
         });
+      } else if (paymentMethod === 'MB Way' && !registration?.form_id) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível obter o form_id da inscrição',
+        });
+        setLoading(false);
+        return;
       }
 
       // Salvar através da API PRIMEIRO (para garantir que o request_id seja salvo)
@@ -106,7 +113,7 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
             mobileNumber: phoneNumber,
             amount: numericAmount,
             description: `Carregamento Cartão - ${registrationId}`,
-            orderId: requestId,
+            orderId: requestId || '',
           })
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'

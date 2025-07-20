@@ -33,7 +33,6 @@ class WebhookService {
     // Debug logging only in development
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
-      console.log(`[WebhookService] ${message}`, data)
     }
   }
 
