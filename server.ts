@@ -1956,11 +1956,28 @@ app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Respo
     const balance = totalDeposit - totalSpent;
     const payment_status = depositResult[0]?.payment_status || 'confirmed';
     
+    // Get all balance records for this staff member
+    const balanceRecords = await sql`
+      SELECT 
+        id,
+        amount,
+        payment_method,
+        payment_status,
+        phone_number,
+        created_at,
+        updated_at
+      FROM snackbar_balance
+      WHERE staff_id = ${staffId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    // Return both balance records and calculated totals
     res.json({
       balance,
       total_deposit: totalDeposit,
       total_spent: totalSpent,
-      payment_status
+      payment_status,
+      records: balanceRecords
     });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching snackbar balance for staff' });
@@ -2241,6 +2258,95 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       message: 'Balance liquidated successfully',
       liquidated_amount: currentBalance,
       camper_name: camperCheck[0].name,
+    });
+  } catch (error) {
+    console.error('Error liquidating camper balance:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}) as any);
+
+// Liquidate snackbar balance for a staff member
+app.post('/api/snackbar-balance/staff/:staffId/liquidate', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { staffId } = req.params;
+    
+    // Check if staff member belongs to the team
+    const staffCheck = await sql`
+      SELECT s.id, s.name FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staffId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!staffCheck[0]) {
+      return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
+    }
+    
+    // Get total loaded from snackbar_balance (confirmed payments only)
+    const balanceResult = await sql`
+      SELECT 
+        COALESCE(SUM(sb.amount), 0) as total_loaded,
+        CASE 
+          WHEN COUNT(*) = 0 THEN 'confirmed'
+          WHEN COUNT(*) = COUNT(CASE WHEN sb.payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM snackbar_balance sb
+      JOIN staff s ON sb.staff_id = s.id
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staffId}::uuid 
+        AND c.team_id = ${teamId}::uuid
+        AND sb.payment_status = 'confirmed'
+    `;
+    
+    // Get total spent from snack_bar_transactions (non-liquidated)
+    const spentResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE staff_id = ${staffId}
+        AND is_liquidated = false
+    `;
+    
+    // Get total liquidated from snack_bar_transactions (liquidated)
+    const liquidatedResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_liquidated
+      FROM snack_bar_transactions
+      WHERE staff_id = ${staffId}
+        AND is_liquidated = true
+    `;
+    
+    const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+    const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
+    const currentBalance = totalLoaded - totalSpent - totalLiquidated;
+    const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
+    
+    if (currentBalance <= 0) {
+      return res.status(400).json({ error: 'Staff member has no balance to liquidate' });
+    }
+    
+    // Verificar se o payment_status é 'confirmed' para permitir liquidação
+    if (paymentStatus !== 'confirmed') {
+      return res.status(400).json({ error: 'Cannot liquidate balance that is not confirmed' });
+    }
+    
+    // Create a transaction record with the total liquidated amount
+    const now = new Date().toISOString();
+    const transactionResult = await sql`
+      INSERT INTO snack_bar_transactions (
+        staff_id, amount, created_at, is_liquidated
+      ) VALUES (
+        ${staffId}::uuid, ${currentBalance}, ${now}, true
+      ) RETURNING *
+    `;
+    
+    res.status(200).json({
+      message: 'Balance liquidated successfully',
+      liquidated_amount: currentBalance,
+      staff_name: staffCheck[0].name,
       transaction: transactionResult[0]
     });
   } catch (error) {
@@ -3606,35 +3712,64 @@ app.get('/api/staff', (async (req: Request, res: Response) => {
       ORDER BY s.created_at DESC
     `;
 
-    // For each staff member, calculate the correct total_balance and payment status
-    const staffWithBalances = await Promise.all(staff.map(async staffMember => {
-      // Get total deposit and payment status for this staff member
-      const depositResult = await sql`
-        SELECT 
-          COALESCE(SUM(amount), 0) as total_deposit,
-          CASE 
-            WHEN COUNT(*) = 0 THEN 'confirmed'
-            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
-            ELSE 'not confirmed'
-          END as payment_status
-        FROM snackbar_balance
-        WHERE staff_id = ${staffMember.id}
-      `;
-      // Get total spent for this staff member
-      const spentResult = await sql`
-        SELECT COALESCE(SUM(amount), 0) as total_spent
-        FROM snack_bar_transactions
-        WHERE staff_id = ${staffMember.id}
-      `;
-      const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
-      const totalSpent = Number(spentResult[0]?.total_spent || 0);
-      const total_balance = totalDeposit - totalSpent;
-      const payment_status = depositResult[0]?.payment_status || 'confirmed';
-      return {
-        ...staffMember,
-        total_balance,
-        payment_status
-      };
+    // For each staff member, calculate the correct snack_bar_balance, payment status, total loaded and total spent
+    const staffWithBalances = await Promise.all(staff.map(async (staffMember) => {
+      try {
+        // Get total balance and payment status from snackbar_balance (confirmed payments only)
+        const balanceResult = await sql`
+          SELECT 
+            COALESCE(SUM(amount), 0) as total_loaded,
+            CASE 
+              WHEN COUNT(*) = 0 THEN 'confirmed'
+              WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+              ELSE 'not confirmed'
+            END as payment_status
+          FROM snackbar_balance
+          WHERE staff_id = ${staffMember.id}
+            AND payment_status = 'confirmed'
+        `;
+        
+        // Get total spent from snack_bar_transactions (non-liquidated)
+        const spentResult = await sql`
+          SELECT COALESCE(SUM(amount), 0) as total_spent
+          FROM snack_bar_transactions
+          WHERE staff_id = ${staffMember.id}
+            AND is_liquidated = false
+        `;
+        
+        // Get total liquidated from snack_bar_transactions (liquidated)
+        const liquidatedResult = await sql`
+          SELECT COALESCE(SUM(amount), 0) as total_liquidated
+          FROM snack_bar_transactions
+          WHERE staff_id = ${staffMember.id}
+            AND is_liquidated = true
+        `;
+        
+        const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
+        const totalSpent = Number(spentResult[0]?.total_spent || 0);
+        const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
+        const snack_bar_balance = totalLoaded - totalSpent - totalLiquidated;
+        const payment_status = balanceResult[0]?.payment_status || 'confirmed';
+        
+        return {
+          ...staffMember,
+          snack_bar_balance,
+          payment_status,
+          totalLoaded,
+          totalSpent,
+          totalLiquidated
+        };
+      } catch (error) {
+        console.error(`Error processing staff member ${staffMember.id}:`, error);
+        return {
+          ...staffMember,
+          snack_bar_balance: 0,
+          payment_status: 'confirmed',
+          totalLoaded: 0,
+          totalSpent: 0,
+          totalLiquidated: 0
+        };
+      }
     }));
     res.json(staffWithBalances);
   } catch (error) {

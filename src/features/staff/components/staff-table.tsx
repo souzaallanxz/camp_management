@@ -28,8 +28,15 @@ import { columns as defaultColumns } from './staff-columns'
 export interface StaffWithActions extends Staff {
   onEdit?: (staff: Staff) => void
   onLoadCard?: (staff: Staff) => void
+  onUpgradeClick?: () => void
+  onLiquidateSnackbar?: (staff: Staff) => void
   total_balance: number
   camp_name?: string;
+  snack_bar_balance?: string | number;
+  payment_status?: string;
+  totalLoaded?: number;
+  totalSpent?: number;
+  totalLiquidated?: number;
 }
 
 interface DataTableProps {
