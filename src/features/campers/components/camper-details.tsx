@@ -99,6 +99,7 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
   const [snackbarBalanceRecords, setSnackbarBalanceRecords] = useState<SnackbarBalanceRecord[]>([])
   const [totalSpent, setTotalSpent] = useState(0)
   const [totalLoaded, setTotalLoaded] = useState(0)
+  const [totalLiquidated, setTotalLiquidated] = useState(0)
 
   useEffect(() => {
     async function loadCamper() {
@@ -106,18 +107,24 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
 
       setLoading(true)
       try {
-        const [data, balanceRecords, total, loaded] = await Promise.all([
+        const [data, balanceRecords, total, loaded, liquidated] = await Promise.all([
           camperService.findById(camperId),
           camperService.getSnackbarBalanceRecords(camperId),
           camperService.getSnackbarTotalSpent(camperId),
-          camperService.getSnackbarTotalLoaded(camperId)
+          camperService.getSnackbarTotalLoaded(camperId),
+          camperService.getSnackbarTotalLiquidated(camperId)
         ])
         
         setCamper(data)
-        setFormData(data)
+        setFormData({
+          ...data,
+          camp: typeof data.camp === 'string' ? data.camp : (data.camp as any)?.name || '',
+          date_of_birth: typeof data.date_of_birth === 'string' ? data.date_of_birth : (data.date_of_birth as any)?.toString() || ''
+        })
         setSnackbarBalanceRecords(balanceRecords)
         setTotalSpent(total)
         setTotalLoaded(loaded)
+        setTotalLiquidated(liquidated)
         setIsEditing(true)
       } catch {
         toast.error('Failed to load camper details')
@@ -164,14 +171,14 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
     <Sheet open={!!camperId} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle>Camper Details</SheetTitle>
+          <SheetTitle>Detalhes do Campista</SheetTitle>
         </SheetHeader>
         <Separator className="my-4" />
         <div className="overflow-y-auto max-h-[calc(100vh-140px)] pr-2">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <label htmlFor="name">Name</label>
+                <label htmlFor="name">Nome</label>
                 <Input
                   id="name"
                   name="name"
@@ -192,7 +199,7 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
                 />
               </div>
               <div className="grid gap-2">
-                <label htmlFor="contact">Contact</label>
+                <label htmlFor="contact">Telemóvel</label>
                 <Input
                   id="contact"
                   name="contact"
@@ -202,28 +209,17 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
                 />
               </div>
               <div className="grid gap-2">
-                <label htmlFor="camp">Camp</label>
+                <label htmlFor="camp">Acampamento</label>
                 <Input
                   id="camp"
                   name="camp"
                   value={formData.camp || ''}
                   onChange={handleInputChange}
-                  disabled={!isEditing}
+                  disabled={true}
                 />
               </div>
               <div className="grid gap-2">
-                <label htmlFor="snack_bar_balance">Snack Bar Balance</label>
-                <Input
-                  id="snack_bar_balance"
-                  name="snack_bar_balance"
-                  type="number"
-                  value={formData.snack_bar_balance || 0}
-                  onChange={handleInputChange}
-                  disabled={!isEditing}
-                />
-              </div>
-              <div className="grid gap-2">
-                <label htmlFor="additional_notes">Additional Notes</label>
+                <label htmlFor="additional_notes">Notas Adicionais</label>
                 <Textarea
                   id="additional_notes"
                   name="additional_notes"
@@ -272,8 +268,8 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
                   </div>
                   <div>
                     <p className="text-sm font-medium">Saldo Disponível</p>
-                    <p className={`text-2xl font-bold ${(totalLoaded - totalSpent) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {formatCurrency(totalLoaded - totalSpent)}
+                    <p className={`text-2xl font-bold ${(totalLoaded - totalSpent - totalLiquidated) < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {formatCurrency(totalLoaded - totalSpent - totalLiquidated)}
                     </p>
                   </div>
                 </div>

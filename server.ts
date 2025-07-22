@@ -1112,7 +1112,7 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
         const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
         const totalSpent = Number(spentResult[0]?.total_spent || 0);
         const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
-        const snack_bar_balance = totalLoaded - totalSpent;
+        const snack_bar_balance = totalLoaded - totalSpent - totalLiquidated;
         const payment_status = balanceResult[0]?.payment_status || 'confirmed';
         
         // Get form_id from registration
@@ -1358,13 +1358,13 @@ app.post('/api/users', (async (req: Request, res: Response) => {
 
 // GET user by ID
 app.get('/api/users/:id', async (req: Request, res: Response) => {
-  const teamId = req.headers['x-team-id'];
-  if (!teamId || typeof teamId !== 'string') {
+  const teamId = getTeamId(req);
+  if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
     const { id } = req.params;
-    const result = await sql`SELECT * FROM users WHERE id = ${id} AND team_id = ${teamId}`;
+    const result = await sql`SELECT * FROM users WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid`;
     if (result.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -1376,46 +1376,72 @@ app.get('/api/users/:id', async (req: Request, res: Response) => {
 
 // PUT user by ID
 app.put('/api/users/:id', async (req: Request, res: Response) => {
-  const teamId = req.headers['x-team-id'];
-  if (!teamId || typeof teamId !== 'string') {
+  const teamId = getTeamId(req);
+  if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
     const { id } = req.params;
     const { firstName, lastName, email, role } = req.body;
+    
+    // Check if user exists and belongs to team
+    const userCheck = await sql`SELECT id, team_id FROM users WHERE id = ${id}::uuid`;
+    
+    if (!userCheck[0]) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (userCheck[0].team_id !== teamId) {
+      return res.status(403).json({ error: 'User does not belong to your team' });
+    }
+    
     const now = new Date().toISOString();
-    const fields = [];
-    if (firstName !== undefined) fields.push(`first_name = '${firstName}'`);
-    if (lastName !== undefined) fields.push(`last_name = '${lastName}'`);
-    if (email !== undefined) fields.push(`email = '${email}'`);
-    if (role !== undefined) fields.push(`role = '${role}'`);
-    fields.push(`updated_at = '${now}'`);
-    if (fields.length === 0) {
+    const updateFields = [];
+    
+    if (firstName !== undefined) {
+      updateFields.push(sql`first_name = ${firstName}`);
+    }
+    if (lastName !== undefined) {
+      updateFields.push(sql`last_name = ${lastName}`);
+    }
+    if (email !== undefined) {
+      updateFields.push(sql`email = ${email}`);
+    }
+    if (role !== undefined) {
+      updateFields.push(sql`role = ${role}`);
+    }
+    updateFields.push(sql`updated_at = ${now}`);
+    
+    if (updateFields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
-    const setClause = fields.join(', ');
-    const result = await sql.unsafe(
-      `UPDATE users SET ${setClause} WHERE id = $1 AND team_id = $2 RETURNING *`,
-      [id, teamId]
-    );
+    
+    const setClause = sql.join(updateFields, sql`, `);
+    const result = await sql`
+      UPDATE users 
+      SET ${setClause} 
+      WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid 
+      RETURNING *
+    `;
     if (!result[0]) {
       return res.status(404).json({ error: 'User not found or you do not have permission to update it' });
     }
     res.json(result[0]);
-  } catch {
+  } catch (error) {
+    console.error('Error updating user:', error);
     res.status(500).json({ error: 'Erro ao atualizar usuário.' });
   }
 });
 
 // DELETE user by ID
 app.delete('/api/users/:id', async (req: Request, res: Response) => {
-  const teamId = req.headers['x-team-id'];
-  if (!teamId || typeof teamId !== 'string') {
+  const teamId = getTeamId(req);
+  if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
     const { id } = req.params;
-    const result = await sql`DELETE FROM users WHERE id = ${id} AND team_id = ${teamId} RETURNING *`;
+    const result = await sql`DELETE FROM users WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid RETURNING *`;
     if (!result[0]) {
       return res.status(404).json({ error: 'User not found or you do not have permission to delete it' });
     }
@@ -2018,7 +2044,7 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
           AND payment_status = 'confirmed'
       `;
       
-      // Get total spent from snack_bar_transactions
+      // Get total spent from snack_bar_transactions (non-liquidated)
       const spentResult = await sql`
         SELECT COALESCE(SUM(amount), 0) as total_spent
         FROM snack_bar_transactions
@@ -2026,9 +2052,18 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
           AND is_liquidated = false
       `;
       
+      // Get total liquidated from snack_bar_transactions (liquidated)
+      const liquidatedResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE camper_id = ${camper_id}
+          AND is_liquidated = true
+      `;
+      
       const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
       const totalSpent = Number(spentResult[0]?.total_spent || 0);
-      const currentBalance = totalLoaded - totalSpent;
+      const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
+      const currentBalance = totalLoaded - totalSpent - totalLiquidated;
       const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
       
       if (currentBalance < amount) {
@@ -2143,7 +2178,7 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
         AND sb.payment_status = 'confirmed'
     `;
     
-    // Get total spent from snack_bar_transactions
+    // Get total spent from snack_bar_transactions (non-liquidated)
     const spentResult = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_spent
       FROM snack_bar_transactions
@@ -2151,9 +2186,18 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
         AND is_liquidated = false
     `;
     
+    // Get total liquidated from snack_bar_transactions (liquidated)
+    const liquidatedResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_liquidated
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}
+        AND is_liquidated = true
+    `;
+    
     const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
     const totalSpent = Number(spentResult[0]?.total_spent || 0);
-    const currentBalance = totalLoaded - totalSpent;
+    const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
+    const currentBalance = totalLoaded - totalSpent - totalLiquidated;
     const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
     
     if (currentBalance <= 0) {
@@ -2223,7 +2267,13 @@ app.get('/api/snackbar-transactions/staff/:staffId', (async (req: Request, res: 
     }
     
     const transactions = await sql`
-      SELECT * FROM snack_bar_transactions
+      SELECT 
+        id,
+        staff_id,
+        amount,
+        is_liquidated,
+        created_at
+      FROM snack_bar_transactions
       WHERE staff_id = ${staffId}::uuid
       ORDER BY created_at DESC
     `;
@@ -2275,8 +2325,7 @@ app.get('/api/snackbar-balance/camper/:camperId', (async (req: Request, res: Res
         payment_method,
         payment_status,
         phone_number,
-        created_at,
-        updated_at
+        created_at
       FROM snackbar_balance
       WHERE registration_id = ${registrationId}
       ORDER BY created_at DESC
@@ -2375,10 +2424,8 @@ app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Respo
         id,
         camper_id,
         amount,
-        description,
         is_liquidated,
-        created_at,
-        updated_at
+        created_at
       FROM snack_bar_transactions
       WHERE camper_id = ${camperId}::uuid
       ORDER BY created_at DESC
@@ -2947,6 +2994,22 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
       }
     }
 
+    // Validar se form_id já existe (se fornecido)
+    if (form_id) {
+      const existingFormId = await sql`
+        SELECT r.id FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE r.form_id = ${form_id} AND c.team_id = ${teamId}::uuid
+      `;
+      
+      if (existingFormId.length > 0) {
+        return res.status(400).json({ 
+          error: 'Form ID already exists',
+          message: 'Este Form ID já está registado no sistema'
+        });
+      }
+    }
+
     // Criar registration (sem team_id)
     const now = new Date().toISOString();
     const result = await sql`
@@ -2969,6 +3032,39 @@ app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Respon
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Verificar se form_id já existe
+app.get('/api/registrations/check-form-id/:formId', (async (req: Request, res: Response) => {
+  try {
+    const { formId } = req.params;
+    const teamId = getTeamId(req);
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' });
+    }
+
+    if (!formId) {
+      return res.status(400).json({ error: 'Form ID is required' });
+    }
+
+    // Verificar se o form_id já existe
+    const existingFormId = await sql`
+      SELECT r.id FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.form_id = ${formId} AND c.team_id = ${teamId}::uuid
+    `;
+    
+    const exists = existingFormId.length > 0;
+    
+    return res.status(200).json({
+      exists,
+      message: exists ? 'Este Form ID já está registado no sistema' : 'Form ID disponível'
+    });
+  } catch (error) {
+    console.error('Error checking form_id:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}) as any);
 
 // Recebe webhooks de pagamentos
 app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
@@ -3764,7 +3860,16 @@ app.get('/api/snackbar-balance/camper/:camperId', (async (req: Request, res: Res
     
     // Get all snackbar_balance records for this registration
     const balanceRecords = await sql`
-      SELECT * FROM snackbar_balance
+      SELECT 
+        id,
+        registration_id,
+        staff_id,
+        amount,
+        payment_method,
+        phone_number,
+        created_at,
+        updated_at
+      FROM snackbar_balance
       WHERE registration_id = ${registrationId}::uuid
       ORDER BY created_at DESC
     `;

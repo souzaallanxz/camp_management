@@ -60,7 +60,6 @@ interface SnackbarTransaction {
   description?: string;
   is_liquidated: boolean;
   created_at: string;
-  updated_at: string;
 }
 
 interface SnackbarBalanceRecord {
@@ -70,7 +69,6 @@ interface SnackbarBalanceRecord {
   payment_status: string;
   phone_number?: string;
   created_at: string;
-  updated_at: string;
 }
 
 
@@ -279,6 +277,21 @@ export const camperService = {
       const totalLoaded = data.reduce((sum: number, record: SnackbarBalanceRecord) => sum + Number(record.amount), 0);
       
       return totalLoaded;
+    } catch {
+      return 0;
+    }
+  },
+
+  async getSnackbarTotalLiquidated(camperId: string): Promise<number> {
+    try {
+      const transactions = await this.getSnackbarTransactions(camperId);
+      
+      // Calcular total liquidado (apenas transações liquidadas)
+      const totalLiquidated = transactions
+        .filter(transaction => transaction.is_liquidated)
+        .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+      
+      return totalLiquidated;
     } catch {
       return 0;
     }

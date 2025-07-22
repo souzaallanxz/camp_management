@@ -33,6 +33,7 @@ import { type Camp } from '@/features/camps/data/schema'
 import { Separator } from '@/components/ui/separator'
 import { paymentService } from '../services/payment-service'
 import { MBWayService } from '../services/mbway-service'
+import { useState, useEffect } from 'react'
 
 const createRegistrationSchema = z.object({
   // Registration fields
@@ -40,7 +41,7 @@ const createRegistrationSchema = z.object({
   email: z.string().email('Email inválido'),
   contact: z.string().min(1, 'Contacto é obrigatório'),
   camp_id: z.string().min(1, 'Selecione um acampamento'),
-  form_id: z.string().optional().nullable(),
+  form_id: z.string().min(1, 'Form ID é obrigatório'),
   
   // Payment fields
   payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro', 'Multibanco']).optional(),
@@ -74,7 +75,6 @@ export function RegistrationDialog({
   const queryClient = useQueryClient()
   const { data: camps = [] } = useCamps()
   
-  
   const form = useForm<CreateRegistrationFormData>({
     resolver: zodResolver(createRegistrationSchema),
     defaultValues: {
@@ -88,6 +88,50 @@ export function RegistrationDialog({
       phone_number: '',
     },
   })
+
+  const [formIdValidation, setFormIdValidation] = useState<{
+    isValidating: boolean;
+    exists: boolean;
+    message: string;
+  }>({
+    isValidating: false,
+    exists: false,
+    message: ''
+  })
+
+  // Validação em tempo real do form_id
+  useEffect(() => {
+    const formId = form.watch('form_id')
+    
+    if (formId && formId.length > 0) {
+      setFormIdValidation(prev => ({ ...prev, isValidating: true }))
+      
+      const timeoutId = setTimeout(async () => {
+        try {
+          const result = await registrationService.checkFormIdExists(formId)
+          setFormIdValidation({
+            isValidating: false,
+            exists: result.exists,
+            message: result.message
+          })
+        } catch {
+          setFormIdValidation({
+            isValidating: false,
+            exists: false,
+            message: 'Erro ao validar Form ID'
+          })
+        }
+      }, 500) // Debounce de 500ms
+      
+      return () => clearTimeout(timeoutId)
+    } else {
+      setFormIdValidation({
+        isValidating: false,
+        exists: false,
+        message: ''
+      })
+    }
+  }, [form.watch('form_id')])
 
   const { mutateAsync: createRegistration, isPending: isCreating } = useMutation({
     mutationFn: async (data: CreateRegistrationFormData) => {
@@ -191,6 +235,13 @@ export function RegistrationDialog({
       // Resetar o formulário
       form.reset()
       
+      // Resetar validação do form_id
+      setFormIdValidation({
+        isValidating: false,
+        exists: false,
+        message: ''
+      })
+      
       // Fechar o diálogo
       onOpenChange(false);
       
@@ -203,8 +254,13 @@ export function RegistrationDialog({
       }
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
-      toast.error(message)
+      // Verificar se é um erro específico de form_id duplicado
+      if (error instanceof Error && error.message.includes('Form ID already exists')) {
+        toast.error('Este Form ID já está registado no sistema')
+      } else {
+        const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
+        toast.error(message)
+      }
     },
   })
 
@@ -344,11 +400,24 @@ export function RegistrationDialog({
                     name="form_id"
                     render={({ field }) => (
                       <FormItem className="flex flex-col space-y-1.5">
-                        <FormLabel>Form ID</FormLabel>
+                        <FormLabel>Form ID *</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ''} />
+                          <Input 
+                            {...field} 
+                            value={field.value || ''} 
+                            placeholder="Digite o Form ID único"
+                          />
                         </FormControl>
                         <FormMessage />
+                        {formIdValidation.isValidating && (
+                          <p className="text-sm text-muted-foreground">Validando Form ID...</p>
+                        )}
+                        {!formIdValidation.isValidating && formIdValidation.exists && (
+                          <p className="text-sm text-destructive">{formIdValidation.message}</p>
+                        )}
+                        {!formIdValidation.isValidating && !formIdValidation.exists && formIdValidation.message && (
+                          <p className="text-sm text-green-600">{formIdValidation.message}</p>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -438,7 +507,10 @@ export function RegistrationDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button 
+                type="submit" 
+                disabled={isPending || formIdValidation.exists}
+              >
                 {isPending ? 'Criando...' : 'Criar'}
               </Button>
             </div>

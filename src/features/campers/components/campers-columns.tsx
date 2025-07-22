@@ -1,7 +1,6 @@
 import { type ColumnDef } from '@tanstack/react-table'
 import { type Camper } from '../data/schema'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
-import LongText from '@/components/long-text'
 import { Button } from '@/components/ui/button'
 import { IconEdit, IconDotsVertical, IconCreditCard, IconCash, IconAlertTriangle } from '@tabler/icons-react'
 import {
@@ -76,14 +75,10 @@ export const columns: ColumnDef<CamperWithActions>[] = [
       const totalLoaded = Number(row.original.totalLoaded) || 0
       const payment_status = row.original.payment_status || 'confirmed'
       
-      // Color logic based on payment status
-      let colorClass = 'text-gray-600' // Default: gray
-      if (totalLoaded > 0) {
-        if (payment_status === 'confirmed') {
-          colorClass = 'text-green-600' // Green: confirmed payments
-        } else {
-          colorClass = 'text-yellow-600' // Yellow: not confirmed payments
-        }
+      // Color logic: black for confirmed payments, yellow for pending payments
+      let colorClass = 'text-black' // Default: black
+      if (totalLoaded > 0 && payment_status !== 'confirmed') {
+        colorClass = 'text-yellow-600' // Yellow: pending payments
       }
       
       return (
@@ -130,16 +125,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
       )
     },
   },
-  {
-    accessorKey: 'additional_notes',
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Notas" />
-    ),
-    cell: ({ row }) => {
-      const notes = row.getValue('additional_notes') as string
-      return notes ? <LongText>{notes}</LongText> : '-'
-    },
-  },
+
   {
     id: 'actions',
     cell: function ActionsCell({ row }) {
