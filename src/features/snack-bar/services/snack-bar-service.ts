@@ -204,10 +204,9 @@ export const snackBarService = {
       const isStaff = person?.type === 'staff'
       
       if (isStaff) {
-        // Para staff, usar o total_balance
-        const balance = (person as StaffWithBalance).total_balance
-        // For staff, we need to get payment_status from the API
+        // Para staff, sempre usar o endpoint específico para obter o saldo correto
         const response = await api.get(`/snackbar-balance/staff/${camperId}`)
+        const balance = response.data.balance || 0
         const payment_status = response.data.payment_status || 'confirmed'
         return { balance, payment_status }
       } else {

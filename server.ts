@@ -1920,7 +1920,7 @@ app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Respo
   try {
     const { staffId } = req.params;
     
-    // Check if staff member belongs to the team
+    // Check if staff member belongs to the team (but don't filter by camp for balance calculation)
     const staffCheck = await sql`
       SELECT s.id FROM staff s
       JOIN camps c ON s.camp_id = c.id
@@ -1931,7 +1931,7 @@ app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Respo
       return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
     }
     
-    // Get total deposit and payment status for this staff member
+    // Get total deposit and payment status for this staff member (ALL camps, not just current camp)
     const depositResult = await sql`
       SELECT 
         COALESCE(SUM(amount), 0) as total_deposit,
@@ -1944,7 +1944,7 @@ app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Respo
       WHERE staff_id = ${staffId}::uuid
     `;
     
-    // Get total spent for this staff member
+    // Get total spent for this staff member (ALL camps, not just current camp)
     const spentResult = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_spent
       FROM snack_bar_transactions
@@ -1956,7 +1956,7 @@ app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Respo
     const balance = totalDeposit - totalSpent;
     const payment_status = depositResult[0]?.payment_status || 'confirmed';
     
-    // Get all balance records for this staff member
+    // Get all balance records for this staff member (ALL camps, not just current camp)
     const balanceRecords = await sql`
       SELECT 
         id,
