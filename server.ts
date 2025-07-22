@@ -779,18 +779,21 @@ app.get('/api/dashboard/camp-payments', (async (req: Request, res: Response) => 
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    
     const camps = await sql`
       SELECT 
         c.id as camp_id,
         c.name as camp_name,
-        COUNT(DISTINCT p.id) as total_payments,
+        COALESCE(SUM(CASE WHEN EXTRACT(YEAR FROM p.payment_date) = ${currentYear} THEN p.amount ELSE 0 END), 0) as total_payments,
         COUNT(DISTINCT r.id) as total_registrations
       FROM camps c
       LEFT JOIN registrations r ON c.id = r.camp_id
       LEFT JOIN payments p ON r.id = p.registration_id
       WHERE c.team_id = ${teamId}
       GROUP BY c.id, c.name
-      ORDER BY c.created_at DESC
+      ORDER BY c.start_date ASC
     `;
     const result = camps.map(camp => ({
       campId: camp.camp_id,
