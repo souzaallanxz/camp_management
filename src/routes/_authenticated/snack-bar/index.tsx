@@ -27,8 +27,9 @@ import { snackBarTransactionSchema } from '@/features/snack-bar/data/schema'
 import type { SnackBarTransaction } from '@/features/snack-bar/data/schema'
 import { TransactionsTable } from '@/features/snack-bar/components/transactions-table'
 import { TransactionsCharts } from '@/features/snack-bar/components/transactions-charts'
+import { AddTransactionDialog } from '@/features/snack-bar/components/add-transaction-dialog'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { IconCoinEuro, IconCashOff } from '@tabler/icons-react'
+import { IconCoinEuro, IconCashOff, IconPlus } from '@tabler/icons-react'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 
@@ -37,6 +38,7 @@ export default function SnackBarPage() {
   const permissions = useTeamPermissions()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
   const [selectedPersonId, setSelectedPersonId] = useState<string>('')
+  const [showAddTransactionDialog, setShowAddTransactionDialog] = useState(false)
   const queryClient = useQueryClient()
 
   const form = useForm<SnackBarTransaction>({
@@ -126,11 +128,22 @@ export default function SnackBarPage() {
             <Button variant="outline" onClick={() => navigate({ to: '/' })}>
               Voltar ao Dashboard
             </Button>
-          </div>
-        </Main>
-      </>
-    )
-  }
+                  </div>
+      </Main>
+
+      <AddTransactionDialog
+        open={showAddTransactionDialog}
+        onOpenChange={setShowAddTransactionDialog}
+        onSuccess={() => {
+          // Refresh data when transaction is added
+          queryClient.invalidateQueries({
+            queryKey: ['all-transactions', currentCamp?.id],
+          })
+        }}
+      />
+    </>
+  )
+}
 
   // Usamos o acampamento real (agora já sabemos que existe)
   const activeCamp = currentCamp
@@ -222,6 +235,10 @@ export default function SnackBarPage() {
               Gere as compras do snack bar dos campistas.
             </p>
           </div>
+                             <Button onClick={() => setShowAddTransactionDialog(true)}>
+                     <IconPlus className="mr-2 h-4 w-4" />
+                     Adicionar Pagamento
+                   </Button>
         </div>
 
         <div className="space-y-8">
@@ -436,6 +453,17 @@ export default function SnackBarPage() {
           </div>
         </div>
       </Main>
+
+      <AddTransactionDialog
+        open={showAddTransactionDialog}
+        onOpenChange={setShowAddTransactionDialog}
+        onSuccess={() => {
+          // Refresh data when transaction is added
+          queryClient.invalidateQueries({
+            queryKey: ['all-transactions', currentCamp?.id],
+          })
+        }}
+      />
     </>
   )
 }

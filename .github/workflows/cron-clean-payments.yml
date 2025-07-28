@@ -2,7 +2,7 @@ name: Cron Clean Pending Payments
 
 on:
   schedule:
-    - cron: '*/20 * * * *'  # a cada 20 minutos
+    - cron: '*/60 * * * *'  # a cada 20 minutos
   workflow_dispatch:        # permite correr manualmente se precisares
 
 jobs:

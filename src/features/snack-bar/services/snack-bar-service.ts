@@ -360,5 +360,20 @@ export const snackBarService = {
     } catch {
       return [];
     }
+  },
+
+  async createIndependentPayment(data: {
+    amount: number
+    payment_method: string
+    phone_number?: string | null
+    description?: string | null
+  }): Promise<any> {
+    try {
+      const response = await api.post('/snackbar-transactions/independent', data)
+      return response.data
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao criar pagamento independente'
+      throw new Error(errorMessage)
+    }
   }
 } 

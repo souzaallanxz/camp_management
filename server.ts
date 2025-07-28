@@ -2238,6 +2238,57 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   }
 }) as any);
 
+// Create independent snackbar transaction (not associated with any camper or staff)
+app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { amount, payment_method, phone_number, description } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: 'Amount is required' });
+    }
+
+    if (!payment_method) {
+      return res.status(400).json({ error: 'Payment method is required' });
+    }
+
+    const now = new Date().toISOString();
+
+    // Create payment in the payments table with NULL registration_id
+    const result = await sql`
+      INSERT INTO payments (
+        registration_id,
+        payment_date,
+        payment_method,
+        amount,
+        payment_status,
+        phone_number,
+        description,
+        created_at,
+        updated_at
+      ) VALUES (
+        NULL,
+        ${now},
+        ${payment_method},
+        ${amount},
+        'confirmed',
+        ${phone_number || null},
+        ${description || null},
+        ${now},
+        ${now}
+      ) RETURNING *
+    `;
+
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error('Error creating independent payment:', error);
+    res.status(500).json({ error: 'Error creating independent payment', details: error.message });
+  }
+}) as any);
+
 // Liquidate snackbar balance for a camper
 app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
