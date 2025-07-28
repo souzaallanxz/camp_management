@@ -74,9 +74,17 @@ const snackbarBalanceColumns: ColumnDef<SnackbarBalanceRecord>[] = [
             <Badge variant="default" className="text-xs">
               Confirmado
             </Badge>
-          ) : (
+          ) : paymentStatus === 'pending' ? (
             <Badge variant="secondary" className="text-xs">
               Pendente
+            </Badge>
+          ) : paymentStatus === 'expired' ? (
+            <Badge variant="destructive" className="text-xs">
+              Expirado
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">
+              {paymentStatus}
             </Badge>
           )}
         </div>
@@ -116,11 +124,13 @@ export function CamperDetails({ camperId, onOpenChange, onSuccess }: CamperDetai
         ])
         
         setCamper(data)
-        setFormData({
-          ...data,
-          camp: typeof data.camp === 'string' ? data.camp : (data.camp as any)?.name || '',
-          date_of_birth: typeof data.date_of_birth === 'string' ? data.date_of_birth : (data.date_of_birth as any)?.toString() || ''
-        })
+        if (data) {
+          setFormData({
+            ...data,
+            camp: typeof data.camp === 'string' ? data.camp : (data.camp as { name?: string })?.name || '',
+            date_of_birth: typeof data.date_of_birth === 'string' ? data.date_of_birth : (data.date_of_birth as Date)?.toString() || ''
+          } as Partial<Camper>)
+        }
         setSnackbarBalanceRecords(balanceRecords)
         setTotalSpent(total)
         setTotalLoaded(loaded)

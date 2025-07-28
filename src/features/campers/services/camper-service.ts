@@ -69,6 +69,7 @@ interface SnackbarBalanceRecord {
   payment_status: string;
   phone_number?: string;
   created_at: string;
+  updated_at: string;
 }
 
 
@@ -273,8 +274,10 @@ export const camperService = {
       }
       
       const data = await response.json();
-      // Calcular total carregado somando todos os registros de snackbar_balance
-      const totalLoaded = data.reduce((sum: number, record: SnackbarBalanceRecord) => sum + Number(record.amount), 0);
+      // Calcular total carregado somando apenas registros confirmados (excluindo expired)
+      const totalLoaded = data
+        .filter((record: SnackbarBalanceRecord) => record.payment_status !== 'expired')
+        .reduce((sum: number, record: SnackbarBalanceRecord) => sum + Number(record.amount), 0);
       
       return totalLoaded;
     } catch {
@@ -309,7 +312,9 @@ export const camperService = {
         return [];
       }
       
-      return await response.json();
+      const data = await response.json();
+      // Filtrar apenas registros que não estão expirados
+      return data.filter((record: SnackbarBalanceRecord) => record.payment_status !== 'expired');
     } catch {
       return [];
     }
