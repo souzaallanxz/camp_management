@@ -14,6 +14,7 @@ export const snackBarTransactionResponseSchema = z.object({
   id: z.string(),
   camper_id: z.string(),
   amount: z.number(),
+  is_liquidated: z.boolean().optional(),
   created_at: z.string(),
   camper: z.object({
     id: z.string(),
@@ -36,4 +37,16 @@ export interface CamperWithBalance {
     id: string
     camp_id: string
   }
-} 
+  form_id?: string | null
+  type?: 'camper'
+}
+
+export interface StaffWithBalance {
+  id: string
+  name: string
+  total_balance: number
+  camp_id: string
+  type: 'staff'
+}
+
+export type PersonWithBalance = CamperWithBalance | StaffWithBalance 

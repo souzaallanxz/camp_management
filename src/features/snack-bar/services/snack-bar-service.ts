@@ -1,4 +1,5 @@
 import { api, hasTeamId } from '@/lib/api-client'
+import { staffService } from '@/features/staff/services/staff-service'
 import type { 
   SnackBarTransaction, 
   SnackBarTransactionResponse,
@@ -13,93 +14,155 @@ interface CamperResponse {
   camp_id: string
 }
 
+interface StaffWithBalance {
+  id: string
+  name: string
+  total_balance: number
+  camp_id: string
+  type: 'staff'
+}
+
+interface SimplePerson {
+  id: string
+  name: string
+  email: string
+  contact: string
+  form_id?: string | null
+  camp_name: string
+  type: 'camper' | 'staff'
+}
+
 export const snackBarService = {
   async getCurrentCamp() {
     // First check if we have a team ID
     if (!hasTeamId()) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('Cannot get current camp: No team ID available');
-      }
       return null;
     }
     
     try {
-      // First try to get current active camp
-      const response = await api.get('/api/camps/current');
+      // Use the backend endpoint that has the correct logic for current camp
+      const response = await api.get('/camps/current');
       if (response.data) {
         return response.data;
       }
       
-      // If no current camp, get the most recent or upcoming camp
-      const allCampsResponse = await api.get('/api/camps');
-      if (allCampsResponse.data && Array.isArray(allCampsResponse.data) && allCampsResponse.data.length > 0) {
-        const camps = allCampsResponse.data;
-        const today = new Date();
-        
-        // Try to find an upcoming camp
-        const upcomingCamps = camps.filter(camp => new Date(camp.start_date) > today)
-          .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
-        
-        if (upcomingCamps.length > 0) {
-          return upcomingCamps[0]; // Return the closest upcoming camp
-        }
-        
-        // If no upcoming camps, return the most recently ended camp
-        const pastCamps = camps.filter(camp => new Date(camp.end_date) < today)
-          .sort((a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime());
-        
-        if (pastCamps.length > 0) {
-          return pastCamps[0]; // Return the most recently ended camp
-        }
-        
-        // If all else fails, return the first camp in the list
-        return camps[0];
-      }
-      
       return null;
-    } catch (error) {
-      // Use console.warn instead of console.error to avoid linter issues
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('Error getting current camp');
-      }
-      
-      // Try fallback approach directly
-      try {
-        const allCampsResponse = await api.get('/api/camps');
-        if (allCampsResponse.data && Array.isArray(allCampsResponse.data) && allCampsResponse.data.length > 0) {
-          return allCampsResponse.data[0]; // Return first camp as fallback
-        }
-      } catch (_) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('Error in fallback camp fetch');
-        }
-      }
-      
+    } catch {
       return null;
     }
   },
 
   async getCampers(campId?: string): Promise<CamperWithBalance[]> {
     try {
-      const url = campId ? `/api/campers?camp_id=${campId}` : '/api/campers'
+      const url = campId ? `/campers?camp_id=${campId}` : '/campers'
       const response = await api.get(url)
-      return response.data.map((camper: CamperResponse & { registration_name?: string }) => ({
+      return response.data.map((camper: CamperResponse & { registration_name?: string, form_id?: string | null }) => ({
         id: camper.id,
         name: camper.name || camper.registration_name || 'Sem nome',
         snack_bar_balance: Number(camper.snack_bar_balance) || 0,
         registration: {
           id: camper.registration_id,
           camp_id: camper.camp_id
-        }
+        },
+        form_id: camper.form_id ?? null,
+        type: 'camper' as const
       }))
     } catch {
       return []
     }
   },
 
+  async getStaff(): Promise<StaffWithBalance[]> {
+    try {
+      const staff = await staffService.findAll()
+      return staff.map((member) => ({
+        id: member.id,
+        name: member.name,
+        total_balance: Number(member.total_balance) || 0,
+        camp_id: member.camp_id,
+        type: 'staff' as const
+      }))
+    } catch {
+      return []
+    }
+  },
+
+  async getCampersAndStaff(campId?: string): Promise<(CamperWithBalance | StaffWithBalance)[]> {
+    try {
+      // Use the new optimized endpoint that returns both campers and staff in one call
+      const url = campId ? `/people/simple?camp_id=${campId}` : '/people/simple'
+      const response = await api.get(url)
+      
+      // Transform the simple data to match the expected format
+      return response.data.map((person: SimplePerson) => {
+        if (person.type === 'staff') {
+          return {
+            id: person.id,
+            name: person.name,
+            total_balance: 0, // Will be calculated when needed
+            camp_id: person.camp_name, // Using camp_name as camp_id for compatibility
+            type: 'staff' as const
+          }
+        } else {
+          return {
+            id: person.id,
+            name: person.name,
+            snack_bar_balance: 0, // Will be calculated when needed
+            registration: {
+              id: '', // Not available in simple endpoint
+              camp_id: person.camp_name // Using camp_name as camp_id for compatibility
+            },
+            form_id: person.form_id,
+            type: 'camper' as const
+          }
+        }
+      })
+    } catch {
+      return []
+    }
+  },
+
+  async getPersonById(id: string): Promise<CamperWithBalance | StaffWithBalance | null> {
+    try {
+      // Primeiro tentar buscar como camper
+      try {
+        const response = await api.get(`/campers/${id}`)
+        const camper = response.data as CamperResponse & { form_id?: string | null }
+        return {
+          id: camper.id,
+          name: camper.name,
+          snack_bar_balance: Number(camper.snack_bar_balance) || 0,
+          registration: {
+            id: camper.registration_id,
+            camp_id: camper.camp_id
+          },
+          form_id: camper.form_id ?? null,
+          type: 'camper' as const
+        }
+      } catch {
+        // Se não for camper, tentar como staff
+        try {
+          const response = await api.get(`/staff/${id}`)
+          const staff = response.data
+          return {
+            id: staff.id,
+            name: staff.name,
+            total_balance: Number(staff.total_balance) || 0,
+            camp_id: staff.camp_id,
+            type: 'staff' as const
+          }
+        } catch {
+          return null
+        }
+      }
+    } catch {
+      return null
+    }
+  },
+
   async getCamperById(id: string): Promise<CamperWithBalance> {
-    const response = await api.get(`/api/campers/${id}`)
-    const camper = response.data as CamperResponse
+    const response = await api.get(`/campers/${id}`)
+    const camper = response.data as CamperResponse & { form_id?: string | null }
     return {
       id: camper.id,
       name: camper.name,
@@ -107,7 +170,8 @@ export const snackBarService = {
       registration: {
         id: camper.registration_id,
         camp_id: camper.camp_id
-      }
+      },
+      form_id: camper.form_id ?? null
     }
   },
 
@@ -118,28 +182,23 @@ export const snackBarService = {
     }
     
     try {
-      console.log('Creating transaction with data:', {
-        camper_id: transaction.camper_id,
-        amount: transaction.amount,
-        teamId: localStorage.getItem('teamId') || localStorage.getItem('team_id')
-      })
-
-      const response = await api.post('/api/snackbar-transactions', {
-        camper_id: transaction.camper_id,
-        amount: transaction.amount
-      })
+      // Determinar se é um camper ou staff baseado no tipo
+      const allPeople = await this.getCampersAndStaff()
+      const person = allPeople.find(p => p.id === transaction.camper_id)
+      const isStaff = person?.type === 'staff'
+      
+      // Garantir que o amount seja um número
+      const amount = Number(transaction.amount)
+      
+      const payload = isStaff 
+        ? { staff_id: transaction.camper_id, amount: amount }
+        : { camper_id: transaction.camper_id, amount: amount }
+      
+      const response = await api.post('/snackbar-transactions', payload)
       return response.data
-    } catch (error: any) {
-      console.error('Erro ao criar transação:', {
-        error: error?.response?.data || error?.message || error,
-        status: error?.response?.status,
-        headers: error?.response?.headers,
-        requestData: {
-          camper_id: transaction.camper_id,
-          amount: transaction.amount
-        }
-      })
-      throw new Error(error?.response?.data?.error || 'Erro ao processar transação')
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao processar transação'
+      throw new Error(errorMessage)
     }
   },
 
@@ -149,8 +208,20 @@ export const snackBarService = {
     }
     
     try {
-      const response = await api.get(`/api/snackbar-transactions/${camper_id}`)
-      return response.data
+      // Determinar se é um camper ou staff baseado no tipo
+      const allPeople = await this.getCampersAndStaff()
+      const person = allPeople.find(p => p.id === camper_id)
+      const isStaff = person?.type === 'staff'
+      
+      if (isStaff) {
+        // Para staff, buscar transações usando staff_id
+        const response = await api.get(`/snackbar-transactions/staff/${camper_id}`)
+        return response.data
+      } else {
+        // Para campers, usar o endpoint existente
+        const response = await api.get(`/snackbar-transactions/${camper_id}`)
+        return response.data
+      }
     } catch {
       return []
     }
@@ -161,8 +232,18 @@ export const snackBarService = {
       return
     }
     
-    // Get current balance
-    const balanceResponse = await api.get(`/api/snackbar-balance/${transaction.camper_id}`)
+    // Determinar se é um camper ou staff baseado no tipo
+    const allPeople = await this.getCampersAndStaff()
+    const person = allPeople.find(p => p.id === transaction.camper_id)
+    const isStaff = person?.type === 'staff'
+    
+    // Get current balance using the appropriate endpoint
+    let balanceResponse
+    if (isStaff) {
+      balanceResponse = await api.get(`/snackbar-balance/staff/${transaction.camper_id}`)
+    } else {
+      balanceResponse = await api.get(`/snackbar-balance/${transaction.camper_id}`)
+    }
     const currentBalance = balanceResponse.data.balance
     
     // Verify if has sufficient balance
@@ -174,89 +255,125 @@ export const snackBarService = {
     await this.createTransaction(transaction)
   },
 
-  async getCamperBalance(camperId: string) {
-    if (!camperId) {
-      return 0
+
+
+  async getPersonData(personId: string): Promise<{ 
+    person: CamperWithBalance | StaffWithBalance | null; 
+    balance: number; 
+    payment_status: string; 
+    transactions: SnackBarTransactionResponse[] 
+  }> {
+    if (!personId) {
+      return { 
+        person: null, 
+        balance: 0, 
+        payment_status: 'confirmed', 
+        transactions: [] 
+      }
     }
     
     try {
-      const response = await api.get(`/api/snackbar-balance/${camperId}`)
-      // A resposta agora contém balance, total_deposit e total_spent
-      return response.data.balance
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('Error getting camper balance:', error)
+      // Use the new optimized endpoint that gets person with balance in one call
+      const personResponse = await api.get(`/people/${personId}`)
+      const person = personResponse.data
+      
+      if (!person) {
+        return { 
+          person: null, 
+          balance: 0, 
+          payment_status: 'confirmed', 
+          transactions: [] 
+        }
       }
-      return 0
+      
+      const isStaff = person.type === 'staff'
+      
+      // Get transactions using the appropriate endpoint
+      const transactionsResponse = await api.get(
+        isStaff 
+          ? `/snackbar-transactions/staff/${personId}`
+          : `/snackbar-transactions/${personId}`
+      )
+      
+      const balance = person.snack_bar_balance || 0
+      const payment_status = person.payment_status || 'confirmed'
+      const transactions = transactionsResponse.data || []
+      
+      // Transform person to match expected format
+      const transformedPerson = isStaff 
+        ? {
+            id: person.id,
+            name: person.name,
+            total_balance: balance,
+            camp_id: person.camp_name,
+            type: 'staff' as const
+          }
+        : {
+            id: person.id,
+            name: person.name,
+            snack_bar_balance: balance,
+            registration: {
+              id: '', // Not available in this endpoint
+              camp_id: person.camp_name
+            },
+            form_id: person.form_id,
+            type: 'camper' as const
+          }
+      
+      return {
+        person: transformedPerson,
+        balance,
+        payment_status,
+        transactions
+      }
+    } catch {
+      return { 
+        person: null, 
+        balance: 0, 
+        payment_status: 'confirmed', 
+        transactions: [] 
+      }
     }
   },
 
   async getAllTransactions(campId?: string): Promise<SnackBarTransactionResponse[]> {
     if (!campId) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('No campId provided to getAllTransactions');
-      }
       return [];
     }
     
     // Ensure team ID is available
     if (!hasTeamId()) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('No team ID available when fetching transactions');
-      }
       return [];
     }
     
     try {
-      // Try both endpoints, starting with the API prefixed one
-      try {
-        const response = await api.get(`/api/snackbar-transactions?camp_id=${campId}`, {
-          timeout: 8000 // 8 second timeout
-        });
-        
-        if (Array.isArray(response.data)) {
-          return response.data;
-        }
-      } catch (_) {
-        // Silent fail, try next endpoint
-      }
+      // Try the correct endpoint without /api prefix
+      const response = await api.get(`/snackbar-transactions?camp_id=${campId}`, {
+        timeout: 8000 // 8 second timeout
+      });
       
-      // If the first endpoint fails, try the one without /api prefix
-      try {
-        const fallbackResponse = await api.get(`/snackbar-transactions?camp_id=${campId}`, {
-          timeout: 8000
-        });
-        
-        if (Array.isArray(fallbackResponse.data)) {
-          return fallbackResponse.data;
-        }
-      } catch (_) {
-        // Silent fail, try next approach
-      }
-      
-      // If both fail, try the debug endpoint
-      const debugResponse = await api.get(`/api/debug/snackbar-transactions?campId=${campId}`);
-      
-      if (debugResponse.data && Array.isArray(debugResponse.data.sample_transactions)) {
-        return debugResponse.data.sample_transactions.map((t: Record<string, any>) => ({
-          id: t.id,
-          camper_id: t.camper_id,
-          amount: Number(t.amount),
-          created_at: t.created_at,
-          camper: t.camper_name ? {
-            id: t.camper_id,
-            name: t.camper_name,
-            registration: {
-              id: t.registration_id,
-              camp_id: t.camp_id
-            }
-          } : undefined
-        }));
+      if (Array.isArray(response.data)) {
+        return response.data;
       }
       
       return [];
-    } catch (_) {
+    } catch {
       return [];
+    }
+  },
+
+  async createIndependentPayment(data: {
+    amount: number
+    payment_method: string
+    phone_number?: string | null
+    description?: string | null
+  }): Promise<any> {
+    try {
+      const response = await api.post('/snackbar-transactions/independent', data)
+      return response.data
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao criar pagamento independente'
+      throw new Error(errorMessage)
     }
   }
 } 

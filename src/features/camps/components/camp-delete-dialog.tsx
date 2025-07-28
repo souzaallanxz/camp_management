@@ -12,7 +12,7 @@ import {
 import { type Camp } from '../data/schema'
 import { toast } from 'sonner'
 import { useState } from 'react'
-import { db } from '@/lib/db'
+import { campService } from '../services/camp-service'
 
 interface CampDeleteDialogProps {
   open: boolean
@@ -35,29 +35,19 @@ export function CampDeleteDialog({
 
     try {
       // First check if we can delete the camp
-      const { data: registrations, error: registrationsError } = await db.query(
-        'SELECT id FROM registrations WHERE camp_id = $1 LIMIT 1',
-        [camp.id]
-      )
+      const canDeleteResult = await campService.canDelete(camp.id)
 
-      if (registrationsError) {
-        throw new Error(`Error checking registrations: ${registrationsError.message}`)
-      }
-
-      if (registrations && registrations.length > 0) {
+      if (!canDeleteResult.canDelete) {
         toast.error('Não é possível excluir um acampamento que possui inscrições. Por favor, exclua todas as inscrições primeiro.')
         setIsDeleting(false)
         return
       }
 
       // Delete the camp
-      const { error: deleteError } = await db.query(
-        'DELETE FROM camps WHERE id = $1',
-        [camp.id]
-      )
+      const success = await campService.delete(camp.id)
 
-      if (deleteError) {
-        throw new Error(`Error deleting camp: ${deleteError.message}`)
+      if (!success) {
+        throw new Error('Failed to delete camp')
       }
 
       toast.success('Acampamento excluído com sucesso')

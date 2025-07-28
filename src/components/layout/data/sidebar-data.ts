@@ -1,10 +1,7 @@
 import {
   IconLayoutDashboard,
   IconSettings,
-  IconTool,
   IconPalette,
-  IconNotification,
-  IconBrowserCheck,
   IconUserCog,
   IconFileDescription,
   IconTent,
@@ -12,12 +9,16 @@ import {
   IconIceCream,
   IconUsers,
   IconWebhook,
+  IconBuildingCommunity,
+  IconCreditCard,
+  IconUsersGroup,
 } from '@tabler/icons-react'
 import { Command } from 'lucide-react'
 import { type SidebarData, type NavItem } from '../types'
 import { useUser } from '@/features/auth/hooks/use-user'
 import { useTeamData } from '@/features/teams/hooks/use-team-data'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useMemo } from 'react'
 
 // Default sidebar data without user info
 export const sidebarData: SidebarData = {
@@ -28,14 +29,14 @@ export const sidebarData: SidebarData = {
   },
   teams: [
     {
-      name: 'Palavra da Vida',
+      name: 'Equipa',
       logo: Command,
       plan: 'Standard Plan',
     },
   ],
   navGroups: [
     {
-      title: 'General',
+      title: 'Geral',
       items: [
         {
           title: 'Dashboard',
@@ -75,24 +76,29 @@ export const sidebarData: SidebarData = {
       ],
     },
     {
-      title: 'Other',
+      title: 'Outros',
       items: [
         {
-          title: 'Settings',
+          title: 'Definições',
           icon: IconSettings,
           items: [
             {
-              title: 'Profile',
+              title: 'Perfil',
               url: '/settings',
               icon: IconUserCog,
             },
             {
-              title: 'Account',
-              url: '/settings/account',
-              icon: IconTool,
+              title: 'Organização',
+              url: '/settings/organization',
+              icon: IconBuildingCommunity,
             },
             {
-              title: 'Appearance',
+              title: 'Faturação',
+              url: '/settings/billing',
+              icon: IconCreditCard,
+            },
+            {
+              title: 'Aparência',
               url: '/settings/appearance',
               icon: IconPalette,
             },
@@ -103,115 +109,156 @@ export const sidebarData: SidebarData = {
   ],
 }
 
-// Hook version with user info
+// Hook version with user info - OPTIMIZED to prevent unnecessary API calls
 export function useSidebarData(): SidebarData & { isLoading: boolean } {
   const user = useUser()
-  const { teams: dbTeams, isLoading } = useTeamData()
+  const { teams: dbTeams, isLoading: teamsLoading } = useTeamData()
   const permissions = useTeamPermissions()
 
-  const teams = dbTeams.map(team => ({
-    name: team.name,
-    logo: Command,
-    plan: team.tier === 'premium' ? 'Premium' : 'Free',
-  }))
+  // Se ainda está carregando informações do usuário ou permissões, não mostrar itens
+  const isLoading = user.isLoading || permissions.isLoading || teamsLoading
 
-  const generalItems: NavItem[] = [
-    {
-      title: 'Dashboard',
-      url: '/',
-      icon: IconLayoutDashboard,
-    },
-    {
-      title: 'Inscrições',
-      url: '/registrations',
-      icon: IconFileDescription,
-    },
-    {
-      title: 'Campistas',
-      url: '/campers',
-      icon: IconTent,
-    },
-  ]
+  // Memoize teams to prevent unnecessary re-renders
+  const teams = useMemo(() => {
+    return dbTeams.map(team => ({
+      name: team.name,
+      logo: Command,
+      plan: team.tier === 'premium' ? 'Premium' : 'Free',
+    }))
+  }, [dbTeams])
 
-  // Only show Users menu item for superadmin and admin roles
-  if (user?.role === 'superadmin' || user?.role === 'admin') {
-    generalItems.push({
-      title: 'Usuários',
-      url: '/users',
-      icon: IconUsers,
-    })
-  }
+  // Memoize general items to prevent unnecessary re-computations
+  const generalItems = useMemo((): NavItem[] => {
+    // Se ainda está carregando, não mostrar nenhum item
+    if (isLoading) {
+      return []
+    }
 
-  generalItems.push({
-    title: 'Acampamentos',
-    url: '/camps',
-    icon: IconCampfire,
-  })
+    const items: NavItem[] = []
 
-  if (permissions.snackBar.access) {
-    generalItems.push({
-      title: 'Snack Bar',
-      url: '/snack-bar',
-      icon: IconIceCream,
-    })
-  }
+    // Se for cashier, só mostra Dashboard e Snack Bar
+    if (user?.role === 'cashier') {
+      items.push({
+        title: 'Dashboard',
+        url: '/',
+        icon: IconLayoutDashboard,
+      })
+      if (permissions.campers?.viewList) {
+        items.push({
+          title: 'Campistas',
+          url: '/campers',
+          icon: IconTent,
+        })
+      }
+      if (permissions.snackBar.access) {
+        items.push({
+          title: 'Snack Bar',
+          url: '/snack-bar',
+          icon: IconIceCream,
+        })
+      }
+    } else {
+      items.push({
+        title: 'Dashboard',
+        url: '/',
+        icon: IconLayoutDashboard,
+      })
+      items.push({
+        title: 'Inscrições',
+        url: '/registrations',
+        icon: IconFileDescription,
+      })
+      items.push({
+        title: 'Campistas',
+        url: '/campers',
+        icon: IconTent,
+      })
+      if (permissions.staff?.viewList) {
+        items.push({
+          title: 'Staff',
+          url: '/staff',
+          icon: IconUsersGroup,
+        })
+      }
+      // Only show Users menu item for superadmin and admin roles
+      if (user?.role === 'superadmin' || user?.role === 'admin') {
+        items.push({
+          title: 'Utilizadores',
+          url: '/users',
+          icon: IconUsers,
+        })
+      }
+      items.push({
+        title: 'Acampamentos',
+        url: '/camps',
+        icon: IconCampfire,
+      })
+      if (permissions.snackBar.access) {
+        items.push({
+          title: 'Snack Bar',
+          url: '/snack-bar',
+          icon: IconIceCream,
+        })
+      }
+      items.push({
+        title: 'Integrações',
+        url: '/integrations',
+        icon: IconWebhook,
+      })
+    }
 
-  // Add Integrations to the menu
-  generalItems.push({
-    title: 'Integrações',
-    url: '/integrations',
-    icon: IconWebhook,
-  })
+    return items
+  }, [isLoading, user?.role, permissions.snackBar.access, permissions.campers?.viewList, permissions.staff?.viewList])
 
-  return {
+  // Memoize the entire sidebar data to prevent unnecessary re-renders
+  const sidebarDataValue = useMemo(() => ({
     user: {
       name: user?.user?.name ?? user?.email ?? 'User',
       email: user?.email ?? '',
       avatar: '/avatars/shadcn.jpg',
     },
     teams,
-    isLoading,
     navGroups: [
       {
-        title: 'General',
+        title: 'Geral',
         items: generalItems,
       },
       {
-        title: 'Other',
+        title: 'Outros',
         items: [
           {
-            title: 'Settings',
+            title: 'Definições',
             icon: IconSettings,
             items: [
               {
-                title: 'Profile',
+                title: 'Perfil',
                 url: '/settings',
                 icon: IconUserCog,
               },
               {
-                title: 'Account',
-                url: '/settings/account',
-                icon: IconTool,
+                title: 'Organização',
+                url: '/settings/organization',
+                icon: IconBuildingCommunity,
               },
               {
-                title: 'Appearance',
+                title: 'Faturação',
+                url: '/settings/billing',
+                icon: IconCreditCard,
+              },
+              {
+                title: 'Aparência',
                 url: '/settings/appearance',
                 icon: IconPalette,
-              },
-              {
-                title: 'Notifications',
-                url: '/settings/notifications',
-                icon: IconNotification,
-              },
-              {
-                title: 'Display',
-                url: '/settings/display',
-                icon: IconBrowserCheck,
-              },
+              }
             ],
           },
         ],
       },
     ],
+  }), [user?.user?.name, user?.email, teams, generalItems])
+
+  return {
+    ...sidebarDataValue,
+    isLoading,
   }
 }

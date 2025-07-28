@@ -13,9 +13,9 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { db } from '@/lib/db'
 import { useTheme } from '@/context/theme-context'
 import { useState, useEffect } from 'react'
+import { getCurrentUserProfile, updateCurrentUserProfile } from '@/features/auth/auth-service'
 
 const appearanceFormSchema = z.object({
   theme: z.enum(['light', 'dark'], {
@@ -40,22 +40,10 @@ export function AppearanceForm() {
   useEffect(() => {
     async function loadUserData() {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          throw new Error('No token found')
-        }
-
-        const { data: userData, error } = await db.query(
-          `SELECT id, email, name, theme FROM public.users WHERE id = $1::uuid`,
-          [token]
-        )
-
-        if (error) {
-          throw new Error(`Error loading user data: ${String(error)}`)
-        }
-
-        if (userData && userData.length > 0) {
-          const theme = userData[0].theme || 'light'
+        const profileData = await getCurrentUserProfile()
+        
+        if (profileData && profileData.user) {
+          const theme = profileData.user.theme || 'light'
           form.reset({ theme })
           setTheme(theme)
         }
@@ -79,26 +67,10 @@ export function AppearanceForm() {
     setIsSaving(true)
 
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No token found')
-      }
-
-      const { data: result, error } = await db.query(
-        `UPDATE public.users
-         SET theme = $1::text
-         WHERE id = $2::uuid
-         RETURNING id, email, name, theme`,
-        [data.theme, token]
-      )
-
-      if (error) {
-        throw new Error(`Error updating user data: ${String(error)}`)
-      }
-
-      if (!result || result.length === 0) {
-        throw new Error(`Failed to update user data`)
-      }
+      await updateCurrentUserProfile({
+        name: '', // This will be ignored by the backend since we're only updating theme
+        theme: data.theme
+      })
 
       setTheme(data.theme)
       toast({
@@ -194,7 +166,7 @@ export function AppearanceForm() {
           )}
         />
         <Button type="submit" disabled={isLoading || isSaving}>
-          {isSaving ? 'A guardar...' : 'Guardar'}
+          {isSaving ? 'Salvando...' : 'Salvar'}
         </Button>
       </form>
     </Form>

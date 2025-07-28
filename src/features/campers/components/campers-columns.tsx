@@ -1,9 +1,8 @@
 import { type ColumnDef } from '@tanstack/react-table'
 import { type Camper } from '../data/schema'
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header'
-import LongText from '@/components/long-text'
 import { Button } from '@/components/ui/button'
-import { IconEdit, IconDotsVertical, IconCreditCard } from '@tabler/icons-react'
+import { IconEdit, IconDotsVertical, IconCreditCard, IconCash, IconAlertTriangle } from '@tabler/icons-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +18,14 @@ export interface CamperWithActions extends Omit<Camper, 'camp'> {
   onEdit?: (camper: Camper) => void
   onLoadCard?: (camper: Camper) => void
   onUpgradeClick?: () => void
+  onLiquidateSnackbar?: (camper: Camper) => void
   snack_bar_balance?: string | number
   total_balance: number
   camp?: string | { name?: string }
+  payment_status?: string
+  totalLoaded?: number
+  totalSpent?: number
+  totalLiquidated?: number
 }
 
 export const columns: ColumnDef<CamperWithActions>[] = [
@@ -51,43 +55,77 @@ export const columns: ColumnDef<CamperWithActions>[] = [
     ),
   },
   {
-    accessorKey: 'camp',
+    accessorKey: 'camp_name',
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Acampamento" />
     ),
-    cell: ({ row }) => {
-      const camp = row.original.camp;
-      // Verificar se camp é objeto e tem propriedade name, ou é string
-      if (typeof camp === 'object' && camp?.name) {
-        return camp.name;
-      }
-      return camp || '-';
+    cell: ({ row }) => row.getValue('camp_name') || '-',
+    enableColumnFilter: true,
+    filterFn: (row, id, value) => {
+      const campName = row.getValue(id);
+      return Array.isArray(value) ? value.includes(campName) : false;
     }
   },
   {
-    accessorKey: 'snack_bar_balance',
+    accessorKey: 'totalLoaded',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Saldo" />
+      <DataTableColumnHeader column={column} title="Saldo Carregado" />
     ),
     cell: ({ row }) => {
-      const balance = Number(row.original.snack_bar_balance) || 0
+      const totalLoaded = Number(row.original.totalLoaded) || 0
+      const payment_status = row.original.payment_status || 'confirmed'
+      
+      // Color logic: black for confirmed payments, yellow for pending payments
+      let colorClass = 'text-black' // Default: black
+      if (totalLoaded > 0 && payment_status !== 'confirmed') {
+        colorClass = 'text-yellow-600' // Yellow: pending payments
+      }
+      
       return (
-        <div className={`font-medium ${balance > 0 ? 'text-green-600' : 'text-red-600'}`}>
-          {formatCurrency(balance)}
+        <div className={`font-medium ${colorClass}`}>
+          {formatCurrency(totalLoaded)}
         </div>
       )
     },
   },
   {
-    accessorKey: 'additional_notes',
+    accessorKey: 'totalSpent',
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Notas" />
+      <DataTableColumnHeader column={column} title="Saldo Utilizado" />
     ),
     cell: ({ row }) => {
-      const notes = row.getValue('additional_notes') as string
-      return notes ? <LongText>{notes}</LongText> : '-'
+      const totalSpent = Number(row.original.totalSpent) || 0
+      const totalLoaded = row.original.totalLoaded || 0
+      const difference = totalLoaded - totalSpent
+      
+      return (
+        <div className="flex items-center gap-2">
+          <div className="font-medium text-red-600">
+            {formatCurrency(totalSpent)}
+          </div>
+          {difference < 0 && (
+            <IconAlertTriangle className="h-4 w-4 text-yellow-500" />
+          )}
+        </div>
+      )
     },
   },
+  {
+    accessorKey: 'totalLiquidated',
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Saldo Liquidado" />
+    ),
+    cell: ({ row }) => {
+      const totalLiquidated = Number(row.original.totalLiquidated) || 0
+      
+      return (
+        <div className="font-medium text-black">
+          {formatCurrency(totalLiquidated)}
+        </div>
+      )
+    },
+  },
+
   {
     id: 'actions',
     cell: function ActionsCell({ row }) {
@@ -107,7 +145,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' className='w-[160px]'>
             <DropdownMenuItem
-              onClick={() => camper.onEdit?.(camper)}
+              onClick={() => camper.onEdit?.(camper as Camper)}
               className='flex items-center'
             >
               Editar
@@ -119,7 +157,7 @@ export const columns: ColumnDef<CamperWithActions>[] = [
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DropdownMenuItem
-                    onClick={() => permissions.campers.rechargeCard ? camper.onLoadCard?.(camper) : camper.onUpgradeClick?.()}
+                    onClick={() => permissions.campers.rechargeCard ? camper.onLoadCard?.(camper as Camper) : camper.onUpgradeClick?.()}
                     className='flex items-center'
                     disabled={!permissions.campers.rechargeCard}
                   >
@@ -136,6 +174,17 @@ export const columns: ColumnDef<CamperWithActions>[] = [
                 )}
               </Tooltip>
             </TooltipProvider>
+            
+            <DropdownMenuItem
+              onClick={() => camper.onLiquidateSnackbar?.(camper as Camper)}
+              className='flex items-center'
+              disabled={!camper.snack_bar_balance || Number(camper.snack_bar_balance) <= 0}
+            >
+              Liquidar Snackbar
+              <DropdownMenuShortcut>
+                <IconCash size={16} />
+              </DropdownMenuShortcut>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       )

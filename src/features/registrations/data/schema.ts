@@ -48,18 +48,19 @@ export const updateRegistrationSchema = registrationSchema
 
 export type UpdateRegistration = z.infer<typeof updateRegistrationSchema>
 
-export type PaymentMethod = 'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Desconto'
-export type PaymentStatus = 'confirmed' | 'not confirmed'
+export type PaymentMethod = 'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Desconto' | 'Multibanco'
+export type PaymentStatus = 'confirmed' | 'not confirmed' | 'expired'
 
 export const paymentSchema = z.object({
   id: z.number(),
   registration_id: z.string().uuid(),
   payment_date: z.string(),
-  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro', 'Desconto']),
-  payment_status: z.enum(['confirmed', 'not confirmed']),
+  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro', 'Desconto', 'Multibanco']),
+  payment_status: z.enum(['confirmed', 'not confirmed', 'expired']),
   amount: z.number(),
   payment_link: z.string().nullable(),
   phone_number: z.string().nullable(),
+  request_id: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string()
 })
@@ -70,10 +71,12 @@ export const registrationListSchema = z.array(registrationSchema)
 
 export const snackbarBalanceSchema = z.object({
   id: z.string().uuid(),
-  registration_id: z.string().uuid(),
+  registration_id: z.string().uuid().optional(),
+  staff_id: z.string().uuid().optional(),
   amount: z.number(),
-  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro']),
+  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro', 'Multibanco']),
   phone_number: z.string().nullable(),
+  request_id: z.string().nullable(),
   created_at: z.string().transform((str) => new Date(str)),
   updated_at: z.string().transform((str) => new Date(str))
 })
@@ -86,6 +89,7 @@ export const snackBarTransactionSchema = z.object({
   amount: z.number(),
   type: z.enum(['credit', 'debit']),
   description: z.string().optional().nullable(),
+  is_liquidated: z.boolean().default(false),
   created_at: z.string().or(z.date())
 })
 

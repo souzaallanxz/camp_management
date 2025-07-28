@@ -17,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import { buildApiUrl } from '@/services/api'
 
 type SetupPasswordFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -30,15 +31,12 @@ const formSchema = z.object({
   path: ['confirmPassword'],
 })
 
-// For production, directly use the correct API URL
-const API_BASE_URL = 'https://campmanagement.vercel.app/api';
-
 export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [passwordSet, setPasswordSet] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const search = useSearch({ from: '/(auth)/setup-password' })
-  const { token } = search
+  const { token, userId } = search
   const navigate = useNavigate()
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -50,26 +48,23 @@ export function SetupPasswordForm({ className, ...props }: SetupPasswordFormProp
   })
 
   async function onSubmit({ password }: z.infer<typeof formSchema>) {
-    if (!token) {
-      setError('Token de convite não encontrado')
+    if (!userId) {
+      setError('ID do utilizador não encontrado')
       return
     }
-
     setIsLoading(true)
     setError(null)
     try {
-      // Chama o backend para definir a senha usando o token
-      const response = await fetch(`${API_BASE_URL}/users/setup-account`, {
+      // Chama o backend para definir a senha usando o userId
+      const response = await fetch(buildApiUrl('/auth/setup-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ userId, password }),
       });
-
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Erro ao definir senha');
       }
-
       toast.success('Senha definida com sucesso!')
       setPasswordSet(true)
       // Redirect to sign in after 2 seconds

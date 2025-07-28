@@ -1,3 +1,6 @@
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { ProfileDropdown } from '@/components/profile-dropdown'
@@ -15,7 +18,6 @@ function IntegrationsContent() {
           <ProfileDropdown />
         </div>
       </Header>
-
       <Main>
         <div className='mb-2 flex items-center justify-between space-y-2 flex-wrap'>
           <div>
@@ -25,7 +27,6 @@ function IntegrationsContent() {
             </p>
           </div>
         </div>
-
         <div className='-mx-4 flex-1 overflow-auto px-4 py-1'>
           <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
             <WebhookIntegrationCard />
@@ -36,6 +37,19 @@ function IntegrationsContent() {
   )
 }
 
-export function IntegrationsFeature() {
+export default function IntegrationsFeature() {
+  const permissions = useTeamPermissions()
+  const navigate = useNavigate()
+  
+  useEffect(() => {
+    // Só verificar permissões após carregamento completo
+    if (!permissions.isLoading && !permissions.dashboard.viewOverview) {
+      navigate({ to: '/' })
+    }
+  }, [permissions, navigate])
+  
+  // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
+  if (permissions.isLoading || !permissions.dashboard.viewOverview) return null
+  
   return <IntegrationsContent />
 } 

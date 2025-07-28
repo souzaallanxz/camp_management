@@ -41,9 +41,14 @@ export const columns: ColumnDef<Payment>[] = [
         'not confirmed': 'bg-yellow-100 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-100',
       }
 
+      const statusText = {
+        confirmed: 'Confirmado',
+        'not confirmed': 'Pendente',
+      }
+
       return (
-        <Badge className={statusStyles[status]}>
-          {status === 'confirmed' ? 'Confirmado' : 'Pendente'}
+        <Badge className={statusStyles[status] || statusStyles['not confirmed']}>
+          {statusText[status] || 'Pendente'}
         </Badge>
       )
     },

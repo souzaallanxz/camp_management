@@ -15,9 +15,6 @@ export const Route = createFileRoute('/_authenticated')({
     } catch {
       throw redirect({
         to: '/sign-in',
-        search: {
-          redirect: window.location.pathname,
-        },
       })
     }
   },

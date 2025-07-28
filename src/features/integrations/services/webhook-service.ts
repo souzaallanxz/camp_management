@@ -33,7 +33,6 @@ class WebhookService {
     // Debug logging only in development
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
-      console.log(`[WebhookService] ${message}`, data)
     }
   }
 
@@ -143,6 +142,9 @@ class WebhookService {
     this.debug(`Starting webhook deactivation for ${webhookType}`)
     const config = await this.loadConfig()
     
+    // Debug: verificar se há dados do webhook
+    this.debug(`Webhook data for ${webhookType}:`, config.hookdeckData[webhookType])
+    
     try {
       // Cleanup in Hookdeck via backend
       const webhookData = config.hookdeckData[webhookType]
@@ -151,7 +153,8 @@ class WebhookService {
           data: {
             connectionId: webhookData.connectionId,
             sourceId: webhookData.sourceId,
-            destinationId: webhookData.destinationId
+            destinationId: webhookData.destinationId,
+            webhookType: webhookType
           }
         })
       }
@@ -171,8 +174,12 @@ class WebhookService {
         }
       }
       
+      // Check if any webhooks are still active
+      const hasActiveWebhooks = updatedConfig.registrationWebhook || updatedConfig.paymentWebhook
+      updatedConfig.isConnected = hasActiveWebhooks
+      
       await this.saveConfig(updatedConfig)
-      this.debug('Webhook disabled successfully')
+      this.debug(`Webhook ${webhookType} disabled successfully. isConnected: ${updatedConfig.isConnected}`)
       return updatedConfig
     } catch (error) {
       this.debugError('Error disabling webhook:', error)

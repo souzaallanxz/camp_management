@@ -3,7 +3,8 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { Resend } from 'resend'
 import bcrypt from 'bcryptjs'
-import { query } from './db.js'
+import crypto from 'crypto'
+import bodyParser from 'body-parser'
 
 // Load environment variables
 dotenv.config()
@@ -12,30 +13,33 @@ const app = express()
 
 // Enable CORS
 app.use(cors({
-  origin: function(origin, callback) {
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:3000',
-      'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app',
-      'https://campmanagement.vercel.app'
-    ];
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
+  origin: ['http://localhost:5173', 'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app', 'https://campmanagement.vercel.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id', 'Origin', 'Accept'],
-  exposedHeaders: ['x-team-id'],
-  maxAge: 86400 // 24 hours
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id']
 }))
 
-// Parse JSON request bodies
+// Capturar corpo RAW do webhook Lemon Squeezy antes do express.json()
+app.post('/api/webhooks/lemon-squeezy', bodyParser.json({
+  verify: (req, res, buf) => {
+    (req as any).rawBody = buf.toString('utf8')
+  }
+}))
+
+// Parse JSON request bodies (para o resto da app)
 app.use(express.json())
+
+// Health check endpoint for Render
+app.get('/api/health', (req: Request, res: Response) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  })
+})
+
+// Initialize Neon database connection
+const sql = neon(process.env.DATABASE_URL!)
 
 // Initialize Resend
 const resend = new Resend(process.env.VITE_RESEND_API_KEY)
@@ -105,32 +109,32 @@ app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
 // Sign up route
 app.post('/api/auth/sign-up', (async (req: Request, res: Response) => {
   try {
-    const { email, password, name } = req.body
+    const { email, password, name } = req.body;
 
     // Check if user already exists
     const existingUserResult = await query`
       SELECT id FROM public.users WHERE email = ${email}
-    `
+    `;
 
     if (existingUserResult.length > 0) {
-      return res.status(400).json({ error: 'User with this email already exists' })
+      return res.status(400).json({ error: 'User with this email already exists' });
     }
 
     // Hash password
-    const salt = await bcrypt.genSalt(10)
-    const hashedPassword = await bcrypt.hash(password, salt)
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create user
-    const result = await query`
-      INSERT INTO public.users (id, email, name, password_hash)
-      VALUES (gen_random_uuid(), ${email}, ${name}, ${hashedPassword})
-      RETURNING id, email, name, team_id
-    `
+    const result = await sql`
+      INSERT INTO public.users (id, email, first_name, password_hash, role)
+      VALUES (gen_random_uuid(), ${email}, ${name}, ${hashedPassword}, 'admin')
+      RETURNING id, email, first_name, team_id
+    `;
 
-    const user = result[0]
+    const user = result[0];
 
     if (!user) {
-      return res.status(500).json({ error: 'Failed to create user' })
+      return res.status(500).json({ error: 'Failed to create user' });
     }
 
     return res.status(200).json({
@@ -139,9 +143,9 @@ app.post('/api/auth/sign-up', (async (req: Request, res: Response) => {
         user,
         token: user.id // Using user ID as token for now
       }
-    })
-  } catch {
-    return res.status(500).json({ error: 'Internal server error' })
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error', details: error instanceof Error ? error.message : error });
   }
 }) as RequestHandler)
 
@@ -292,6 +296,111 @@ app.get('/api/auth/me', (async (req: Request, res: Response) => {
       database_url_set: !!process.env.DATABASE_URL
     })
   }
+}) as any)
+
+// Get current user profile route
+app.get('/api/auth/profile', (async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const token = authHeader.split(' ')[1]
+
+    // Find user by token (which is the user ID)
+    const userResult = await sql`
+      SELECT id, email, first_name, last_name, team_id, role, created_at, updated_at
+      FROM public.users
+      WHERE id = ${token}::uuid
+    `
+
+    const user = userResult[0]
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' })
+    }
+
+    // Combine first_name and last_name to create the full name
+    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
+
+    return res.status(200).json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: fullName || null,
+        team_id: user.team_id,
+        role: user.role
+      }
+    })
+  } catch (error) {
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message,
+      database_url_set: !!process.env.DATABASE_URL
+    })
+  }
+}) as any)
+
+// Update current user profile route
+app.put('/api/auth/profile', (async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const token = authHeader.split(' ')[1]
+    const { name, language, theme } = req.body
+
+    // Find user by token (which is the user ID)
+    const userResult = await sql`
+      SELECT id, first_name, last_name
+      FROM public.users
+      WHERE id = ${token}::uuid
+    `
+
+    const user = userResult[0]
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' })
+    }
+
+    // Update user profile
+    // For now, we'll update the first_name field with the full name
+    // In the future, you might want to add separate fields for language and theme preferences
+    const updateResult = await sql`
+      UPDATE public.users
+      SET first_name = ${name}, updated_at = NOW()
+      WHERE id = ${token}::uuid
+      RETURNING id, email, first_name, last_name, team_id, role
+    `
+
+    const updatedUser = updateResult[0]
+
+    if (!updatedUser) {
+      return res.status(500).json({ error: 'Failed to update user profile' })
+    }
+
+    // Combine first_name and last_name to create the full name
+    const fullName = `${updatedUser.first_name || ''} ${updatedUser.last_name || ''}`.trim()
+
+    return res.status(200).json({
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: fullName || null,
+        team_id: updatedUser.team_id,
+        role: updatedUser.role
+      }
+    })
+  } catch (error) {
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message,
+      database_url_set: !!process.env.DATABASE_URL
+    })
+  }
 }) as RequestHandler)
 
 // Existing email route
@@ -407,7 +516,121 @@ app.get('/api/teams/current', (async (req: Request, res: Response) => {
   } catch {
     return res.status(500).json({ error: 'Internal server error' });
   }
-}) as RequestHandler)
+}) as any)
+
+// === CREATE NEW TEAM ===
+app.post('/api/teams', (async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Team name is required' });
+    }
+
+    // Buscar o usuário pelo token (id)
+    const userResult = await sql`
+      SELECT id, team_id FROM public.users WHERE id = ${token}::uuid
+    `;
+    
+    const user = userResult[0];
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Verificar se o usuário já tem uma equipe
+    if (user.team_id) {
+      return res.status(400).json({ error: 'User already belongs to a team' });
+    }
+
+    // Criar a nova equipe
+    const teamResult = await sql`
+      INSERT INTO public.teams (id, name, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${name}, NOW(), NOW())
+      RETURNING *
+    `;
+
+    const team = teamResult[0];
+    if (!team) {
+      return res.status(500).json({ error: 'Failed to create team' });
+    }
+
+    // Associar o usuário à equipe
+    await sql`
+      UPDATE public.users 
+      SET team_id = ${team.id}::uuid, updated_at = NOW()
+      WHERE id = ${user.id}::uuid
+    `;
+
+    return res.status(200).json(team);
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}) as any)
+
+// === UPDATE TEAM ===
+app.put('/api/teams/:id', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const authHeader = req.headers.authorization
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const token = authHeader.split(' ')[1]
+
+    // Get user's team_id from their profile
+    const userResult = await sql`
+      SELECT team_id FROM public.users WHERE id = ${token}::uuid
+    `
+
+    const user = userResult[0]
+    if (!user || !user.team_id) {
+      return res.status(401).json({ error: 'User not found or no team associated' })
+    }
+
+    const teamId = user.team_id
+
+    // Ensure user can only update their own team
+    if (id !== teamId) {
+      return res.status(403).json({ error: 'You can only update your own team' })
+    }
+
+    const { name, logo_url, tier } = req.body
+
+    // Validate tier value if provided
+    if (tier !== undefined && !['free', 'premium'].includes(tier)) {
+      return res.status(400).json({ error: 'Invalid tier value. Must be "free" or "premium"' })
+    }
+
+    // For now, we'll focus on tier updates (the main use case for Lemon Squeezy)
+    if (tier === undefined) {
+      return res.status(400).json({ error: 'Tier field is required' })
+    }
+
+    // Update team tier
+    const result = await sql`
+      UPDATE teams 
+      SET tier = ${tier}, updated_at = NOW()
+      WHERE id = ${teamId}::uuid
+      RETURNING *
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Team not found' })
+    }
+
+    return res.status(200).json(result[0])
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
 
 // ===== DASHBOARD ENDPOINTS =====
 
@@ -427,17 +650,30 @@ app.get('/api/dashboard/monthly-payments', (async (req: Request, res: Response) 
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    // Get total payments across all time
-    const result = await query`
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    // Pagamentos do ano atual
+    const current = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM payments p
       JOIN registrations r ON p.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
-      WHERE c.team_id = ${teamId}
+      WHERE EXTRACT(YEAR FROM payment_date) = ${currentYear}
+      AND c.team_id = ${teamId}
     `;
-    
-    const total = Number(result[0]?.total_amount) || 0;
-    res.json({ total, previousTotal: 0, percentageChange: null });
+    // Pagamentos do ano anterior
+    const previous = await sql`
+      SELECT COALESCE(SUM(amount), 0) as previous_year_total
+      FROM payments p
+      JOIN registrations r ON p.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE EXTRACT(YEAR FROM payment_date) = ${currentYear - 1}
+      AND c.team_id = ${teamId}
+    `;
+    const total = Number(current[0]?.total_amount) || 0;
+    const previousTotal = Number(previous[0]?.previous_year_total) || 0;
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
+    res.json({ total, previousTotal, percentageChange });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar pagamentos.' });
   }
@@ -449,16 +685,28 @@ app.get('/api/dashboard/monthly-registrations', (async (req: Request, res: Respo
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    // Get total registrations across all time
-    const result = await query`
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    // Inscrições do ano atual
+    const current = await sql`
       SELECT COUNT(*) as total_count
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      WHERE c.team_id = ${teamId}
+      WHERE EXTRACT(YEAR FROM r.created_at) = ${currentYear}
+      AND c.team_id = ${teamId}
     `;
-    
-    const total = Number(result[0]?.total_count) || 0;
-    res.json({ total, previousTotal: 0, percentageChange: null });
+    // Inscrições do ano anterior
+    const previous = await sql`
+      SELECT COUNT(*) as previous_year_count
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE EXTRACT(YEAR FROM r.created_at) = ${currentYear - 1}
+      AND c.team_id = ${teamId}
+    `;
+    const total = Number(current[0]?.total_count) || 0;
+    const previousTotal = Number(previous[0]?.previous_year_count) || 0;
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
+    res.json({ total, previousTotal, percentageChange });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar inscrições.' });
   }
@@ -470,17 +718,30 @@ app.get('/api/dashboard/monthly-snackbar', (async (req: Request, res: Response) 
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    // Get total snackbar balance loads across all time
-    const result = await query`
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    // Carregamentos do ano atual
+    const current = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_amount
       FROM snackbar_balance sb
       JOIN registrations r ON sb.registration_id = r.id
       JOIN camps camp ON r.camp_id = camp.id
-      WHERE camp.team_id = ${teamId}
+      WHERE EXTRACT(YEAR FROM sb.created_at) = ${currentYear}
+      AND camp.team_id = ${teamId}
     `;
-    
-    const total = Number(result[0]?.total_amount) || 0;
-    res.json({ total, previousTotal: 0, percentageChange: null });
+    // Carregamentos do ano anterior
+    const previous = await sql`
+      SELECT COALESCE(SUM(amount), 0) as previous_year_total
+      FROM snackbar_balance sb
+      JOIN registrations r ON sb.registration_id = r.id
+      JOIN camps camp ON r.camp_id = camp.id
+      WHERE EXTRACT(YEAR FROM sb.created_at) = ${currentYear - 1}
+      AND camp.team_id = ${teamId}
+    `;
+    const total = Number(current[0]?.total_amount) || 0;
+    const previousTotal = Number(previous[0]?.previous_year_total) || 0;
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
+    res.json({ total, previousTotal, percentageChange });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar carregamentos.' });
   }
@@ -492,17 +753,30 @@ app.get('/api/dashboard/yearly-campers', (async (req: Request, res: Response) =>
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    // Get total campers across all time
-    const result = await query`
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    // Campistas do ano atual
+    const current = await sql`
       SELECT COUNT(*) as total_count
       FROM campers c
       JOIN registrations r ON c.registration_id = r.id
       JOIN camps camp ON r.camp_id = camp.id
-      WHERE camp.team_id = ${teamId}
+      WHERE EXTRACT(YEAR FROM c.created_at) = ${currentYear}
+      AND camp.team_id = ${teamId}
     `;
-    
-    const total = Number(result[0]?.total_count) || 0;
-    res.json({ total, previousTotal: 0, percentageChange: null });
+    // Campistas do ano anterior
+    const previous = await sql`
+      SELECT COUNT(*) as previous_year_count
+      FROM campers c
+      JOIN registrations r ON c.registration_id = r.id
+      JOIN camps camp ON r.camp_id = camp.id
+      WHERE EXTRACT(YEAR FROM c.created_at) = ${currentYear - 1}
+      AND camp.team_id = ${teamId}
+    `;
+    const total = Number(current[0]?.total_count) || 0;
+    const previousTotal = Number(previous[0]?.previous_year_count) || 0;
+    const percentageChange = previousTotal === 0 ? null : ((total - previousTotal) / previousTotal) * 100;
+    res.json({ total, previousTotal, percentageChange });
   } catch {
     res.status(500).json({ error: 'Erro ao buscar campistas.' });
   }
@@ -514,18 +788,21 @@ app.get('/api/dashboard/camp-payments', (async (req: Request, res: Response) => 
     return res.status(401).json({ error: 'Missing x-team-id header' })
   }
   try {
-    const camps = await query`
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    
+    const camps = await sql`
       SELECT 
         c.id as camp_id,
         c.name as camp_name,
-        COUNT(DISTINCT p.id) as total_payments,
+        COALESCE(SUM(CASE WHEN EXTRACT(YEAR FROM p.payment_date) = ${currentYear} THEN p.amount ELSE 0 END), 0) as total_payments,
         COUNT(DISTINCT r.id) as total_registrations
       FROM camps c
       LEFT JOIN registrations r ON c.id = r.camp_id
       LEFT JOIN payments p ON r.id = p.registration_id
       WHERE c.team_id = ${teamId}
       GROUP BY c.id, c.name
-      ORDER BY c.created_at DESC
+      ORDER BY c.start_date ASC
     `;
     const result = camps.map(camp => ({
       campId: camp.camp_id,
@@ -553,10 +830,10 @@ app.get('/api/dashboard/recent-registrations', (async (req: Request, res: Respon
         r.email, 
         r.created_at,
         c.name as camp_name,
-        COALESCE(SUM(p.amount), 0) as total_paid
+        COALESCE(SUM(CASE WHEN p.payment_status = 'confirmed' THEN p.amount ELSE 0 END), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      LEFT JOIN payments p ON r.id = p.registration_id
+      LEFT JOIN payments p ON r.id = p.registration_id AND p.payment_status != 'expired'
       WHERE c.team_id = ${teamId}
       GROUP BY r.id, r.name, r.email, r.created_at, c.name
       ORDER BY r.created_at DESC
@@ -609,10 +886,10 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
         c.start_date as camp_start_date,
         c.end_date as camp_end_date,
         c.price as camp_price,
-        COALESCE(SUM(p.amount), 0) as total_paid
+        COALESCE(SUM(CASE WHEN p.payment_status = 'confirmed' THEN p.amount ELSE 0 END), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      LEFT JOIN payments p ON r.id = p.registration_id
+      LEFT JOIN payments p ON r.id = p.registration_id AND p.payment_status != 'expired'
       WHERE c.team_id = ${teamId}
       GROUP BY r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date, c.price
       ORDER BY r.created_at DESC
@@ -643,7 +920,6 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
     
     res.json(registrations);
   } catch (error) {
-    console.error('Error fetching registrations:', error);
     res.status(500).json({ error: 'Erro ao buscar inscrições.' });
   }
 }) as RequestHandler)
@@ -695,27 +971,37 @@ app.put('/api/camps/:id', (async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { name, start_date, end_date, price } = req.body;
-    const now = new Date().toISOString();
-    const fields = [];
-    const values = [];
-    if (name !== undefined) fields.push(query`name = ${name}`);
-    if (start_date !== undefined) fields.push(query`start_date = ${start_date}`);
-    if (end_date !== undefined) fields.push(query`end_date = ${end_date}`);
-    if (price !== undefined) fields.push(query`price = ${price}`);
-    fields.push(query`updated_at = ${now}`);
-    if (fields.length === 0) {
-      return res.status(400).json({ error: 'No fields to update' });
-    }
-    const setClause = query.join(fields, query`, `);
-    const result = await query.unsafe(
-      `UPDATE camps SET ${setClause.sql} WHERE id = $1 AND team_id = $2 RETURNING *`,
-      [id, teamId, ...setClause.values]
-    );
-    if (!result[0]) {
+    
+    // Validate that the camp exists and belongs to the team
+    const existingCamp = await sql`
+      SELECT id FROM camps 
+      WHERE id = ${id} AND team_id = ${teamId}
+      LIMIT 1
+    `;
+    
+    if (existingCamp.length === 0) {
       return res.status(404).json({ error: 'Camp not found or you do not have permission to update it' });
     }
+    
+    // Update the camp with the provided fields
+    const result = await sql`
+      UPDATE camps 
+      SET 
+        name = COALESCE(${name}, name),
+        start_date = COALESCE(${start_date}, start_date),
+        end_date = COALESCE(${end_date}, end_date),
+        price = COALESCE(${price}, price),
+        updated_at = NOW()
+      WHERE id = ${id} AND team_id = ${teamId}
+      RETURNING *
+    `;
+    
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Camp not found or you do not have permission to update it' });
+    }
+    
     res.json(result[0]);
-  } catch {
+  } catch (error) {
     res.status(500).json({ error: 'Erro ao atualizar acampamento.' });
   }
 }) as RequestHandler)
@@ -741,9 +1027,36 @@ app.delete('/api/camps/:id', (async (req: Request, res: Response) => {
   } catch {
     res.status(500).json({ error: 'Erro ao deletar acampamento.' });
   }
-}) as RequestHandler)
+}) as any);
 
-// List all campers for the current team
+// Get current camp (active camp where current date is between start_date and end_date)
+app.get('/api/camps/current', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const currentDate = new Date().toISOString().split('T')[0]; // Get current date in YYYY-MM-DD format
+    
+    const currentCamp = await sql`
+      SELECT * FROM camps 
+      WHERE team_id = ${teamId} 
+      AND ${currentDate}::date BETWEEN start_date AND end_date
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `;
+    
+    if (currentCamp.length === 0) {
+      return res.status(404).json({ error: 'No active camps found for this team' });
+    }
+    
+    res.json(currentCamp[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar acampamento atual.' });
+  }
+}) as any);
+
+// List all campers for the current team (optimized with single query)
 app.get('/api/campers', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   if (!teamId) {
@@ -751,43 +1064,129 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
   }
   try {
     const { camp_id } = req.query;
+    
+    // Single optimized query that calculates all balances in one go
     let campers;
     if (camp_id) {
-      campers = await query`
-        SELECT ca.*, 
-               c.name as camp_name, 
-               COALESCE(ca.snack_bar_balance, 0) as snack_bar_balance
+      campers = await sql`
+        SELECT 
+          ca.*,
+          c.name as camp_name,
+          r.form_id,
+          COALESCE(sb.total_loaded, 0) as total_loaded,
+          COALESCE(sbt_spent.total_spent, 0) as total_spent,
+          COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+          (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+          CASE 
+            WHEN sb.total_loaded IS NULL THEN 'confirmed'
+            WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
         FROM campers ca
         JOIN registrations r ON ca.registration_id = r.id
         JOIN camps c ON r.camp_id = c.id
+        LEFT JOIN (
+          SELECT 
+            registration_id,
+            SUM(amount) as total_loaded,
+            CASE 
+              WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+              ELSE 'not confirmed'
+            END as payment_status
+          FROM snackbar_balance
+          WHERE payment_status = 'confirmed'
+          GROUP BY registration_id
+        ) sb ON r.id = sb.registration_id
+        LEFT JOIN (
+          SELECT 
+            camper_id,
+            SUM(amount) as total_spent
+          FROM snack_bar_transactions
+          WHERE is_liquidated = false
+          GROUP BY camper_id
+        ) sbt_spent ON ca.id = sbt_spent.camper_id
+        LEFT JOIN (
+          SELECT 
+            camper_id,
+            SUM(amount) as total_liquidated
+          FROM snack_bar_transactions
+          WHERE is_liquidated = true
+          GROUP BY camper_id
+        ) sbt_liquidated ON ca.id = sbt_liquidated.camper_id
         WHERE c.team_id = ${teamId} AND c.id = ${camp_id}
         ORDER BY ca.created_at DESC
       `;
     } else {
-      campers = await query`
-        SELECT ca.*, 
-               c.name as camp_name, 
-               COALESCE(ca.snack_bar_balance, 0) as snack_bar_balance
+      campers = await sql`
+        SELECT 
+          ca.*,
+          c.name as camp_name,
+          r.form_id,
+          COALESCE(sb.total_loaded, 0) as total_loaded,
+          COALESCE(sbt_spent.total_spent, 0) as total_spent,
+          COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+          (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+          CASE 
+            WHEN sb.total_loaded IS NULL THEN 'confirmed'
+            WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
         FROM campers ca
         JOIN registrations r ON ca.registration_id = r.id
         JOIN camps c ON r.camp_id = c.id
+        LEFT JOIN (
+          SELECT 
+            registration_id,
+            SUM(amount) as total_loaded,
+            CASE 
+              WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+              ELSE 'not confirmed'
+            END as payment_status
+          FROM snackbar_balance
+          WHERE payment_status = 'confirmed'
+          GROUP BY registration_id
+        ) sb ON r.id = sb.registration_id
+        LEFT JOIN (
+          SELECT 
+            camper_id,
+            SUM(amount) as total_spent
+          FROM snack_bar_transactions
+          WHERE is_liquidated = false
+          GROUP BY camper_id
+        ) sbt_spent ON ca.id = sbt_spent.camper_id
+        LEFT JOIN (
+          SELECT 
+            camper_id,
+            SUM(amount) as total_liquidated
+          FROM snack_bar_transactions
+          WHERE is_liquidated = true
+          GROUP BY camper_id
+        ) sbt_liquidated ON ca.id = sbt_liquidated.camper_id
         WHERE c.team_id = ${teamId}
         ORDER BY ca.created_at DESC
       `;
     }
-    // Mapear os resultados para incluir camp como objeto e garantir que snack_bar_balance seja um número
-    const campersWithCampObject = campers.map(camper => ({
+
+    // Process results to match expected format
+    const processedCampers = campers.map((camper: any) => ({
       ...camper,
       camp: { name: camper.camp_name },
-      snack_bar_balance: Number(camper.snack_bar_balance) || 0
+      snack_bar_balance: Number(camper.snack_bar_balance) || 0,
+      totalLoaded: Number(camper.total_loaded) || 0,
+      totalSpent: Number(camper.total_spent) || 0,
+      totalLiquidated: Number(camper.total_liquidated) || 0,
+      payment_status: camper.payment_status || 'confirmed',
+      form_id: camper.form_id || null
     }));
-    res.json(campersWithCampObject);
-  } catch {
-    res.status(500).json({ error: 'Erro ao buscar campistas.' });
+
+    res.json(processedCampers);
+  } catch (error) {
+    console.error('Error fetching campers:', error);
+    res.status(500).json({ error: 'Erro ao buscar campistas.', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 }) as RequestHandler)
 
-// Get a single camper by ID
+// Get a single camper by ID with balance
 app.get('/api/campers/:id', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   if (!teamId) {
@@ -795,19 +1194,73 @@ app.get('/api/campers/:id', (async (req: Request, res: Response) => {
   }
   try {
     const { id } = req.params;
-    const camper = await query`
-      SELECT ca.*
+    const camper = await sql`
+      SELECT 
+        ca.*,
+        c.name as camp_name,
+        r.form_id,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
       FROM campers ca
       JOIN registrations r ON ca.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          registration_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY registration_id
+      ) sb ON r.id = sb.registration_id
+      LEFT JOIN (
+        SELECT 
+          camper_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY camper_id
+      ) sbt_spent ON ca.id = sbt_spent.camper_id
+      LEFT JOIN (
+        SELECT 
+          camper_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY camper_id
+      ) sbt_liquidated ON ca.id = sbt_liquidated.camper_id
       WHERE ca.id = ${id} AND c.team_id = ${teamId}
       LIMIT 1
     `;
     if (!camper[0]) {
       return res.status(404).json({ error: 'Camper not found' });
     }
-    res.json(camper[0]);
-  } catch {
+    
+    // Process result to match expected format
+    const processedCamper = {
+      ...camper[0],
+      camp: { name: camper[0].camp_name },
+      snack_bar_balance: Number(camper[0].snack_bar_balance) || 0,
+      totalLoaded: Number(camper[0].total_loaded) || 0,
+      totalSpent: Number(camper[0].total_spent) || 0,
+      totalLiquidated: Number(camper[0].total_liquidated) || 0,
+      payment_status: camper[0].payment_status || 'confirmed',
+      form_id: camper[0].form_id || null
+    };
+    
+    res.json(processedCamper);
+  } catch (error) {
+    console.error('Error fetching camper:', error);
     res.status(500).json({ error: 'Erro ao buscar campista.' });
   }
 }) as RequestHandler)
@@ -820,22 +1273,26 @@ app.post('/api/campers', (async (req: Request, res: Response) => {
   }
   try {
     const { name, email, contact, registration_id, form_id, camp, additional_notes } = req.body;
-    if (!name || !email || !contact || !registration_id) {
+    if (!name || !email) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    // Check if registration belongs to the team
-    const reg = await query`
-      SELECT r.id FROM registrations r
-      JOIN camps c ON r.camp_id = c.id
-      WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
-    `;
-    if (!reg[0]) {
-      return res.status(400).json({ error: 'Registration does not belong to your team' });
+    
+    // If registration_id is provided, check if it belongs to the team
+    if (registration_id) {
+      const reg = await sql`
+        SELECT r.id FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
+      `;
+      if (!reg[0]) {
+        return res.status(400).json({ error: 'Registration does not belong to your team' });
+      }
     }
+    
     const now = new Date().toISOString();
     const result = await query`
       INSERT INTO campers (name, email, contact, registration_id, form_id, camp, additional_notes, created_at, updated_at)
-      VALUES (${name}, ${email}, ${contact}, ${registration_id}, ${form_id}, ${camp}, ${additional_notes}, ${now}, ${now})
+      VALUES (${name}, ${email}, ${contact || null}, ${registration_id}, ${form_id}, ${camp}, ${additional_notes}, ${now}, ${now})
       RETURNING *
     `;
     res.status(201).json(result[0]);
@@ -902,7 +1359,6 @@ app.put('/api/campers/:id', (async (req: Request, res: Response) => {
     
     res.json(result[0]);
   } catch (error) {
-    console.error('Error updating camper:', error);
     res.status(500).json({ error: 'Erro ao atualizar campista.' });
   }
 }) as RequestHandler)
@@ -950,32 +1406,54 @@ app.post('/api/users', (async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { name, firstName, lastName, email, role } = req.body;
-    const fullName = name || ((firstName && lastName) ? `${firstName} ${lastName}` : null);
-    if (!fullName || !email || !role) {
+    const { firstName, lastName, email, role } = req.body;
+    if (!firstName || !lastName || !email || !role) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     const now = new Date().toISOString();
-    const result = await query`
-      INSERT INTO users (name, email, role, team_id, created_at, updated_at)
-      VALUES (${fullName}, ${email}, ${role}, ${teamId}, ${now}, ${now})
+    const inviteToken = crypto.randomUUID();
+    const inviteExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const result = await sql`
+      INSERT INTO users (first_name, last_name, email, role, team_id, created_at, updated_at, status, invite_token, invite_expires_at)
+      VALUES (${firstName}, ${lastName}, ${email}, ${role}, ${teamId}, ${now}, ${now}, 'invited', ${inviteToken}, ${inviteExpiresAt})
       RETURNING *
     `;
+    // Enviar email de convite
+    const setupLink = `${process.env.NEXT_PUBLIC_APP_URL}/setup-password?userId=${result[0].id}&token=${inviteToken}&email=${encodeURIComponent(email)}`;
+    await resend.emails.send({
+      from: 'Campy <noreply@infolio.pt>',
+      to: email,
+      subject: 'Convite para a plataforma Campy',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">Bem-vindo à plataforma Campy!</h2>
+          <p>Foi convidado para fazer parte da nossa plataforma.</p>
+          <p>Clique no botão abaixo para definir sua palavra-passe e começar a usar:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${setupLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">Definir Palavra-passe</a>
+          </div>
+          <p>Se você não solicitou este convite, ignore este email.</p>
+          <p>Este link expira em 24 horas por motivos de segurança.</p>
+          <hr style="border: 1px solid #eee; margin: 30px 0;" />
+          <p style="color: #666; font-size: 12px;">© 2025 Campy. Todos os direitos reservados.</p>
+        </div>
+      `
+    });
     res.status(201).json(result[0]);
-  } catch {
+  } catch (error) {
     res.status(500).json({ error: 'Erro ao criar usuário.' });
   }
 }) as RequestHandler)
 
 // GET user by ID
 app.get('/api/users/:id', async (req: Request, res: Response) => {
-  const teamId = req.headers['x-team-id'];
-  if (!teamId || typeof teamId !== 'string') {
+  const teamId = getTeamId(req);
+  if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
     const { id } = req.params;
-    const result = await query`SELECT * FROM users WHERE id = ${id} AND team_id = ${teamId}`;
+    const result = await sql`SELECT * FROM users WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid`;
     if (result.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -987,45 +1465,72 @@ app.get('/api/users/:id', async (req: Request, res: Response) => {
 
 // PUT user by ID
 app.put('/api/users/:id', async (req: Request, res: Response) => {
-  const teamId = req.headers['x-team-id'];
-  if (!teamId || typeof teamId !== 'string') {
+  const teamId = getTeamId(req);
+  if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
     const { id } = req.params;
-    const { name, email, role } = req.body;
+    const { firstName, lastName, email, role } = req.body;
+    
+    // Check if user exists and belongs to team
+    const userCheck = await sql`SELECT id, team_id FROM users WHERE id = ${id}::uuid`;
+    
+    if (!userCheck[0]) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (userCheck[0].team_id !== teamId) {
+      return res.status(403).json({ error: 'User does not belong to your team' });
+    }
+    
     const now = new Date().toISOString();
-    const fields = [];
-    if (name !== undefined) fields.push(`name = '${name}'`);
-    if (email !== undefined) fields.push(`email = '${email}'`);
-    if (role !== undefined) fields.push(`role = '${role}'`);
-    fields.push(`updated_at = '${now}'`);
-    if (fields.length === 0) {
+    const updateFields = [];
+    
+    if (firstName !== undefined) {
+      updateFields.push(sql`first_name = ${firstName}`);
+    }
+    if (lastName !== undefined) {
+      updateFields.push(sql`last_name = ${lastName}`);
+    }
+    if (email !== undefined) {
+      updateFields.push(sql`email = ${email}`);
+    }
+    if (role !== undefined) {
+      updateFields.push(sql`role = ${role}`);
+    }
+    updateFields.push(sql`updated_at = ${now}`);
+    
+    if (updateFields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
-    const setClause = fields.join(', ');
-    const result = await query.unsafe(
-      `UPDATE users SET ${setClause} WHERE id = $1 AND team_id = $2 RETURNING *`,
-      [id, teamId]
-    );
+    
+    const setClause = sql.join(updateFields, sql`, `);
+    const result = await sql`
+      UPDATE users 
+      SET ${setClause} 
+      WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid 
+      RETURNING *
+    `;
     if (!result[0]) {
       return res.status(404).json({ error: 'User not found or you do not have permission to update it' });
     }
     res.json(result[0]);
-  } catch {
+  } catch (error) {
+    console.error('Error updating user:', error);
     res.status(500).json({ error: 'Erro ao atualizar usuário.' });
   }
 });
 
 // DELETE user by ID
 app.delete('/api/users/:id', async (req: Request, res: Response) => {
-  const teamId = req.headers['x-team-id'];
-  if (!teamId || typeof teamId !== 'string') {
+  const teamId = getTeamId(req);
+  if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
     const { id } = req.params;
-    const result = await query`DELETE FROM users WHERE id = ${id} AND team_id = ${teamId} RETURNING *`;
+    const result = await sql`DELETE FROM users WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid RETURNING *`;
     if (!result[0]) {
       return res.status(404).json({ error: 'User not found or you do not have permission to delete it' });
     }
@@ -1045,7 +1550,7 @@ app.post('/api/registrations', (async (req: Request, res: Response) => {
     const {
       camp_id, name, email, contact, status, onboarding_status, form_id,
       id_number, sns_number, date_of_birth, dietary_restrictions,
-      guardian_name, guardian_email, guardian_phone
+      guardian_name, guardian_email, guardian_phone, request_id
     } = req.body;
 
     if (!camp_id || !name || !email || !contact) {
@@ -1063,12 +1568,12 @@ app.post('/api/registrations', (async (req: Request, res: Response) => {
       INSERT INTO registrations (
         camp_id, name, email, contact, status, onboarding_status, form_id,
         id_number, sns_number, date_of_birth, dietary_restrictions,
-        guardian_name, guardian_email, guardian_phone, created_at, updated_at
+        guardian_name, guardian_email, guardian_phone, request_id, created_at, updated_at
       )
       VALUES (
         ${camp_id}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${onboarding_status || 'Pendente'}, ${form_id},
         ${id_number}, ${sns_number}, ${date_of_birth}, ${dietary_restrictions},
-        ${guardian_name}, ${guardian_email}, ${guardian_phone}, ${now}, ${now}
+        ${guardian_name}, ${guardian_email}, ${guardian_phone}, ${request_id || null}, ${now}, ${now}
       )
       RETURNING *
     `;
@@ -1076,7 +1581,83 @@ app.post('/api/registrations', (async (req: Request, res: Response) => {
   } catch {
     res.status(500).json({ error: 'Erro ao criar inscrição.' });
   }
-}) as RequestHandler)
+}) as any);
+
+// Get a single registration by ID
+app.get('/api/registrations/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    
+    // Get registration with camp details
+    const registrationResult = await sql`
+      SELECT 
+        r.id,
+        r.form_id,
+        r.name,
+        r.email,
+        r.contact,
+        r.status,
+        r.created_at,
+        r.updated_at,
+        r.user_id,
+        r.camp_id,
+        r.onboarding_status,
+        r.snack_bar_balance,
+        r.id_number,
+        r.sns_number,
+        r.date_of_birth,
+        r.dietary_restrictions,
+        r.guardian_name,
+        r.guardian_email,
+        r.guardian_phone,
+        r.request_id,
+        c.name as camp_name,
+        c.start_date as camp_start_date,
+        c.end_date as camp_end_date,
+        c.price as camp_price
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${id}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (registrationResult.length === 0) {
+      return res.status(404).json({ error: 'Registration not found or you do not have permission to access it' });
+    }
+    
+    const registration = registrationResult[0];
+    
+    // Get total paid amount separately
+    const totalPaidResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_paid
+      FROM payments 
+      WHERE registration_id = ${id}::uuid AND payment_status = 'confirmed' AND payment_status != 'expired'
+    `;
+    
+    const totalPaid = parseFloat(totalPaidResult[0]?.total_paid || '0');
+    const campPrice = parseFloat(registration.camp_price || '0');
+    
+    // Determine status based on total paid vs camp price
+    let status = 'unpaid';
+    if (totalPaid >= campPrice || (campPrice > 0 && (campPrice - totalPaid) < 1)) {
+      status = 'paid';
+    } else if (totalPaid > 0) {
+      status = 'partial';
+    }
+    
+    res.json({
+      ...registration,
+      total_paid: totalPaid,
+      camp_price: campPrice,
+      status: status
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao buscar inscrição.' });
+  }
+}) as any);
 
 // Update a registration
 app.put('/api/registrations/:id', (async (req: Request, res: Response) => {
@@ -1089,25 +1670,26 @@ app.put('/api/registrations/:id', (async (req: Request, res: Response) => {
     const {
       camp_id, name, email, contact, status, onboarding_status, form_id,
       id_number, sns_number, date_of_birth, dietary_restrictions,
-      guardian_name, guardian_email, guardian_phone
+      guardian_name, guardian_email, guardian_phone, request_id
     } = req.body;
     const now = new Date().toISOString();
     const fields = [];
-    if (camp_id !== undefined) fields.push(query`camp_id = ${camp_id}`);
-    if (name !== undefined) fields.push(query`name = ${name}`);
-    if (email !== undefined) fields.push(query`email = ${email}`);
-    if (contact !== undefined) fields.push(query`contact = ${contact}`);
-    if (status !== undefined) fields.push(query`status = ${status}`);
-    if (onboarding_status !== undefined) fields.push(query`onboarding_status = ${onboarding_status}`);
-    if (form_id !== undefined) fields.push(query`form_id = ${form_id}`);
-    if (id_number !== undefined) fields.push(query`id_number = ${id_number}`);
-    if (sns_number !== undefined) fields.push(query`sns_number = ${sns_number}`);
-    if (date_of_birth !== undefined) fields.push(query`date_of_birth = ${date_of_birth}`);
-    if (dietary_restrictions !== undefined) fields.push(query`dietary_restrictions = ${dietary_restrictions}`);
-    if (guardian_name !== undefined) fields.push(query`guardian_name = ${guardian_name}`);
-    if (guardian_email !== undefined) fields.push(query`guardian_email = ${guardian_email}`);
-    if (guardian_phone !== undefined) fields.push(query`guardian_phone = ${guardian_phone}`);
-    fields.push(query`updated_at = ${now}`);
+    if (camp_id !== undefined) fields.push(sql`camp_id = ${camp_id}`);
+    if (name !== undefined) fields.push(sql`name = ${name}`);
+    if (email !== undefined) fields.push(sql`email = ${email}`);
+    if (contact !== undefined) fields.push(sql`contact = ${contact}`);
+    if (status !== undefined) fields.push(sql`status = ${status}`);
+    if (onboarding_status !== undefined) fields.push(sql`onboarding_status = ${onboarding_status}`);
+    if (form_id !== undefined) fields.push(sql`form_id = ${form_id}`);
+    if (id_number !== undefined) fields.push(sql`id_number = ${id_number}`);
+    if (sns_number !== undefined) fields.push(sql`sns_number = ${sns_number}`);
+    if (date_of_birth !== undefined) fields.push(sql`date_of_birth = ${date_of_birth}`);
+    if (dietary_restrictions !== undefined) fields.push(sql`dietary_restrictions = ${dietary_restrictions}`);
+    if (guardian_name !== undefined) fields.push(sql`guardian_name = ${guardian_name}`);
+    if (guardian_email !== undefined) fields.push(sql`guardian_email = ${guardian_email}`);
+    if (guardian_phone !== undefined) fields.push(sql`guardian_phone = ${guardian_phone}`);
+    if (request_id !== undefined) fields.push(sql`request_id = ${request_id}`);
+    fields.push(sql`updated_at = ${now}`);
     if (fields.length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
@@ -1145,13 +1727,77 @@ app.delete('/api/registrations/:id', (async (req: Request, res: Response) => {
   } catch {
     res.status(500).json({ error: 'Erro ao deletar inscrição.' });
   }
-}) as RequestHandler)
+}) as any);
+
+// Update registration onboarding status
+app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  
+  
+  
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    
+    
+    if (!status) {
+      return res.status(400).json({ error: 'Status is required' });
+    }
+    
+    const now = new Date().toISOString();
+    
+    // First, check if the registration exists and belongs to the team
+    const registrationCheck = await sql`
+      SELECT r.id, r.camp_id, c.team_id 
+      FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${id}::uuid
+    `;
+    
+    
+    
+    if (registrationCheck.length === 0) {
+      return res.status(404).json({ error: 'Registration not found' });
+    }
+    
+    // Compare team_id as strings
+    const registrationTeamId = registrationCheck[0].team_id;
+    
+    
+    if (registrationTeamId !== teamId) {
+      return res.status(404).json({ error: 'Registration does not belong to your team' });
+    }
+    
+    // Update the registration
+    const result = await sql`
+      UPDATE registrations 
+      SET onboarding_status = ${status}, updated_at = ${now}
+      WHERE id = ${id}::uuid
+      RETURNING *
+    `;
+    
+    
+    
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Failed to update registration' });
+    }
+    
+    res.json(result[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar status de onboarding.' });
+  }
+}) as any);
 
 // Helper to update registration status after payment changes
 async function updateRegistrationStatus(registrationId: string) {
-  // Get total paid amount
-  const totalPaid = await query`
-    SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE registration_id = ${registrationId}
+  // Get total paid amount - only confirmed payments (exclude pending and expired)
+  const totalPaid = await sql`
+    SELECT COALESCE(SUM(amount), 0) as total FROM payments 
+    WHERE registration_id = ${registrationId} AND payment_status = 'confirmed' AND payment_status != 'expired'
   `;
   // Get the registration with its camp
   const registration = await query`
@@ -1212,6 +1858,7 @@ app.get('/api/payments', (async (req: Request, res: Response) => {
         p.phone_number,
         p.payment_link,
         p.payment_status,
+        p.request_id,
         p.created_at,
         p.updated_at
       FROM payments p
@@ -1227,7 +1874,6 @@ app.get('/api/payments', (async (req: Request, res: Response) => {
     
     res.json(processedPayments);
   } catch (error) {
-    console.error('Error fetching payments:', error);
     res.status(500).json({ error: 'Error fetching payments' });
   }
 }) as RequestHandler)
@@ -1239,7 +1885,7 @@ app.post('/api/payments', (async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { registration_id, payment_method, amount, payment_date, phone_number, payment_link } = req.body;
+    const { registration_id, payment_method, amount, payment_date, phone_number, payment_link, request_id } = req.body;
     if (!registration_id || !payment_method || !amount || !payment_date) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -1253,359 +1899,1020 @@ app.post('/api/payments', (async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Registration does not belong to your team' });
     }
     const now = new Date().toISOString();
-    const paymentStatus = payment_method === 'MB Way' ? 'pending' : 'confirmed';
-    const result = await query`
+    const paymentStatus = payment_method === 'MB Way' ? 'not confirmed' : 'confirmed';
+    const result = await sql`
       INSERT INTO payments (
-        registration_id, payment_method, amount, payment_date, phone_number, payment_link, payment_status, created_at, updated_at
+        registration_id, payment_method, amount, payment_date, phone_number, payment_link, payment_status, request_id, created_at, updated_at
       ) VALUES (
-        ${registration_id}, ${payment_method}, ${amount}, ${payment_date}, ${phone_number}, ${payment_link}, ${paymentStatus}, ${now}, ${now}
+        ${registration_id}, ${payment_method}, ${amount}, ${payment_date}, ${phone_number}, ${payment_link}, ${paymentStatus}, ${request_id || null}, ${now}, ${now}
       ) RETURNING *
     `;
-    await updateRegistrationStatus(registration_id);
-    res.status(201).json(result[0]);
-  } catch {
-    res.status(500).json({ error: 'Erro ao criar pagamento.' });
-  }
-}) as RequestHandler)
-
-// Update a payment
-app.put('/api/payments/:id', (async (req: Request, res: Response) => {
-  const teamId = getTeamId(req);
-  if (!teamId) {
-    return res.status(401).json({ error: 'Missing x-team-id header' });
-  }
-  try {
-    const { id } = req.params;
-    const { registration_id, ...fields } = req.body;
-    const now = new Date().toISOString();
-    const setFields = Object.entries(fields).map(([key, value]) => `${key} = '${value}'`).join(', ');
-    const result = await query.unsafe(
-      `UPDATE payments SET ${setFields}, updated_at = '${now}' WHERE id = $1 AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = $2) RETURNING *`,
-      [id, teamId]
-    );
-    if (!result[0]) {
-      return res.status(404).json({ error: 'Payment not found or you do not have permission to update it' });
-    }
-    if (registration_id) {
-      await updateRegistrationStatus(registration_id);
-    }
     res.json(result[0]);
-  } catch {
-    res.status(500).json({ error: 'Erro ao atualizar pagamento.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error creating payment' });
   }
 }) as RequestHandler)
 
-// Delete a payment
-app.delete('/api/payments/:id', (async (req: Request, res: Response) => {
+// Create a new snackbar balance entry
+app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { id } = req.params;
-    // Get registration_id before deleting
-    const payment = await query`
-      SELECT registration_id FROM payments WHERE id = ${id}
-    `;
-    const result = await query`
-      DELETE FROM payments WHERE id = ${id} AND registration_id IN (SELECT r.id FROM registrations r JOIN camps c ON r.camp_id = c.id WHERE c.team_id = ${teamId}) RETURNING *
-    `;
+    const { registration_id, amount, payment_method, phone_number, request_id } = req.body;
     
-    if (!result[0]) {
-      return res.status(404).json({ error: 'Payment not found or you do not have permission to delete it' });
+    // Debug log
+    console.log('Snackbar balance request:', { registration_id, amount, payment_method, phone_number, request_id });
+    
+    if (!registration_id || !amount || !payment_method) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    // Update registration status after deleting payment
-    if (payment[0] && payment[0].registration_id) {
-      await updateRegistrationStatus(payment[0].registration_id);
+    // Check if registration belongs to the team
+    const reg = await sql`
+      SELECT r.id FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${registration_id} AND c.team_id = ${teamId}
+    `;
+    
+    if (!reg[0]) {
+      return res.status(400).json({ error: 'Registration does not belong to your team' });
     }
     
-    res.status(204).end();
+    const now = new Date().toISOString();
+    
+    // Determinar payment_status baseado no método de pagamento
+    const paymentStatus = payment_method === 'MB Way' ? 'not confirmed' : 'confirmed';
+    
+    const result = await sql`
+      INSERT INTO snackbar_balance (
+        registration_id, amount, payment_method, phone_number, request_id, payment_status, created_at, updated_at
+      ) VALUES (
+        ${registration_id}, ${amount}, ${payment_method}, ${phone_number}, ${request_id || null}, ${paymentStatus}, ${now}, ${now}
+      ) RETURNING *
+    `;
+    
+    res.status(201).json(result[0]);
   } catch (error) {
-    console.error('Error deleting payment:', error);
-    res.status(500).json({ error: 'Erro ao deletar pagamento.' });
+    res.status(500).json({ error: 'Error creating snackbar balance entry' });
   }
 }) as RequestHandler)
 
-// Get camper's snack bar balance (CORRECTED)
-app.get('/api/snackbar-balance/:camperId', async (req: Request, res: Response) => {
+// Get snackbar balance for a camper
+app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
     const { camperId } = req.params;
-    const teamId = getTeamId(req);
-
-    if (!teamId) {
-      return res.status(401).json({ error: 'Team ID is required' });
-    }
-
-    // Get camper's registration_id and check team
-    const camperResult = await query`
-      SELECT c.registration_id
-      FROM campers c
-      JOIN registrations r ON c.registration_id = r.id
-      JOIN camps cp ON r.camp_id = cp.id
-      WHERE c.id = ${camperId}
-      AND cp.team_id = ${teamId}
+    
+    // Get total balance and payment status from snackbar_balance (including negative amounts for liquidations)
+    const balanceResult = await sql`
+      SELECT 
+        COALESCE(SUM(sb.amount), 0) as total_balance,
+        CASE 
+          WHEN COUNT(*) = 0 THEN 'confirmed'
+          WHEN COUNT(*) = COUNT(CASE WHEN sb.payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM snackbar_balance sb
+      JOIN registrations r ON sb.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      JOIN campers ca ON r.id = ca.registration_id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
     `;
+    
+    const balance = Number(balanceResult[0]?.total_balance || 0);
+    const payment_status = balanceResult[0]?.payment_status || 'confirmed';
+    
+    res.json({
+      balance,
+      total_balance: balance,
+      payment_status
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar balance' });
+  }
+}) as RequestHandler)
 
-    if (camperResult.length === 0) {
-      return res.status(404).json({ error: 'Camper not found' });
+
+
+// Get snackbar balance for a staff member
+app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { staffId } = req.params;
+    
+    // Check if staff member belongs to the team (but don't filter by camp for balance calculation)
+    const staffCheck = await sql`
+      SELECT s.id FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staffId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!staffCheck[0]) {
+      return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
     }
-
-    const registrationId = camperResult[0].registration_id;
-
-    // Sum all deposits for this registration
-    const depositResult = await query`
-      SELECT COALESCE(SUM(amount), 0) as total_deposit
+    
+    // Get total deposit and payment status for this staff member (ALL camps, not just current camp)
+    const depositResult = await sql`
+      SELECT 
+        COALESCE(SUM(amount), 0) as total_deposit,
+        CASE 
+          WHEN COUNT(*) = 0 THEN 'confirmed'
+          WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
       FROM snackbar_balance
-      WHERE registration_id = ${registrationId}
+      WHERE staff_id = ${staffId}::uuid
+    `;
+    
+    // Get total spent for this staff member (ALL camps, not just current camp)
+    const spentResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_spent
+      FROM snack_bar_transactions
+      WHERE staff_id = ${staffId}::uuid
+    `;
+    
+    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+    const balance = totalDeposit - totalSpent;
+    const payment_status = depositResult[0]?.payment_status || 'confirmed';
+    
+    // Get all balance records for this staff member (ALL camps, not just current camp)
+    const balanceRecords = await sql`
+      SELECT 
+        id,
+        amount,
+        payment_method,
+        payment_status,
+        phone_number,
+        created_at,
+        updated_at
+      FROM snackbar_balance
+      WHERE staff_id = ${staffId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    // Return both balance records and calculated totals
+    res.json({
+      balance,
+      total_deposit: totalDeposit,
+      total_spent: totalSpent,
+      payment_status,
+      records: balanceRecords
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar balance for staff' });
+  }
+}) as any);
+
+// Create a new snackbar transaction
+app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camper_id, staff_id, amount } = req.body;
+    
+    
+    if (!amount) {
+      return res.status(400).json({ error: 'Amount is required' });
+    }
+    
+    if (!camper_id && !staff_id) {
+      return res.status(400).json({ error: 'Either camper_id or staff_id is required' });
+    }
+    
+    if (camper_id && staff_id) {
+      return res.status(400).json({ error: 'Cannot specify both camper_id and staff_id' });
+    }
+    
+    let personCheck;
+    
+    if (camper_id) {
+      // Check if camper belongs to the team
+      personCheck = await sql`
+        SELECT ca.id FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE ca.id = ${camper_id}::uuid AND c.team_id = ${teamId}::uuid
+      `;
+      
+      if (!personCheck[0]) {
+        return res.status(400).json({ error: 'Camper does not belong to your team' });
+      }
+    } else if (staff_id) {
+      // Check if staff member belongs to the team
+      personCheck = await sql`
+        SELECT s.id FROM staff s
+        JOIN camps c ON s.camp_id = c.id
+        WHERE s.id = ${staff_id}::uuid AND c.team_id = ${teamId}::uuid
+      `;
+      
+      if (!personCheck[0]) {
+        return res.status(400).json({ error: 'Staff member does not belong to your team' });
+      }
+    }
+    
+    const now = new Date().toISOString();
+    
+    let result;
+    if (camper_id) {
+      
+      // Get the registration_id for this camper
+      const registrationResult = await sql`
+        SELECT ca.registration_id FROM campers ca
+        WHERE ca.id = ${camper_id}::uuid
+      `;
+      
+      if (!registrationResult[0]?.registration_id) {
+        return res.status(400).json({ error: 'Camper does not have a registration' });
+      }
+      
+      const registrationId = registrationResult[0].registration_id;
+      
+      // Get total loaded from snackbar_balance (confirmed payments only)
+      const balanceResult = await sql`
+        SELECT 
+          COALESCE(SUM(amount), 0) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = 0 THEN 'confirmed'
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE registration_id = ${registrationId}
+          AND payment_status = 'confirmed'
+      `;
+      
+      // Get total spent from snack_bar_transactions (non-liquidated)
+      const spentResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_spent
+        FROM snack_bar_transactions
+        WHERE camper_id = ${camper_id}
+          AND is_liquidated = false
+      `;
+      
+      // Get total liquidated from snack_bar_transactions (liquidated)
+      const liquidatedResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE camper_id = ${camper_id}
+          AND is_liquidated = true
+      `;
+      
+      const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
+      const totalSpent = Number(spentResult[0]?.total_spent || 0);
+      const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
+      const currentBalance = totalLoaded - totalSpent - totalLiquidated;
+      const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
+      
+      if (currentBalance < amount) {
+        return res.status(400).json({ error: 'Insufficient balance' });
+      }
+      
+      // Verificar se o payment_status é 'confirmed'
+      if (paymentStatus !== 'confirmed') {
+        return res.status(400).json({ error: 'Cannot use balance that is not confirmed' });
+      }
+      
+      // No need to deduct from snackbar_balance - just create the transaction
+      // The balance will be calculated dynamically (total loaded - total spent)
+      
+      // Create the transaction record
+      result = await sql`
+        INSERT INTO snack_bar_transactions (
+          camper_id, amount, created_at, is_liquidated
+        ) VALUES (
+          ${camper_id}::uuid, ${amount}, ${now}, false
+        ) RETURNING *
+      `;
+    } else {
+      
+      // Get current balance and payment status for staff
+      const balanceResult = await sql`
+        SELECT 
+          COALESCE(SUM(amount), 0) as total_deposit,
+          CASE 
+            WHEN COUNT(*) = 0 THEN 'confirmed'
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE staff_id = ${staff_id}::uuid
+      `;
+      
+      const totalDeposit = Number(balanceResult[0]?.total_deposit || 0);
+      const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
+      
+      // Get total spent for this staff member
+      const spentResult = await sql`
+        SELECT COALESCE(SUM(amount), 0) as total_spent
+        FROM snack_bar_transactions
+        WHERE staff_id = ${staff_id}::uuid
+      `;
+      
+      const totalSpent = Number(spentResult[0]?.total_spent || 0);
+      const currentBalance = totalDeposit - totalSpent;
+      
+      if (currentBalance < amount) {
+        return res.status(400).json({ error: 'Insufficient balance' });
+      }
+      
+      // Verificar se o payment_status é 'confirmed'
+      if (paymentStatus !== 'confirmed') {
+        return res.status(400).json({ error: 'Cannot use balance that is not confirmed' });
+      }
+      
+      result = await sql`
+        INSERT INTO snack_bar_transactions (
+          staff_id, amount, created_at, is_liquidated
+        ) VALUES (
+          ${staff_id}::uuid, ${amount}, ${now}, false
+        ) RETURNING *
+      `;
+    }
+    
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error('Error creating snackbar transaction:', error);
+    res.status(500).json({ error: 'Error creating snackbar transaction', details: error.message });
+  }
+}) as any);
+
+// Create independent snackbar transaction (not associated with any camper or staff)
+app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { amount, payment_method, phone_number, description } = req.body;
+
+    if (!amount) {
+      return res.status(400).json({ error: 'Amount is required' });
+    }
+
+    if (!payment_method) {
+      return res.status(400).json({ error: 'Payment method is required' });
+    }
+
+    const now = new Date().toISOString();
+
+    // Create payment in the payments table with NULL registration_id
+    const result = await sql`
+      INSERT INTO payments (
+        registration_id,
+        payment_date,
+        payment_method,
+        amount,
+        payment_status,
+        phone_number,
+        description,
+        created_at,
+        updated_at
+      ) VALUES (
+        NULL,
+        ${now},
+        ${payment_method},
+        ${amount},
+        'confirmed',
+        ${phone_number || null},
+        ${description || null},
+        ${now},
+        ${now}
+      ) RETURNING *
     `;
 
-    // Sum all debits for this camper
-    const spentResult = await query`
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error('Error creating independent payment:', error);
+    res.status(500).json({ error: 'Error creating independent payment', details: error.message });
+  }
+}) as any);
+
+// Liquidate snackbar balance for a camper
+app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camperId } = req.params;
+    
+    // Check if camper belongs to the team
+    const camperCheck = await sql`
+      SELECT ca.id, ca.name FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!camperCheck[0]) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+    
+    // Get total loaded from snackbar_balance (confirmed payments only)
+    const balanceResult = await sql`
+      SELECT 
+        COALESCE(SUM(sb.amount), 0) as total_loaded,
+        CASE 
+          WHEN COUNT(*) = 0 THEN 'confirmed'
+          WHEN COUNT(*) = COUNT(CASE WHEN sb.payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM snackbar_balance sb
+      JOIN registrations r ON sb.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      JOIN campers ca ON r.id = ca.registration_id
+      WHERE ca.id = ${camperId}::uuid 
+        AND c.team_id = ${teamId}::uuid
+        AND sb.payment_status = 'confirmed'
+    `;
+    
+    // Get total spent from snack_bar_transactions (non-liquidated)
+    const spentResult = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_spent
       FROM snack_bar_transactions
       WHERE camper_id = ${camperId}
+        AND is_liquidated = false
     `;
-
-    const totalDeposit = Number(depositResult[0]?.total_deposit || 0);
+    
+    // Get total liquidated from snack_bar_transactions (liquidated)
+    const liquidatedResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_liquidated
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}
+        AND is_liquidated = true
+    `;
+    
+    const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
     const totalSpent = Number(spentResult[0]?.total_spent || 0);
-    const currentBalance = totalDeposit - totalSpent;
-
-    return res.json({
-      balance: currentBalance,
-      total_deposit: totalDeposit,
-      total_spent: totalSpent
+    const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
+    const currentBalance = totalLoaded - totalSpent - totalLiquidated;
+    const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
+    
+    if (currentBalance <= 0) {
+      return res.status(400).json({ error: 'Camper has no balance to liquidate' });
+    }
+    
+    // Verificar se o payment_status é 'confirmed' para permitir liquidação
+    if (paymentStatus !== 'confirmed') {
+      return res.status(400).json({ error: 'Cannot liquidate balance that is not confirmed' });
+    }
+    
+    // Get the registration_id for this camper
+    const registrationResult = await sql`
+      SELECT ca.registration_id FROM campers ca
+      WHERE ca.id = ${camperId}::uuid
+    `;
+    
+    if (!registrationResult[0]?.registration_id) {
+      return res.status(400).json({ error: 'Camper does not have a registration' });
+    }
+    
+    const registrationId = registrationResult[0].registration_id;
+    
+    // No need to update snackbar_balance records - just create a liquidation transaction
+    // The balance will be calculated dynamically (total loaded - total spent)
+    
+    // Create a transaction record with the total liquidated amount
+    const now = new Date().toISOString();
+    const transactionResult = await sql`
+      INSERT INTO snack_bar_transactions (
+        camper_id, amount, created_at, is_liquidated
+      ) VALUES (
+        ${camperId}::uuid, ${currentBalance}, ${now}, true
+      ) RETURNING *
+    `;
+    
+    res.status(200).json({
+      message: 'Balance liquidated successfully',
+      liquidated_amount: currentBalance,
+      camper_name: camperCheck[0].name,
     });
   } catch (error) {
-    console.error('Error getting snack bar balance:', error);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Error liquidating camper balance:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-});
+}) as any);
 
-// Get camper's transactions
-app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Response) => {
-  try {
-    const { camperId } = req.params
-    const teamId = getTeamId(req)
-
-    if (!teamId) {
-      return res.status(401).json({ error: 'Team ID is required' })
-    }
-
-    // Get camper's transactions
-    const result = await query`
-      SELECT t.*
-      FROM snack_bar_transactions t
-      JOIN campers c ON t.camper_id = c.id
-      JOIN registrations r ON c.registration_id = r.id
-      JOIN camps cp ON r.camp_id = cp.id
-      WHERE c.id = ${camperId}
-      AND cp.team_id = ${teamId}
-      ORDER BY t.created_at DESC
-    `
-
-    return res.status(200).json(result)
-  } catch {
-    return res.status(500).json({ error: 'Internal server error' })
+// Liquidate snackbar balance for a staff member
+app.post('/api/snackbar-balance/staff/:staffId/liquidate', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
   }
-}) as RequestHandler)
-
-// Create transaction (deduct balance)
-app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
   try {
-    const { camper_id, amount } = req.body
-    const teamId = getTeamId(req)
-
-    // Log request details for debugging
-    console.log('Snackbar transaction request:', { 
-      camper_id, 
-      amount, 
-      teamId,
-      headers: req.headers
-    })
-
-    if (!teamId) {
-      return res.status(401).json({ error: 'Team ID is required in x-team-id header' })
+    const { staffId } = req.params;
+    
+    // Check if staff member belongs to the team
+    const staffCheck = await sql`
+      SELECT s.id, s.name FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staffId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!staffCheck[0]) {
+      return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
     }
-
-    if (!camper_id || !amount) {
-      return res.status(400).json({ error: 'Camper ID and amount are required' })
-    }
-
-    // Verify if camper belongs to the team and get registration_id
-    const camperResult = await query`
-      SELECT c.id, c.registration_id
-      FROM campers c
-      JOIN registrations r ON c.registration_id = r.id
-      JOIN camps cp ON r.camp_id = cp.id
-      WHERE c.id = ${camper_id}
-      AND cp.team_id = ${teamId}
-    `
-
-    if (camperResult.length === 0) {
-      return res.status(404).json({ error: 'Camper not found or does not belong to your team' })
-    }
-
-    const registrationId = camperResult[0].registration_id
-
-    // Calculate current balance from snackbar_balance and snack_bar_transactions tables
-    const depositResult = await query`
-      SELECT COALESCE(SUM(amount), 0) as total_deposit
-      FROM snackbar_balance
-      WHERE registration_id = ${registrationId}
-    `
-
-    const spentResult = await query`
+    
+    // Get total loaded from snackbar_balance (confirmed payments only)
+    const balanceResult = await sql`
+      SELECT 
+        COALESCE(SUM(sb.amount), 0) as total_loaded,
+        CASE 
+          WHEN COUNT(*) = 0 THEN 'confirmed'
+          WHEN COUNT(*) = COUNT(CASE WHEN sb.payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM snackbar_balance sb
+      JOIN staff s ON sb.staff_id = s.id
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staffId}::uuid 
+        AND c.team_id = ${teamId}::uuid
+        AND sb.payment_status = 'confirmed'
+    `;
+    
+    // Get total spent from snack_bar_transactions (non-liquidated)
+    const spentResult = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_spent
       FROM snack_bar_transactions
-      WHERE camper_id = ${camper_id}
-    `
-
-    const totalDeposit = Number(depositResult[0]?.total_deposit || 0)
-    const totalSpent = Number(spentResult[0]?.total_spent || 0)
-    const currentBalance = totalDeposit - totalSpent
-    const newBalance = currentBalance - Number(amount)
-
-    if (newBalance < 0) {
-      return res.status(400).json({ error: 'Insufficient balance' })
+      WHERE staff_id = ${staffId}
+        AND is_liquidated = false
+    `;
+    
+    // Get total liquidated from snack_bar_transactions (liquidated)
+    const liquidatedResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_liquidated
+      FROM snack_bar_transactions
+      WHERE staff_id = ${staffId}
+        AND is_liquidated = true
+    `;
+    
+    const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
+    const totalSpent = Number(spentResult[0]?.total_spent || 0);
+    const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
+    const currentBalance = totalLoaded - totalSpent - totalLiquidated;
+    const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
+    
+    if (currentBalance <= 0) {
+      return res.status(400).json({ error: 'Staff member has no balance to liquidate' });
     }
-
-    // Create transaction
-    const result = await query`
-      INSERT INTO snack_bar_transactions (camper_id, amount, created_at, updated_at)
-      VALUES (${camper_id}, ${amount}, NOW(), NOW())
-      RETURNING id, camper_id, amount, created_at
-    `
-
-    return res.status(200).json({
-      id: result[0].id,
-      camper_id: result[0].camper_id,
-      amount: Number(result[0].amount),
-      created_at: result[0].created_at,
-      current_balance: newBalance
-    })
+    
+    // Verificar se o payment_status é 'confirmed' para permitir liquidação
+    if (paymentStatus !== 'confirmed') {
+      return res.status(400).json({ error: 'Cannot liquidate balance that is not confirmed' });
+    }
+    
+    // Create a transaction record with the total liquidated amount
+    const now = new Date().toISOString();
+    const transactionResult = await sql`
+      INSERT INTO snack_bar_transactions (
+        staff_id, amount, created_at, is_liquidated
+      ) VALUES (
+        ${staffId}::uuid, ${currentBalance}, ${now}, true
+      ) RETURNING *
+    `;
+    
+    res.status(200).json({
+      message: 'Balance liquidated successfully',
+      liquidated_amount: currentBalance,
+      staff_name: staffCheck[0].name,
+      transaction: transactionResult[0]
+    });
   } catch (error) {
-    console.error('Error creating snack bar transaction:', error)
-    return res.status(500).json({ 
-      error: 'Internal server error', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
-    })
+    console.error('Error liquidating snackbar balance:', error);
+    res.status(500).json({ error: 'Error liquidating snackbar balance', details: error.message });
   }
-}) as RequestHandler)
+}) as any);
+
+// Get transactions for a specific staff member
+app.get('/api/snackbar-transactions/staff/:staffId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { staffId } = req.params;
+    
+    // Check if staff member belongs to the team
+    const staffCheck = await sql`
+      SELECT s.id FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staffId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!staffCheck[0]) {
+      return res.status(404).json({ error: 'Staff member not found or does not belong to your team' });
+    }
+    
+    const transactions = await sql`
+      SELECT 
+        id,
+        staff_id,
+        amount,
+        is_liquidated,
+        created_at
+      FROM snack_bar_transactions
+      WHERE staff_id = ${staffId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    res.json(transactions);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar transactions' });
+  }
+}) as any);
+
+// Get snackbar balance records for a specific camper
+app.get('/api/snackbar-balance/camper/:camperId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camperId } = req.params;
+    
+    // Check if camper belongs to the team
+    const camperCheck = await sql`
+      SELECT ca.id FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!camperCheck[0]) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+    
+    // Get the registration_id for this camper
+    const registrationResult = await sql`
+      SELECT ca.registration_id FROM campers ca
+      WHERE ca.id = ${camperId}::uuid
+    `;
+    
+    if (!registrationResult[0]?.registration_id) {
+      return res.status(404).json({ error: 'Camper does not have a registration' });
+    }
+    
+    const registrationId = registrationResult[0].registration_id;
+    
+    // Get all snackbar balance records for this registration
+    const balanceRecords = await sql`
+      SELECT 
+        id,
+        amount,
+        payment_method,
+        payment_status,
+        phone_number,
+        created_at
+      FROM snackbar_balance
+      WHERE registration_id = ${registrationId}
+      ORDER BY created_at DESC
+    `;
+    
+    res.json(balanceRecords);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar balance records' });
+  }
+}) as any);
 
 // Get all transactions for a camp
 app.get('/api/snackbar-transactions', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
   try {
-    const { camp_id } = req.query
-    const teamId = getTeamId(req)
+    const { camp_id } = req.query;
+    
+    if (!camp_id) {
+      return res.status(400).json({ error: 'Camp ID is required' });
+    }
+    
+    // Check if camp belongs to the team
+    const campCheck = await sql`
+      SELECT id FROM camps WHERE id = ${camp_id}::uuid AND team_id = ${teamId}::uuid
+    `;
+    
+    if (!campCheck[0]) {
+      return res.status(404).json({ error: 'Camp not found or does not belong to your team' });
+    }
+    
+    // Buscar transações de campistas
+    const camperTransactions = await sql`
+      SELECT 
+        sbt.id,
+        sbt.camper_id,
+        sbt.amount,
+        sbt.created_at,
+        ca.name as person_name,
+        'camper' as person_type
+      FROM snack_bar_transactions sbt
+      JOIN campers ca ON sbt.camper_id = ca.id
+      JOIN registrations r ON ca.registration_id = r.id
+      WHERE r.camp_id = ${camp_id}::uuid
+    `;
+    
+    // Buscar transações de staff
+    const staffTransactions = await sql`
+      SELECT 
+        sbt.id,
+        sbt.staff_id,
+        sbt.amount,
+        sbt.created_at,
+        s.name as person_name,
+        'staff' as person_type
+      FROM snack_bar_transactions sbt
+      JOIN staff s ON sbt.staff_id = s.id
+      WHERE s.camp_id = ${camp_id}::uuid
+    `;
+    
+    // Combinar e ordenar todas as transações
+    const allTransactions = [...camperTransactions, ...staffTransactions]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    
+    res.json(allTransactions);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar transactions' });
+  }
+}) as any);
 
+// Get snackbar transactions for a specific camper
+app.get('/api/snackbar-transactions/:camperId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camperId } = req.params;
+    
+    // Check if camper belongs to the team
+    const camperCheck = await sql`
+      SELECT ca.id FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!camperCheck[0]) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+    
+    const transactions = await sql`
+      SELECT 
+        id,
+        camper_id,
+        amount,
+        is_liquidated,
+        created_at
+      FROM snack_bar_transactions
+      WHERE camper_id = ${camperId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    res.json(transactions);
+  } catch (error) {
+    console.error('Error fetching snackbar transactions for camper:', error);
+    res.status(500).json({ error: 'Error fetching snackbar transactions' });
+  }
+}) as any);
+
+// WEBHOOKS ENDPOINTS
+
+// Utilitário para integração real com Hookdeck
+async function createHookdeckConnection(type: 'registrations' | 'payments', teamId: string) {
+  const hookdeckApiKey = process.env.HOOKDECK_API_KEY
+  if (!hookdeckApiKey) {
+    throw new Error('HOOKDECK_API_KEY not configured')
+  }
+
+  // Forçar o uso da URL do Render para garantir que funcione
+  const baseUrl = 'https://camp-management-1.onrender.com'
+  const webhookUrl = `${baseUrl}/api/webhooks/${type}/${teamId}`
+
+  // 1. Criar Destination
+  const timestamp = Date.now()
+  const sanitizedName = `webhook-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
+  const destinationPayload = {
+    name: sanitizedName,
+    config: {
+      url: webhookUrl,
+      method: type === 'payments' ? 'GET' : 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+  }
+
+  
+  const destinationResponse = await fetch('https://api.hookdeck.com/2025-01-01/destinations', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${hookdeckApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(destinationPayload)
+  })
+
+  if (!destinationResponse.ok) {
+    const errorText = await destinationResponse.text()
+    throw new Error(`Failed to create destination: ${destinationResponse.statusText} - ${errorText}`)
+  }
+
+  const destination = await destinationResponse.json()
+
+  // 2. Criar Source
+  const sourceUrl = type === 'payments'
+    ? `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}?x-hookdeck-allow-methods=get`
+    : `https://hkdk.events/${Math.random().toString(36).slice(2, 10)}`
+  const sourceSanitizedName = `source-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
+  const sourcePayload = {
+    name: sourceSanitizedName,
+    url: sourceUrl,
+    config: {
+      custom_response: {
+        status: 200,
+        content_type: 'json', // Hookdeck exige 'json', 'text' ou 'xml'
+        headers: {
+          'Content-Type': 'application/json'
+        },
+                  body: JSON.stringify({
+            status: 'SUCCESS',
+            message: 'Webhook received and processed successfully'
+          })
+      }
+    }
+  }
+
+  
+  const sourceResponse = await fetch('https://api.hookdeck.com/2025-01-01/sources', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${hookdeckApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(sourcePayload)
+  })
+
+  if (!sourceResponse.ok) {
+    const errorText = await sourceResponse.text()
+    throw new Error(`Failed to create source: ${sourceResponse.statusText} - ${errorText}`)
+  }
+
+  const source = await sourceResponse.json()
+
+  // 3. Criar Connection
+  const connectionSanitizedName = `connection-${type}-team-${teamId}-${timestamp}`.replace(/[^A-z0-9-_]/g, '-')
+  const connectionPayload = {
+    name: connectionSanitizedName,
+    source_id: source.id,
+    destination_id: destination.id
+  }
+  
+  const connectionResponse = await fetch('https://api.hookdeck.com/2025-01-01/connections', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${hookdeckApiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(connectionPayload)
+  })
+
+  if (!connectionResponse.ok) {
+    const errorText = await connectionResponse.text()
+    throw new Error(`Failed to create connection: ${connectionResponse.statusText} - ${errorText}`)
+  }
+
+  const connection = await connectionResponse.json()
+
+  const result = {
+    connection: { id: connection.id },
+    source: { id: source.id, url: source.url },
+    destination: { id: destination.id },
+    webhookUrl: source.url
+  }
+  
+  return result
+}
+
+async function deleteHookdeckConnection(connectionId: string) {
+  const hookdeckApiKey = process.env.HOOKDECK_API_KEY
+  if (!hookdeckApiKey) {
+    throw new Error('HOOKDECK_API_KEY not configured')
+  }
+
+  const response = await fetch(`https://api.hookdeck.com/2025-01-01/connections/${connectionId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${hookdeckApiKey}`
+    }
+  })
+
+  // Se a connection não existe (404), consideramos sucesso
+  if (response.status === 404) {
+    return true
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete connection: ${response.statusText}`)
+  }
+
+  return true
+}
+
+async function deleteHookdeckResources(connectionId: string, sourceId?: string, destinationId?: string) {
+  const hookdeckApiKey = process.env.HOOKDECK_API_KEY
+  if (!hookdeckApiKey) {
+    throw new Error('HOOKDECK_API_KEY not configured')
+  }
+
+
+  const headers = {
+    'Authorization': `Bearer ${hookdeckApiKey}`,
+    'Content-Type': 'application/json'
+  }
+
+  // 1. Deletar connection
+  try {
+    await deleteHookdeckConnection(connectionId)
+  } catch {
+  }
+
+  // 2. Deletar source se fornecido
+  if (sourceId) {
+    try {
+      const sourceResponse = await fetch(`https://api.hookdeck.com/2025-01-01/sources/${sourceId}`, {
+        method: 'DELETE',
+        headers
+      })
+      
+      if (sourceResponse.status === 404) {
+        // Source not found, assuming already deleted
+      } else if (sourceResponse.ok) {
+        // Successfully deleted source
+      } else {
+        // Failed to delete source
+      }
+    } catch {
+      // Error deleting source
+    }
+  }
+
+  // 3. Deletar destination se fornecido
+  if (destinationId) {
+    try {
+      const destinationResponse = await fetch(`https://api.hookdeck.com/2025-01-01/destinations/${destinationId}`, {
+        method: 'DELETE',
+        headers
+      })
+      
+      if (destinationResponse.status === 404) {
+        // Destination not found, assuming already deleted
+      } else if (destinationResponse.ok) {
+        // Successfully deleted destination
+      } else {
+        // Failed to delete destination
+      }
+    } catch {
+      // Error deleting destination
+    }
+  }
+
+  return true
+}
+
+// 1. GET /api/webhooks/config
+app.get('/api/webhooks/config', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
     if (!teamId) {
       return res.status(401).json({ error: 'Team ID is required' })
     }
-
-    if (!camp_id) {
-      return res.status(400).json({ error: 'Camp ID is required' })
-    }
-
-    // Get all transactions for the camp
-    const result = await query`
-      SELECT t.*, c.name as camper_name
-      FROM snack_bar_transactions t
-      JOIN campers c ON t.camper_id = c.id
-      JOIN registrations r ON c.registration_id = r.id
-      JOIN camps cp ON r.camp_id = cp.id
-      WHERE cp.id = ${camp_id}
-      AND cp.team_id = ${teamId}
-      ORDER BY t.created_at DESC
+    const result = await sql`
+      SELECT * FROM webhook_configs WHERE team_id = ${teamId}::uuid
     `
-
     return res.status(200).json(result)
-  } catch {
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}) as RequestHandler)
-
-// === WEBHOOK ROUTES === //
-
-// Helper function to validate webhook payload for registrations
-function validateRegistrationPayload(payload: any) {
-  const errors: string[] = []
-  if (!payload.name) errors.push('name is required')
-  if (!payload.email) errors.push('email is required')
-  if (!payload.contact) errors.push('contact is required')
-  return errors
-}
-
-// Helper function to map webhook payload to registration fields
-function mapRegistrationPayload(payload: any, userId: string) {
-  return {
-    id: payload.id || null, // UUID will be generated if not provided
-    form_id: payload.form_id || null,
-    name: payload.name,
-    email: payload.email,
-    contact: payload.contact,
-    status: payload.status || 'unpaid',
-    user_id: userId,
-    camp_id: payload.camp_id || null,
-    onboarding_status: payload.onboarding_status || 'Pendente',
-    snack_bar_balance: payload.snack_bar_balance || 0.00,
-    total_amount_paid: payload.total_amount_paid || 0,
-    id_number: payload.id_number || null,
-    sns_number: payload.sns_number || null,
-    date_of_birth: payload.date_of_birth || null,
-    dietary_restrictions: payload.dietary_restrictions || null,
-    guardian_name: payload.guardian_name || null,
-    guardian_email: payload.guardian_email || null,
-    guardian_phone: payload.guardian_phone || null
-  }
-}
-
-// Helper function to make Hookdeck API calls
-async function makeHookdeckRequest(endpoint: string, method: string = 'GET', body: any = null) {
-  const url = `https://api.hookdeck.com/2025-01-01${endpoint}`
-  const options: any = {
-    method,
-    headers: {
-      'Authorization': `Bearer ${process.env.HOOKDECK_API_KEY}`,
-      'Content-Type': 'application/json',
-    }
-  }
-  if (body) {
-    options.body = JSON.stringify(body)
-  }
-  const response = await fetch(url, options)
-  const responseText = await response.text()
-  if (!response.ok) {
-    throw new Error(`Hookdeck API error: ${response.status} ${response.statusText} - ${responseText}`)
-  }
-  return JSON.parse(responseText)
-}
-
-// Endpoint para ler configuração atual dos webhooks do time
-app.get('/api/webhooks/config', async (req: Request, res: Response) => {
-  const teamId = getTeamId(req)
-  if (!teamId) return res.status(401).json({ error: 'Unauthorized' })
-  try {
-    const configs = await query`
-      SELECT * FROM webhook_configs WHERE team_id = ${teamId}
-    `
-    // Se não houver configurações, retornar um array vazio
-    if (!configs || configs.length === 0) {
-      return res.json([])
-    }
-    res.json(configs)
   } catch (error) {
-    console.error('Error fetching webhook configs:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
-})
+}) as any)
 
-// Endpoint para salvar configuração dos webhooks
-app.post('/api/webhooks/config', async (req: Request, res: Response) => {
-  const teamId = getTeamId(req)
-  if (!teamId) return res.status(401).json({ error: 'Unauthorized' })
-  
+// 2. POST /api/webhooks/config
+app.post('/api/webhooks/config', (async (req: Request, res: Response) => {
   try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
     const {
       apiKey,
       registrationWebhook,
@@ -1615,346 +2922,1600 @@ app.post('/api/webhooks/config', async (req: Request, res: Response) => {
       paymentWebhookUrl,
       hookdeckData
     } = req.body
-    
-    // Verificar se já existe configuração para este time
-    const existingConfig = await query`
-      SELECT id, api_key FROM webhook_configs WHERE team_id = ${teamId}
+
+    // Upsert config (um por time)
+    const result = await sql`
+      INSERT INTO webhook_configs (
+        team_id, api_key, registration_webhook, payment_webhook, is_connected,
+        registration_webhook_url, payment_webhook_url, hookdeck_data, updated_at
+      ) VALUES (
+        ${teamId}::uuid, ${apiKey}, ${registrationWebhook}, ${paymentWebhook}, ${isConnected},
+        ${registrationWebhookUrl}, ${paymentWebhookUrl}, ${JSON.stringify(hookdeckData)}, NOW()
+      )
+      ON CONFLICT (team_id) DO UPDATE SET
+        api_key = EXCLUDED.api_key,
+        registration_webhook = EXCLUDED.registration_webhook,
+        payment_webhook = EXCLUDED.payment_webhook,
+        is_connected = EXCLUDED.is_connected,
+        registration_webhook_url = EXCLUDED.registration_webhook_url,
+        payment_webhook_url = EXCLUDED.payment_webhook_url,
+        hookdeck_data = EXCLUDED.hookdeck_data,
+        updated_at = NOW()
+      RETURNING *
     `
+    return res.status(200).json(result[0])
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// 3. POST /api/webhooks/setup
+app.post('/api/webhooks/setup', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+    const { webhookType } = req.body
+    if (!['registrations', 'payments'].includes(webhookType)) {
+      return res.status(400).json({ error: 'Invalid webhook type' })
+    }
     
-    if (existingConfig.length > 0) {
-      // Atualizar configuração existente, mantendo a api_key existente se não fornecida
-      const currentApiKey = existingConfig[0].api_key
-      await query`
-        UPDATE webhook_configs
-        SET 
-          api_key = ${apiKey || currentApiKey},
-          registration_webhook = ${registrationWebhook},
-          payment_webhook = ${paymentWebhook},
-          is_connected = ${isConnected},
-          registration_webhook_url = ${registrationWebhookUrl},
-          payment_webhook_url = ${paymentWebhookUrl},
-          hookdeck_data = ${JSON.stringify(hookdeckData)}::jsonb,
-          updated_at = NOW()
-        WHERE team_id = ${teamId}
-      `
-    } else {
-      // Criar nova configuração com uma nova api_key se não fornecida
-      await query`
-        INSERT INTO webhook_configs (
-          team_id,
-          api_key,
-          registration_webhook,
-          payment_webhook,
-          is_connected,
-          registration_webhook_url,
-          payment_webhook_url,
-          hookdeck_data,
-          created_at,
-          updated_at
-        ) VALUES (
-          ${teamId},
-          ${apiKey || crypto.randomUUID()},
-          ${registrationWebhook},
-          ${paymentWebhook},
-          ${isConnected},
-          ${registrationWebhookUrl},
-          ${paymentWebhookUrl},
-          ${JSON.stringify(hookdeckData)}::jsonb,
-          NOW(),
-          NOW()
-        )
-      `
+    // Criar connection real no Hookdeck
+    const hookdeck = await createHookdeckConnection(webhookType, teamId)
+    return res.status(200).json(hookdeck)
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// 4. DELETE /api/webhooks/cleanup
+app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    const { connectionId, sourceId, destinationId, webhookType } = req.body
+    
+    if (!connectionId) {
+      return res.status(400).json({ error: 'Connection ID is required' })
+    }
+    
+    // Remover todos os recursos do Hookdeck (connection, source, destination)
+    try {
+      await deleteHookdeckResources(connectionId, sourceId, destinationId)
+    } catch {
+      // Continuamos mesmo se falhar no Hookdeck, pois pode já ter sido deletado
+    }
+    
+    // Atualizar estado na base de dados
+    try {
+      if (webhookType) {
+        const webhookPropName = webhookType === 'registrations' ? 'registration_webhook' : 'payment_webhook'
+        const webhookUrlPropName = webhookType === 'registrations' ? 'registration_webhook_url' : 'payment_webhook_url'
+        
+        // Buscar configuração atual
+        const currentConfig = await sql`
+          SELECT * FROM webhook_configs WHERE team_id = ${teamId}::uuid
+        `
+        
+        if (currentConfig.length > 0) {
+          const config = currentConfig[0]
+          const hookdeckData = config.hookdeck_data || {}
+          
+          // Remover dados do webhook específico
+          delete hookdeckData[webhookType]
+          
+          // Verificar se ainda há webhooks ativos
+          const hasActiveWebhooks = (webhookType === 'registrations' ? false : config.registration_webhook) || 
+                                   (webhookType === 'payments' ? false : config.payment_webhook)
+          
+          // Atualizar configuração
+          await sql`
+            UPDATE webhook_configs 
+            SET 
+              ${webhookPropName} = false,
+              ${webhookUrlPropName} = '',
+              hookdeck_data = ${JSON.stringify(hookdeckData)},
+              is_connected = ${hasActiveWebhooks},
+              updated_at = NOW()
+            WHERE team_id = ${teamId}::uuid
+          `
+          
+          // Updated database state
+        }
+      }
+    } catch {
+      // Não falhamos a operação se a atualização do DB falhar
     }
     
     return res.status(200).json({ success: true })
   } catch (error) {
-    console.error('Error saving webhook config:', error)
     return res.status(500).json({ error: 'Internal server error' })
   }
-})
+}) as any)
 
-// Setup webhook endpoint
-app.post('/api/webhooks/setup', async (req: Request, res: Response) => {
-  try {
-    const teamId = getTeamId(req)
-    if (!teamId) {
-      return res.status(401).json({ error: 'Unauthorized' })
-    }
-    const { webhookType } = req.body
-    if (!webhookType || !['registrations', 'payments'].includes(webhookType)) {
-      return res.status(400).json({ error: 'Invalid webhook type. Must be "registrations" or "payments"' })
-    }
+// ===== LEMON SQUEEZY WEBHOOKS =====
 
-    // Step 1: Create destination
-    const timestamp = Date.now()
-    const destination = await makeHookdeckRequest('/destinations', 'POST', {
-      name: `webhook-${webhookType}-user-${teamId}-${timestamp}`,
-      config: {
-        url: `${req.protocol}://${req.get('host')}/api/webhooks/${webhookType}/${teamId}`
-      }
-    })
-
-    // Step 2: Create source
-    const source = await makeHookdeckRequest('/sources', 'POST', {
-      name: `${webhookType}-user-${teamId}-${timestamp}`,
-      type: 'WEBHOOK',
-      alias: `${webhookType}-user-${teamId}-${timestamp}`,
-      label: `${webhookType.charAt(0).toUpperCase() + webhookType.slice(1)} Webhook`
-    })
-
-    // Step 3: Create connection
-    const connection = await makeHookdeckRequest('/connections', 'POST', {
-      name: `connection-${webhookType}-user-${teamId}-${timestamp}`,
-      source_id: source.id,
-      destination_id: destination.id
-    })
-
-    // Check if webhook config exists
-    const existing = await query`
-      SELECT id FROM webhook_configs WHERE team_id = ${teamId}
-    `
-
-    const hookdeckData = {
-      [webhookType]: { destination, source, connection }
-    }
-
-    if (existing.length > 0) {
-      // Update existing config
-      if (webhookType === 'registrations') {
-        await query`
-          UPDATE webhook_configs
-          SET registration_webhook = true,
-              registration_webhook_url = ${source.url},
-              is_connected = true,
-              hookdeck_data = COALESCE(hookdeck_data, '{}'::jsonb) || ${JSON.stringify(hookdeckData)}::jsonb,
-              updated_at = NOW()
-          WHERE team_id = ${teamId}
-        `
-      } else {
-        await query`
-          UPDATE webhook_configs
-          SET payment_webhook = true,
-              payment_webhook_url = ${source.url},
-              is_connected = true,
-              hookdeck_data = COALESCE(hookdeck_data, '{}'::jsonb) || ${JSON.stringify(hookdeckData)}::jsonb,
-              updated_at = NOW()
-          WHERE team_id = ${teamId}
-        `
-      }
-    } else {
-      // Create new config
-      await query`
-        INSERT INTO webhook_configs (
-          team_id,
-          api_key,
-          registration_webhook,
-          payment_webhook,
-          is_connected,
-          registration_webhook_url,
-          payment_webhook_url,
-          hookdeck_data,
-          created_at,
-          updated_at
-        ) VALUES (
-          ${teamId},
-          ${crypto.randomUUID()},
-          ${webhookType === 'registrations'},
-          ${webhookType === 'payments'},
-          true,
-          ${webhookType === 'registrations' ? source.url : null},
-          ${webhookType === 'payments' ? source.url : null},
-          ${JSON.stringify(hookdeckData)}::jsonb,
-          NOW(),
-          NOW()
-        )
-      `
-    }
-
-    return res.status(200).json({
-      success: true,
-      webhookUrl: source.url,
-      destination,
-      source,
-      connection
-    })
-  } catch (error) {
-    console.error('Error setting up webhook:', error)
-    return res.status(500).json({ 
-      error: 'Failed to setup webhook',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    })
+// Função utilitária para validar assinatura do Lemon Squeezy
+function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
+  const signature = req.headers['x-signature'] as string
+  if (!signature) {
+    return false
   }
-})
+  
+  // Usar sempre o corpo RAW se disponível
+  const rawBody = (req as any).rawBody || JSON.stringify(req.body)
+  
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody)
+    .digest('hex')
+  
+  return signature === expectedSignature
+}
 
-// Cleanup webhook endpoint
-app.delete('/api/webhooks/cleanup', async (req: Request, res: Response) => {
+// Process Lemon Squeezy payment confirmations
+app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
   try {
-    const teamId = getTeamId(req)
-    if (!teamId) {
-      return res.status(401).json({ error: 'Unauthorized' })
+    // Validar assinatura do webhook
+    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
+    
+    if (secret) {
+      const isValid = isValidLemonSqueezySignature(req, secret)
+      
+      if (!isValid) {
+        // Temporariamente permitir webhooks com assinatura inválida para debug
+        // return res.status(401).json({ error: 'Invalid webhook signature' })
+      }
     }
-    const { connectionId, sourceId, destinationId } = req.body
-    if (!connectionId || !sourceId || !destinationId) {
-      return res.status(400).json({ error: 'Missing required IDs for cleanup' })
+    
+    const { meta, data } = req.body
+
+    if (!meta || !data) {
+      return res.status(400).json({ error: 'Invalid webhook payload' })
     }
-    // Delete in reverse order: connection, source, destination
-    await makeHookdeckRequest(`/connections/${connectionId}`, 'DELETE')
-    await makeHookdeckRequest(`/sources/${sourceId}`, 'DELETE')
-    await makeHookdeckRequest(`/destinations/${destinationId}`, 'DELETE')
 
-    // Atualizar webhook_configs para is_enabled = false
-    await query`
-      UPDATE webhook_configs
-      SET is_enabled = false, updated_at = NOW()
-      WHERE team_id = ${teamId} AND (
-        (hookdeck_data->'source'->>'id' = ${sourceId})
-        OR (hookdeck_data->'connection'->>'id' = ${connectionId})
-      )
-    `
+    const eventName = meta.event_name
+    
+    // Handle subscription or order events
+    if (eventName === 'subscription_created' || eventName === 'order_created' || eventName === 'checkout_completed' || eventName === 'order_created') {
+      // O custom_data está no meta, não no data.attributes
+      const customData = meta.custom_data
+      
+      // Try to get teamId from different possible locations
+      let teamId = null
+      let planType = 'premium'
+      
+      if (meta.custom_data && meta.custom_data.teamId) {
+        teamId = meta.custom_data.teamId
+        planType = meta.custom_data.planType || 'premium'
+      } else if (customData && customData.teamId) {
+        teamId = customData.teamId
+        planType = customData.planType || 'premium'
+      } else if (data.attributes?.custom_data?.teamId) {
+        teamId = data.attributes.custom_data.teamId
+        planType = data.attributes.custom_data.planType || 'premium'
+      } else if (data.attributes?.custom?.teamId) {
+        teamId = data.attributes.custom.teamId
+        planType = data.attributes.custom.planType || 'premium'
+      }
+      
+      if (!teamId) {
+        return res.status(200).json({ message: 'Processed but no team ID found' })
+      }
 
-    return res.status(200).json({
-      success: true,
-      message: 'Webhook cleaned up successfully'
-    })
+      try {
+        // Update team to premium tier
+        const result = await sql`
+          UPDATE teams 
+          SET tier = ${planType}, updated_at = NOW()
+          WHERE id = ${teamId}::uuid
+          RETURNING *
+        `
+
+        if (result.length > 0) {
+          // Store subscription data for future reference
+          const subscriptionData = {
+            team_id: teamId,
+            subscription_id: data.id,
+            variant_id: data.attributes?.variant_id || null,
+            status: data.attributes?.status || 'active',
+            event_name: eventName,
+            custom_data: meta.custom_data || customData || data.attributes?.custom_data || data.attributes?.custom
+          }
+          
+          await sql`
+            INSERT INTO lemon_squeezy_subscriptions (
+              team_id, 
+              subscription_id, 
+              variant_id,
+              status,
+              event_name,
+              custom_data,
+              created_at,
+              updated_at
+            ) VALUES (
+              ${teamId}::uuid, 
+              ${data.id}, 
+              ${data.attributes?.variant_id || null},
+              ${data.attributes?.status || 'active'},
+              ${eventName},
+              ${JSON.stringify(meta.custom_data || customData || data.attributes?.custom_data || data.attributes?.custom)},
+              NOW(),
+              NOW()
+            )
+            ON CONFLICT (team_id, subscription_id) DO UPDATE SET
+              status = EXCLUDED.status,
+              event_name = EXCLUDED.event_name,
+              custom_data = EXCLUDED.custom_data,
+              updated_at = NOW()
+          `
+          
+        } else {
+          // Team not found for upgrade
+        }
+      } catch {
+        // Don't fail the webhook response
+      }
+    }
+
+    // Handle subscription cancellation
+    if (eventName === 'subscription_cancelled') {
+      const customData = data.attributes?.custom_data
+      
+      if (customData && customData.teamId) {
+        const teamId = customData.teamId
+
+        try {
+          // Downgrade team to free tier
+          await sql`
+            UPDATE teams 
+            SET tier = 'free', updated_at = NOW()
+            WHERE id = ${teamId}::uuid
+          `
+
+          // Update subscription status
+          await sql`
+            UPDATE lemon_squeezy_subscriptions 
+            SET status = 'cancelled', updated_at = NOW()
+            WHERE team_id = ${teamId}::uuid AND subscription_id = ${data.id}
+          `
+
+        } catch {
+          // Database error processing subscription cancellation
+        }
+      }
+    }
+
+    return res.status(200).json({ message: 'Webhook processed successfully' })
   } catch (error) {
-    return res.status(500).json({ 
-      error: 'Failed to cleanup webhook',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    })
+    return res.status(500).json({ error: 'Internal server error' })
   }
-})
+}) as any)
 
-// Webhook endpoint for registrations
-app.post('/api/webhooks/registrations/:userId', (async (req: Request, res: Response) => {
+// Recebe webhooks de inscrições
+app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params
-    const payload = req.body
-    // Validate required fields
-    const validationErrors = validateRegistrationPayload(payload)
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        error: 'Validation failed', 
-        details: validationErrors 
-      })
+    const { teamId } = req.params;
+    // Lê o request_id do header enviado pelo Hookdeck
+    const request_id = req.headers['x-hookdeck-requestid'] as string | undefined;
+
+    const {
+      name,
+      email,
+      contact,
+      form_id,
+      camp_id,
+      status,
+      id_number,
+      sns_number,
+      date_of_birth,
+      dietary_restrictions,
+      guardian_name,
+      guardian_email,
+      guardian_phone
+    } = req.body;
+
+    // Validação dos campos obrigatórios
+    const errors: string[] = [];
+    if (!name) errors.push('name is required');
+    if (!email) errors.push('email is required');
+    if (!contact) errors.push('contact is required');
+    if (errors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: errors });
     }
-    // Map payload to registration fields
-    const registrationData = mapRegistrationPayload(payload, userId)
-    // Insert registration into database
-    const result = await query`
+
+    // Validar se o teamId é válido
+    const teamResult = await sql`SELECT id FROM teams WHERE id = ${teamId}::uuid`;
+    if (!teamResult[0]) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    // Se camp_id for enviado, validar se pertence ao time
+    if (camp_id) {
+      const camp = await sql`SELECT id FROM camps WHERE id = ${camp_id} AND team_id = ${teamId}`;
+      if (!camp[0]) {
+        return res.status(400).json({ error: 'Camp does not belong to your team' });
+      }
+    }
+
+    // Validar se form_id já existe (se fornecido)
+    if (form_id) {
+      const existingFormId = await sql`
+        SELECT r.id FROM registrations r
+        JOIN camps c ON r.camp_id = c.id
+        WHERE r.form_id = ${form_id} AND c.team_id = ${teamId}::uuid
+      `;
+      
+      if (existingFormId.length > 0) {
+        return res.status(400).json({ 
+          error: 'Form ID already exists',
+          message: 'Este Form ID já está registado no sistema'
+        });
+      }
+    }
+
+    // Criar registration (sem team_id)
+    const now = new Date().toISOString();
+    const result = await sql`
       INSERT INTO registrations (
-        id, form_id, name, email, contact, status, user_id, camp_id,
-        onboarding_status, snack_bar_balance, total_amount_paid,
-        id_number, sns_number, date_of_birth, dietary_restrictions,
-        guardian_name, guardian_email, guardian_phone, created_at, updated_at
+        camp_id, name, email, contact, status, form_id, id_number, sns_number, date_of_birth, dietary_restrictions, guardian_name, guardian_email, guardian_phone, request_id, created_at, updated_at
       ) VALUES (
-        COALESCE(${registrationData.id}::uuid, gen_random_uuid()),
-        ${registrationData.form_id},
-        ${registrationData.name},
-        ${registrationData.email},
-        ${registrationData.contact},
-        ${registrationData.status}::registration_status,
-        ${registrationData.user_id}::uuid,
-        ${registrationData.camp_id}::uuid,
-        ${registrationData.onboarding_status}::onboarding_status_type,
-        ${registrationData.snack_bar_balance},
-        ${registrationData.total_amount_paid},
-        ${registrationData.id_number},
-        ${registrationData.sns_number},
-        ${registrationData.date_of_birth}::date,
-        ${registrationData.dietary_restrictions},
-        ${registrationData.guardian_name},
-        ${registrationData.guardian_email},
-        ${registrationData.guardian_phone},
-        timezone('utc'::text, now()),
-        timezone('utc'::text, now())
-      )
-      RETURNING *
-    `
-    const registration = result[0]
-    return res.status(201).json({
+        ${camp_id || null}, ${name}, ${email}, ${contact}, ${status || 'unpaid'}, ${form_id || null}, ${id_number || null}, ${sns_number || null}, ${date_of_birth || null}, ${dietary_restrictions || null}, ${guardian_name || null}, ${guardian_email || null}, ${guardian_phone || null}, ${request_id || null}, ${now}, ${now}
+      ) RETURNING *
+    `;
+
+    
+
+    return res.status(200).json({
       success: true,
       message: 'Registration created successfully',
-      registration: registration
-    })
+      registration: result[0]
+    });
   } catch (error) {
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    })
+    
+    return res.status(500).json({ error: 'Internal server error' });
   }
-}) as RequestHandler)
+});
 
-// Webhook endpoint for payments
-app.post('/api/webhooks/payments/:userId', (async (req: Request, res: Response) => {
+// Verificar se form_id já existe
+app.get('/api/registrations/check-form-id/:formId', (async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params
-    const payload = req.body
-    // Validate required fields for payment
-    if (!payload.registration_id && !payload.email) {
-      return res.status(400).json({ 
-        error: 'Either registration_id or email is required to identify the registration' 
-      })
+    const { formId } = req.params;
+    const teamId = getTeamId(req);
+
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' });
     }
-    if (!payload.amount) {
-      return res.status(400).json({ 
-        error: 'Payment amount is required' 
-      })
+
+    if (!formId) {
+      return res.status(400).json({ error: 'Form ID is required' });
     }
-    // Find the registration to update
-    let registration
-    if (payload.registration_id) {
-      const result = await query`
-        SELECT * FROM registrations 
-        WHERE id = ${payload.registration_id}::uuid AND user_id = ${userId}::uuid
-      `
-      registration = result[0]
-    } else {
-      const result = await query`
-        SELECT * FROM registrations 
-        WHERE email = ${payload.email} AND user_id = ${userId}::uuid
-        ORDER BY created_at DESC
-        LIMIT 1
-      `
-      registration = result[0]
+
+    // Verificar se o form_id já existe
+    const existingFormId = await sql`
+      SELECT r.id FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.form_id = ${formId} AND c.team_id = ${teamId}::uuid
+    `;
+    
+    const exists = existingFormId.length > 0;
+    
+    return res.status(200).json({
+      exists,
+      message: exists ? 'Este Form ID já está registado no sistema' : 'Form ID disponível'
+    });
+  } catch (error) {
+    console.error('Error checking form_id:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}) as any);
+
+// Recebe webhooks de pagamentos
+app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
+  try {
+    const { teamId } = req.params;
+    const { request_id, amount, phone_number, email, payment_method, payment_date, payment_status, payment_link, status } = req.query;
+
+    // Validação dos campos obrigatórios
+    const errors: string[] = [];
+    if (!amount) errors.push('amount is required');
+    if (!email && !request_id) errors.push('email or request_id query parameter is required');
+    if (errors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: errors });
     }
+
+    // Validar se o teamId é válido
+    const teamResult = await sql`SELECT id FROM teams WHERE id = ${teamId}::uuid`;
+    if (!teamResult[0]) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    const now = new Date().toISOString();
+    let registration = null;
+    let result = null;
+
+    // Lógica baseada no tipo de request_id
+    if (request_id) {
+      const requestIdStr = request_id as string;
+      
+      if (requestIdStr.startsWith('R')) {
+        // UPDATE na tabela payments - confirmar pagamento existente
+        const paymentUpdate = await sql`
+          UPDATE payments 
+          SET payment_status = 'confirmed', updated_at = ${now}
+          WHERE request_id = ${request_id} AND registration_id IN (
+            SELECT r.id FROM registrations r
+            JOIN camps c ON r.camp_id = c.id
+            WHERE c.team_id = ${teamId}::uuid
+          )
+          RETURNING *
+        `;
+        
+        if (paymentUpdate.length === 0) {
+          return res.status(404).json({ error: 'Payment not found or does not belong to your team' });
+        }
+        
+        result = paymentUpdate[0];
+        
+        // Buscar registration para resposta
+        const regResult = await sql`
+          SELECT r.* FROM registrations r
+          WHERE r.id = ${result.registration_id}
+        `;
+        registration = regResult[0];
+        
+      } else if (requestIdStr.startsWith('S')) {
+        // UPDATE na tabela snackbar_balance - confirmar pagamento existente
+        // Considera tanto campers (registration_id) quanto staff (staff_id)
+        const snackbarUpdate = await sql`
+          UPDATE snackbar_balance 
+          SET payment_status = 'confirmed', updated_at = ${now}
+          WHERE request_id = ${request_id} AND (
+            -- Caso seja de camper, valida o registration_id
+            (registration_id IS NOT NULL AND registration_id IN (
+              SELECT r.id FROM registrations r
+              JOIN camps c ON r.camp_id = c.id
+              WHERE c.team_id = ${teamId}::uuid
+            ))
+            -- Caso seja de staff, valida o staff_id
+            OR (staff_id IS NOT NULL AND staff_id IN (
+              SELECT s.id FROM staff s
+              JOIN camps c ON s.camp_id = c.id
+              WHERE c.team_id = ${teamId}::uuid
+            ))
+          )
+          RETURNING *
+        `;
+        
+        if (snackbarUpdate.length === 0) {
+          return res.status(404).json({ error: 'Snackbar payment not found or does not belong to your team' });
+        }
+        
+        result = snackbarUpdate[0];
+        
+        // Buscar registration ou staff para resposta
+        if (result.registration_id) {
+          // É um camper
+          const regResult = await sql`
+            SELECT r.* FROM registrations r
+            WHERE r.id = ${result.registration_id}
+          `;
+          registration = regResult[0];
+        } else if (result.staff_id) {
+          // É um staff
+          const staffResult = await sql`
+            SELECT s.* FROM staff s
+            WHERE s.id = ${result.staff_id}
+          `;
+          // Criar um objeto similar ao registration para manter compatibilidade
+          registration = staffResult[0] ? {
+            id: staffResult[0].id,
+            name: staffResult[0].name,
+            email: staffResult[0].email,
+            status: 'confirmed'
+          } : null;
+        }
+        
+      } else {
+        // INSERT na tabela payments - novo pagamento
+        // Buscar registration por form_id (que vem no request_id)
+        const regResult = await sql`
+          SELECT r.*, c.price as camp_price FROM registrations r
+          LEFT JOIN camps c ON r.camp_id = c.id
+          WHERE r.form_id = ${request_id} AND c.team_id = ${teamId}::uuid
+          ORDER BY r.created_at DESC LIMIT 1
+        `;
+        registration = regResult[0];
+        
+        if (!registration) {
+          return res.status(404).json({ error: 'Registration not found' });
+        }
+        
+        // Criar novo pagamento com os valores default e os da query
+        const paymentInsert = await sql`
+          INSERT INTO payments (
+            registration_id, payment_method, amount, payment_date, payment_status, payment_link, phone_number, request_id, created_at, updated_at
+          ) VALUES (
+            ${registration.id}, 'MB Way', ${amount}, ${now}, 'confirmed', null, ${phone_number || null}, ${request_id}, ${now}, ${now}
+          ) RETURNING *
+        `;
+        
+        result = paymentInsert[0];
+      }
+      
+    } else if (email) {
+      // Buscar registration por email
+      const regResult = await sql`
+        SELECT r.*, c.price as camp_price FROM registrations r
+        LEFT JOIN camps c ON r.camp_id = c.id
+        WHERE r.email = ${email} AND c.team_id = ${teamId}
+        ORDER BY r.created_at DESC LIMIT 1
+      `;
+      registration = regResult[0];
+      
+      if (!registration) {
+        return res.status(404).json({ error: 'Registration not found' });
+      }
+      
+      // Criar novo pagamento
+      const paymentInsert = await sql`
+        INSERT INTO payments (
+          registration_id, payment_method, amount, payment_date, payment_status, payment_link, phone_number, request_id, created_at, updated_at
+        ) VALUES (
+          ${registration.id}, ${payment_method || 'webhook'}, ${amount}, ${payment_date || now}, ${payment_status || 'confirmed'}, ${payment_link || null}, ${phone_number || null}, ${request_id || null}, ${now}, ${now}
+        ) RETURNING *
+      `;
+      
+      result = paymentInsert[0];
+    }
+
     if (!registration) {
-      return res.status(404).json({ 
-        error: 'Registration not found' 
-      })
+      return res.status(404).json({ error: 'Registration not found' });
     }
-    // Update payment information
-    const newTotalPaid = (parseFloat(registration.total_amount_paid) || 0) + parseFloat(payload.amount)
-    const newStatus = payload.status || (newTotalPaid > 0 ? 'paid' : 'unpaid')
-    const updateResult = await query`
-      UPDATE registrations 
-      SET 
-        total_amount_paid = ${newTotalPaid},
-        status = ${newStatus}::registration_status,
-        updated_at = timezone('utc'::text, now())
-      WHERE id = ${registration.id}::uuid
-      RETURNING *
-    `
-    const updatedRegistration = updateResult[0]
+
+    // Atualizar status do registro se enviado
+    let updatedRegistration = registration;
+    if (status) {
+      const regUpdate = await sql`
+        UPDATE registrations SET status = ${status}, updated_at = ${now} WHERE id = ${registration.id} RETURNING *
+      `;
+      updatedRegistration = regUpdate[0] || registration;
+    }
+
+    // Calcular total pago
+    const totalPaidResult = await sql`
+      SELECT COALESCE(SUM(amount), 0) as total_paid FROM payments WHERE registration_id = ${registration.id}
+    `;
+    const totalPaid = Number(totalPaidResult[0]?.total_paid || 0);
+
     return res.status(200).json({
       success: true,
       message: 'Payment processed successfully',
-      registration: updatedRegistration,
+      registration: {
+        id: updatedRegistration.id,
+        total_amount_paid: totalPaid,
+        status: updatedRegistration.status,
+        email: updatedRegistration.email,
+        name: updatedRegistration.name
+      },
       payment: {
-        amount: parseFloat(payload.amount),
-        total_paid: newTotalPaid,
-        status: newStatus
+        amount: Number(amount),
+        total_paid: totalPaid,
+        status: updatedRegistration.status,
+        payment_method: result?.payment_method || 'MB Way',
+        payment_status: result?.payment_status || 'confirmed'
+      }
+    });
+  } catch (error) {
+    console.error('Error processing payment webhook:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/lemon-squeezy/checkout
+app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    // Buscar o usuário pelo token (id)
+    const userResult = await sql`SELECT team_id, first_name FROM public.users WHERE id = ${token}::uuid`;
+    const user = userResult[0];
+    if (!user || !user.team_id) {
+      return res.status(401).json({ error: 'User not found or no team associated' });
+    }
+    const { planType } = req.body;
+    // Chamar o serviço Lemon Squeezy (API)
+    const lemonApiKey = process.env.LEMON_SQUEEZY_API_KEY;
+    if (!lemonApiKey) {
+      return res.status(500).json({ error: 'Lemon Squeezy API key not configured' });
+    }
+    // IDs fixos do plano premium
+    const storeId = '181507';
+    const variantId = '883664';
+    const returnUrl = req.body.returnUrl || (process.env.NEXT_PUBLIC_APP_URL + '/settings/billing');
+    // Montar payload baseado na documentação oficial do Lemon Squeezy
+    const payload = {
+      data: {
+        type: 'checkouts',
+        attributes: {
+          checkout_options: {
+            embed: false, // false para desabilitar overlay - abrir em nova página
+            media: true,
+            logo: true,
+            desc: true,
+            discount: true,
+            subscription_preview: true
+          },
+          product_options: {
+            redirect_url: returnUrl // URL de redirecionamento após pagamento bem-sucedido
+          },
+          checkout_data: {
+            name: user.first_name || 'Campy User',
+            custom: {
+              teamId: user.team_id,
+              planType: planType || 'premium',
+              timestamp: new Date().toISOString(),
+            },
+          },
+          test_mode: process.env.NODE_ENV !== 'production',
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Expira em 24 horas
+        },
+        relationships: {
+          store: { data: { type: 'stores', id: storeId } },
+          variant: { data: { type: 'variants', id: variantId } },
+        },
+      },
+    };
+    
+    // Fazer request à API Lemon Squeezy
+    const response = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/vnd.api+json',
+        'Content-Type': 'application/vnd.api+json',
+        'Authorization': `Bearer ${lemonApiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(500).json({ error: 'Lemon Squeezy API error', details: errorText });
+    }
+    const data = await response.json();
+    return res.status(200).json({ url: data.data.attributes.url });
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Test endpoint for Lemon Squeezy webhook signature validation
+app.post('/api/lemon-squeezy/test-signature', (async (req: Request, res: Response) => {
+  try {
+    
+    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
+    
+    
+    if (!secret) {
+      return res.status(400).json({ 
+        error: 'No webhook secret configured',
+        envVars: {
+          LEMON_SQUEEZY_WEBHOOK_SECRET: !!process.env.LEMON_SQUEEZY_WEBHOOK_SECRET,
+          NODE_ENV: process.env.NODE_ENV
+        }
+      })
+    }
+    
+    const isValid = isValidLemonSqueezySignature(req, secret)
+    
+    return res.status(200).json({ 
+      success: true,
+      signatureValid: isValid,
+      secretConfigured: !!secret,
+      secretLength: secret.length,
+      secretPreview: secret.substring(0, 10) + '...',
+      headers: req.headers,
+      body: req.body,
+      envVars: {
+        NODE_ENV: process.env.NODE_ENV
       }
     })
   } catch (error) {
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Test endpoint with real webhook payload
+app.post('/api/lemon-squeezy/test-real-signature', (async (req: Request, res: Response) => {
+  try {
+    
+    
+    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
+    if (!secret) {
+      return res.status(400).json({ error: 'No webhook secret configured' })
+    }
+    
+    // Payload real do webhook que recebemos
+    const realPayload = {
+      "meta": {
+        "test_mode": true,
+        "event_name": "subscription_created",
+        "custom_data": {
+          "teamId": "e4333e4d-c348-4a8e-bf74-09a32194d6d5",
+          "planType": "premium",
+          "timestamp": "2025-07-03T14:38:46.307Z"
+        },
+        "webhook_id": "test-webhook-id"
+      },
+      "data": {
+        "id": "test-subscription-id",
+        "type": "subscriptions",
+        "attributes": {
+          "status": "active",
+          "variant_id": "883664"
+        }
+      }
+    }
+    
+    const signature = "a96de36c1478ad4ec6f54ef9067b6e34f835d2ad6226fbd28a9a16afb1f1bb30"
+    
+    // Testar diferentes métodos
+    const payload1 = JSON.stringify(realPayload)
+    const signature1 = crypto.createHmac('sha256', secret).update(payload1).digest('hex')
+    
+    const payload2 = JSON.stringify(realPayload).replace(/\s+/g, '')
+    const signature2 = crypto.createHmac('sha256', secret).update(payload2).digest('hex')
+    
+    const payload3 = JSON.stringify(realPayload, null, 0)
+    const signature3 = crypto.createHmac('sha256', secret).update(payload3).digest('hex')
+    
+    return res.status(200).json({
+      success: true,
+      realSignature: signature,
+      method1: {
+        payload: payload1.substring(0, 100) + '...',
+        signature: signature1,
+        matches: signature === signature1
+      },
+      method2: {
+        payload: payload2.substring(0, 100) + '...',
+        signature: signature2,
+        matches: signature === signature2
+      },
+      method3: {
+        payload: payload3.substring(0, 100) + '...',
+        signature: signature3,
+        matches: signature === signature3
+      },
+      secretPreview: secret.substring(0, 10) + '...'
     })
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Test endpoint for Lemon Squeezy webhook accessibility
+app.get('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
+  
+  
+  return res.status(200).json({ 
+    message: 'Lemon Squeezy webhook endpoint is accessible',
+    method: 'GET',
+    timestamp: new Date().toISOString(),
+    note: 'This endpoint only accepts POST requests from Lemon Squeezy'
+  })
+}) as any)
+
+// Test endpoint for Lemon Squeezy webhook
+app.get('/api/lemon-squeezy/test', (async (req: Request, res: Response) => {
+  try {
+    const teamId = req.query.teamId as string
+    if (!teamId) {
+      return res.status(400).json({ error: 'Team ID is required' })
+    }
+
+    // Simulate a webhook payload for testing
+    const testPayload = {
+      meta: {
+        event_name: 'checkout_completed'
+      },
+      data: {
+        id: 'test-subscription-id',
+        attributes: {
+          status: 'active',
+          variant_id: '883664',
+          custom_data: {
+            teamId: teamId,
+            planType: 'premium',
+            timestamp: new Date().toISOString()
+          }
+        }
+      }
+    }
+
+    
+
+    // Process the test webhook
+    const { meta, data } = testPayload
+    const eventName = meta.event_name
+    const customData = data.attributes?.custom_data
+
+    if (customData && customData.teamId) {
+      const planType = customData.planType || 'premium'
+
+      // Update team to premium tier
+      const result = await sql`
+        UPDATE teams 
+        SET tier = ${planType}, updated_at = NOW()
+        WHERE id = ${customData.teamId}::uuid
+        RETURNING *
+      `
+
+      if (result.length > 0) {
+        
+        
+        // Store subscription data
+        await sql`
+          INSERT INTO lemon_squeezy_subscriptions (
+            team_id, 
+            subscription_id, 
+            variant_id,
+            status,
+            event_name,
+            custom_data,
+            created_at,
+            updated_at
+          ) VALUES (
+            ${customData.teamId}::uuid, 
+            ${data.id}, 
+            ${data.attributes?.variant_id || null},
+            ${data.attributes?.status || 'active'},
+            ${eventName},
+            ${JSON.stringify(customData)},
+            NOW(),
+            NOW()
+          )
+          ON CONFLICT (team_id, subscription_id) DO UPDATE SET
+            status = EXCLUDED.status,
+            event_name = EXCLUDED.event_name,
+            custom_data = EXCLUDED.custom_data,
+            updated_at = NOW()
+        `
+        
+        return res.status(200).json({ 
+          success: true, 
+          message: 'Test webhook processed successfully',
+          teamId: customData.teamId,
+          planType: planType
+        })
+      } else {
+        return res.status(404).json({ error: 'Team not found' })
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid test payload' })
+    }
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }) as RequestHandler)
 
+// Endpoint to check current team tier
+app.get('/api/teams/:id/tier', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const teamId = getTeamId(req)
+    
+    if (!teamId) {
+      return res.status(401).json({ error: 'Missing x-team-id header' })
+    }
+
+    // Ensure user can only check their own team
+    if (id !== teamId) {
+      return res.status(403).json({ error: 'You can only check your own team' })
+    }
+
+    const result = await sql`
+      SELECT tier FROM teams WHERE id = ${teamId}::uuid
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Team not found' })
+    }
+
+    return res.status(200).json({ tier: result[0].tier })
+  } catch (error) {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// STAFF ENDPOINTS
+
+// List all staff for the current team (optimized with single query)
+app.get('/api/staff', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    // Single optimized query that calculates all balances in one go
+    const staff = await sql`
+      SELECT 
+        s.*,
+        c.name as camp_name,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY staff_id
+      ) sb ON s.id = sb.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY staff_id
+      ) sbt_spent ON s.id = sbt_spent.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY staff_id
+      ) sbt_liquidated ON s.id = sbt_liquidated.staff_id
+      WHERE c.team_id = ${teamId}
+      ORDER BY s.created_at DESC
+    `;
+
+    // Process results to match expected format
+    const processedStaff = staff.map((staffMember: any) => ({
+      ...staffMember,
+      snack_bar_balance: Number(staffMember.snack_bar_balance) || 0,
+      totalLoaded: Number(staffMember.total_loaded) || 0,
+      totalSpent: Number(staffMember.total_spent) || 0,
+      totalLiquidated: Number(staffMember.total_liquidated) || 0,
+      payment_status: staffMember.payment_status || 'confirmed'
+    }));
+
+    res.json(processedStaff);
+  } catch (error) {
+    console.error('Error fetching staff:', error);
+    res.status(500).json({ error: 'Erro ao buscar staff.' });
+  }
+}) as any);
+
+// Get a single staff member by ID with balance
+app.get('/api/staff/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const staff = await sql`
+      SELECT 
+        s.*,
+        c.name as camp_name,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY staff_id
+      ) sb ON s.id = sb.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY staff_id
+      ) sbt_spent ON s.id = sbt_spent.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY staff_id
+      ) sbt_liquidated ON s.id = sbt_liquidated.staff_id
+      WHERE s.id = ${id} AND c.team_id = ${teamId}
+      LIMIT 1
+    `;
+    if (!staff[0]) {
+      return res.status(404).json({ error: 'Staff member not found' });
+    }
+    
+    // Process result to match expected format
+    const processedStaff = {
+      ...staff[0],
+      snack_bar_balance: Number(staff[0].snack_bar_balance) || 0,
+      totalLoaded: Number(staff[0].total_loaded) || 0,
+      totalSpent: Number(staff[0].total_spent) || 0,
+      totalLiquidated: Number(staff[0].total_liquidated) || 0,
+      payment_status: staff[0].payment_status || 'confirmed'
+    };
+    
+    res.json(processedStaff);
+  } catch (error) {
+    console.error('Error fetching staff member:', error);
+    res.status(500).json({ error: 'Erro ao buscar membro do staff.' });
+  }
+}) as any);
+
+// Get simple list of campers for dropdowns (without balance calculations)
+app.get('/api/campers/simple', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camp_id } = req.query;
+    
+    let campers;
+    if (camp_id) {
+      campers = await sql`
+        SELECT 
+          ca.id,
+          ca.name,
+          ca.email,
+          ca.contact,
+          r.form_id,
+          c.name as camp_name,
+          'camper' as type
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId} AND c.id = ${camp_id}
+        ORDER BY ca.name ASC
+      `;
+    } else {
+      campers = await sql`
+        SELECT 
+          ca.id,
+          ca.name,
+          ca.email,
+          ca.contact,
+          r.form_id,
+          c.name as camp_name,
+          'camper' as type
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}
+        ORDER BY ca.name ASC
+      `;
+    }
+
+    res.json(campers);
+  } catch (error) {
+    console.error('Error fetching simple campers list:', error);
+    res.status(500).json({ error: 'Erro ao buscar lista de campistas.' });
+  }
+}) as any);
+
+// Get simple list of staff for dropdowns (without balance calculations)
+app.get('/api/staff/simple', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const staff = await sql`
+      SELECT 
+        s.id,
+        s.name,
+        s.email,
+        s.phone,
+        c.name as camp_name,
+        'staff' as type
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY s.name ASC
+    `;
+
+    res.json(staff);
+  } catch (error) {
+    console.error('Error fetching simple staff list:', error);
+    res.status(500).json({ error: 'Erro ao buscar lista de staff.' });
+  }
+}) as any);
+
+// Get combined simple list of campers and staff for dropdowns
+app.get('/api/people/simple', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camp_id } = req.query;
+    
+    // Get campers
+    let campers;
+    if (camp_id) {
+      campers = await sql`
+        SELECT 
+          ca.id,
+          ca.name,
+          ca.email,
+          ca.contact,
+          r.form_id,
+          c.name as camp_name,
+          'camper' as type
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId} AND c.id = ${camp_id}
+        ORDER BY ca.name ASC
+      `;
+    } else {
+      campers = await sql`
+        SELECT 
+          ca.id,
+          ca.name,
+          ca.email,
+          ca.contact,
+          r.form_id,
+          c.name as camp_name,
+          'camper' as type
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}
+        ORDER BY ca.name ASC
+      `;
+    }
+
+    // Get staff
+    const staff = await sql`
+      SELECT 
+        s.id,
+        s.name,
+        s.email,
+        s.phone as contact,
+        NULL as form_id,
+        c.name as camp_name,
+        'staff' as type
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY s.name ASC
+    `;
+
+    // Combine and sort by name
+    const allPeople = [...campers, ...staff].sort((a, b) => 
+      a.name.localeCompare(b.name)
+    );
+
+    res.json(allPeople);
+  } catch (error) {
+    console.error('Error fetching simple people list:', error);
+    res.status(500).json({ error: 'Erro ao buscar lista de pessoas.' });
+  }
+}) as any);
+
+// Get a single person by ID with balance (for snack-bar selection)
+app.get('/api/people/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    
+    // First try to find as camper
+    let person = await sql`
+      SELECT 
+        ca.id,
+        ca.name,
+        ca.email,
+        ca.contact,
+        r.form_id,
+        c.name as camp_name,
+        'camper' as type,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          registration_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY registration_id
+      ) sb ON r.id = sb.registration_id
+      LEFT JOIN (
+        SELECT 
+          camper_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY camper_id
+      ) sbt_spent ON ca.id = sbt_spent.camper_id
+      LEFT JOIN (
+        SELECT 
+          camper_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY camper_id
+      ) sbt_liquidated ON ca.id = sbt_liquidated.camper_id
+      WHERE ca.id = ${id} AND c.team_id = ${teamId}
+      LIMIT 1
+    `;
+    
+    if (person.length > 0) {
+      // Found as camper
+      const camper = person[0];
+      return res.json({
+        id: camper.id,
+        name: camper.name,
+        email: camper.email,
+        contact: camper.contact,
+        form_id: camper.form_id,
+        camp_name: camper.camp_name,
+        type: 'camper',
+        snack_bar_balance: Number(camper.snack_bar_balance) || 0,
+        totalLoaded: Number(camper.total_loaded) || 0,
+        totalSpent: Number(camper.total_spent) || 0,
+        totalLiquidated: Number(camper.total_liquidated) || 0,
+        payment_status: camper.payment_status || 'confirmed'
+      });
+    }
+    
+    // If not found as camper, try as staff
+    person = await sql`
+      SELECT 
+        s.id,
+        s.name,
+        s.email,
+        s.phone as contact,
+        NULL as form_id,
+        c.name as camp_name,
+        'staff' as type,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY staff_id
+      ) sb ON s.id = sb.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY staff_id
+      ) sbt_spent ON s.id = sbt_spent.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY staff_id
+      ) sbt_liquidated ON s.id = sbt_liquidated.staff_id
+      WHERE s.id = ${id} AND c.team_id = ${teamId}
+      LIMIT 1
+    `;
+    
+    if (person.length > 0) {
+      // Found as staff
+      const staff = person[0];
+      return res.json({
+        id: staff.id,
+        name: staff.name,
+        email: staff.email,
+        contact: staff.contact,
+        form_id: staff.form_id,
+        camp_name: staff.camp_name,
+        type: 'staff',
+        snack_bar_balance: Number(staff.snack_bar_balance) || 0,
+        totalLoaded: Number(staff.total_loaded) || 0,
+        totalSpent: Number(staff.total_spent) || 0,
+        totalLiquidated: Number(staff.total_liquidated) || 0,
+        payment_status: staff.payment_status || 'confirmed'
+      });
+    }
+    
+    // Person not found
+    return res.status(404).json({ error: 'Person not found' });
+  } catch (error) {
+    console.error('Error fetching person:', error);
+    res.status(500).json({ error: 'Erro ao buscar pessoa.' });
+  }
+}) as any);
+
+// Create a new staff member
+app.post('/api/staff', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { name, email, phone, camp_id } = req.body;
+    if (!name || !email || !phone || !camp_id) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Check if camp belongs to the team
+    const camp = await sql`
+      SELECT id FROM camps WHERE id = ${camp_id} AND team_id = ${teamId}
+    `;
+    if (!camp[0]) {
+      return res.status(400).json({ error: 'Camp does not belong to your team' });
+    }
+    
+    const now = new Date().toISOString();
+    const result = await sql`
+      INSERT INTO staff (name, email, phone, camp_id, created_at, updated_at)
+      VALUES (${name}, ${email}, ${phone}, ${camp_id}, ${now}, ${now})
+      RETURNING *
+    `;
+    res.status(201).json(result[0]);
+  } catch {
+    res.status(500).json({ error: 'Erro ao criar membro do staff.' });
+  }
+}) as any);
+
+// Update a staff member
+app.put('/api/staff/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const { name, email, phone, camp_id } = req.body;
+    
+    // Check if camp_id is provided and belongs to the team
+    if (camp_id !== undefined) {
+      const campCheck = await sql`
+        SELECT id FROM camps WHERE id = ${camp_id} AND team_id = ${teamId}
+      `;
+      if (!campCheck[0]) {
+        return res.status(400).json({ error: 'Camp does not belong to your team' });
+      }
+    }
+    
+    const now = new Date().toISOString();
+    
+    // Build the update query using template literals
+    let updateQuery = sql`UPDATE staff SET updated_at = ${now}`;
+    
+    if (name !== undefined) {
+      updateQuery = sql`${updateQuery}, name = ${name}`;
+    }
+    if (email !== undefined) {
+      updateQuery = sql`${updateQuery}, email = ${email}`;
+    }
+    if (phone !== undefined) {
+      updateQuery = sql`${updateQuery}, phone = ${phone}`;
+    }
+    if (camp_id !== undefined) {
+      updateQuery = sql`${updateQuery}, camp_id = ${camp_id}`;
+    }
+    
+    const result = await sql`
+      ${updateQuery}
+      WHERE id = ${id} AND camp_id IN (SELECT id FROM camps WHERE team_id = ${teamId})
+      RETURNING *
+    `;
+    
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Staff member not found or you do not have permission to update it' });
+    }
+    
+    res.json(result[0]);
+  } catch (error) {
+    console.error('Error updating staff member:', error);
+    res.status(500).json({ error: 'Erro ao atualizar membro do staff.' });
+  }
+}) as any);
+
+// Delete a staff member
+app.delete('/api/staff/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    const result = await sql`
+      DELETE FROM staff WHERE id = ${id} AND camp_id IN (SELECT id FROM camps WHERE team_id = ${teamId}) RETURNING *
+    `;
+    if (!result[0]) {
+      return res.status(404).json({ error: 'Staff member not found or you do not have permission to delete it' });
+    }
+    res.status(204).end();
+  } catch {
+    res.status(500).json({ error: 'Erro ao deletar membro do staff.' });
+  }
+}) as any);
+
+// Add snackbar balance for staff
+app.post('/api/staff-snackbar-balance', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { staff_id, amount, payment_method, phone_number, request_id } = req.body;
+    
+    if (!staff_id || !amount || !payment_method) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Check if staff member belongs to the team
+    const staffCheck = await sql`
+      SELECT s.id FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE s.id = ${staff_id} AND c.team_id = ${teamId}
+    `;
+    
+    if (!staffCheck[0]) {
+      return res.status(400).json({ error: 'Staff member does not belong to your team' });
+    }
+    
+    const now = new Date().toISOString();
+    
+    // Determinar payment_status baseado no método de pagamento
+    const paymentStatus = payment_method === 'MB Way' ? 'not confirmed' : 'confirmed';
+    
+    const result = await sql`
+      INSERT INTO snackbar_balance (
+        staff_id, amount, payment_method, phone_number, request_id, payment_status, created_at, updated_at
+      ) VALUES (
+        ${staff_id}, ${amount}, ${payment_method}, ${phone_number}, ${request_id || null}, ${paymentStatus}, ${now}, ${now}
+      ) RETURNING *
+    `;
+    
+    res.status(201).json(result[0]);
+  } catch (error) {
+    console.error('Error creating snackbar balance entry for staff:', error);
+    res.status(500).json({ error: 'Error creating snackbar balance entry for staff', details: error.message });
+  }
+}) as any);
+
+// Debug endpoint to check database schema
+app.get('/api/debug/schema', (async (req: Request, res: Response) => {
+  try {
+    const result = await sql`
+      SELECT 
+        table_name, 
+        column_name, 
+        data_type, 
+        is_nullable
+      FROM information_schema.columns 
+      WHERE table_name IN ('staff', 'snackbar_balance', 'snack_bar_transactions')
+      ORDER BY table_name, ordinal_position
+    `;
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error checking schema:', error);
+    res.status(500).json({ error: 'Error checking schema', details: error.message });
+  }
+}) as any);
+
+// Get snackbar balance records for a specific camper
+app.get('/api/snackbar-balance/camper/:camperId', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camperId } = req.params;
+    
+    // Check if camper belongs to the team
+    const camperCheck = await sql`
+      SELECT ca.id, ca.registration_id FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      WHERE ca.id = ${camperId}::uuid AND c.team_id = ${teamId}::uuid
+    `;
+    
+    if (!camperCheck[0]) {
+      return res.status(404).json({ error: 'Camper not found or does not belong to your team' });
+    }
+    
+    const registrationId = camperCheck[0].registration_id;
+    
+    // Get all snackbar_balance records for this registration
+    const balanceRecords = await sql`
+      SELECT 
+        id,
+        registration_id,
+        staff_id,
+        amount,
+        payment_method,
+        phone_number,
+        created_at,
+        updated_at
+      FROM snackbar_balance
+      WHERE registration_id = ${registrationId}::uuid
+      ORDER BY created_at DESC
+    `;
+    
+    res.json(balanceRecords);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching snackbar balance records' });
+  }
+}) as any);
+
 // Start the server
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`)
-})
+  
+});

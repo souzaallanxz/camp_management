@@ -31,12 +31,54 @@ interface SnackBarPermissions {
   access: boolean
 }
 
+interface StaffPermissions {
+  viewList: boolean
+  create: boolean
+  rechargeCard: boolean
+}
+
 export interface FeaturePermissions {
   dashboard: DashboardPermissions
   registrations: RegistrationsPermissions
   campers: CampersPermissions
   camps: CampsPermissions
   snackBar: SnackBarPermissions
+  staff: StaffPermissions
+}
+
+// Permissões para o role Cashier
+const CASHIER_ROLE_PERMISSIONS: FeaturePermissions = {
+  dashboard: {
+    viewPaymentsTotal: false, // Cashier não deve ver Total Pagamentos
+    viewRegistrationsTotal: true,
+    viewCamperTotal: true,
+    viewRechargesTotal: true,
+    viewOverview: false, // Cashier não deve ver Overview
+    viewLatestRegistrations: false, // Cashier não deve ver Últimas Inscrições
+  },
+  registrations: {
+    viewList: false,
+    create: false,
+    startOnboarding: false,
+    delete: false,
+  },
+  campers: {
+    viewList: true, // Cashier agora pode ver a lista de campistas
+    create: false,
+    rechargeCard: false,
+  },
+  camps: {
+    viewList: false,
+    create: false,
+  },
+  snackBar: {
+    access: true, // Cashier deve ter acesso apenas ao Snackbar
+  },
+  staff: {
+    viewList: false,
+    create: false,
+    rechargeCard: false,
+  },
 }
 
 const FREE_TIER_PERMISSIONS: FeaturePermissions = {
@@ -65,6 +107,11 @@ const FREE_TIER_PERMISSIONS: FeaturePermissions = {
   },
   snackBar: {
     access: false,
+  },
+  staff: {
+    viewList: true,
+    create: true,
+    rechargeCard: false,
   },
 }
 
@@ -95,21 +142,32 @@ const PREMIUM_TIER_PERMISSIONS: FeaturePermissions = {
   snackBar: {
     access: true,
   },
+  staff: {
+    viewList: true,
+    create: true,
+    rechargeCard: true,
+  },
 }
 
-export function getFeaturePermissions(tier: TeamTier): FeaturePermissions {
+export function getFeaturePermissions(tier: TeamTier, userRole?: string): FeaturePermissions {
+  // Se o usuário tem role Cashier, usar permissões específicas do Cashier
+  if (userRole === 'cashier') {
+    return CASHIER_ROLE_PERMISSIONS
+  }
+  
+  // Caso contrário, usar permissões baseadas no tier
   return tier === 'premium' ? PREMIUM_TIER_PERMISSIONS : FREE_TIER_PERMISSIONS
 }
 
-export function hasFeatureAccess(tier: TeamTier, feature: keyof FeaturePermissions): boolean {
-  const permissions = getFeaturePermissions(tier)
+export function hasFeatureAccess(tier: TeamTier, feature: keyof FeaturePermissions, userRole?: string): boolean {
+  const permissions = getFeaturePermissions(tier, userRole)
   return Object.values(permissions[feature]).some(Boolean)
 }
 
 export function hasSpecificPermission<
   T extends keyof FeaturePermissions,
   P extends keyof FeaturePermissions[T]
->(tier: TeamTier, feature: T, permission: P): boolean {
-  const permissions = getFeaturePermissions(tier)
+>(tier: TeamTier, feature: T, permission: P, userRole?: string): boolean {
+  const permissions = getFeaturePermissions(tier, userRole)
   return permissions[feature][permission] as boolean
 } 

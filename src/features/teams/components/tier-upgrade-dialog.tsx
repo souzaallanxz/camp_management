@@ -12,6 +12,7 @@ import { teamService } from '../services/team-service'
 import { useCurrentTeam } from '../hooks/use-current-team'
 import { Check, AlertTriangle, Star } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useLemonSqueezyCheckout } from '../hooks/use-lemon-squeezy-checkout'
 
 interface Props {
   open: boolean
@@ -22,6 +23,11 @@ export function TierUpgradeDialog({ open, onOpenChange }: Props) {
   const [isLoading, setIsLoading] = useState(false)
   const { data: team, mutate } = useCurrentTeam()
   const isPremium = team?.tier === 'premium'
+  
+  const { initiateCheckout, isLoading: isCheckoutLoading } = useLemonSqueezyCheckout({
+    onSuccess: () => onOpenChange(false),
+    onError: () => setIsLoading(false)
+  })
 
   const handleTierChange = async () => {
     if (!team) {
@@ -34,28 +40,32 @@ export function TierUpgradeDialog({ open, onOpenChange }: Props) {
     try {
       setIsLoading(true)
       
-      const promise = teamService.updateTeam(team.id, {
-        tier: isPremium ? 'free' : 'premium'
-      })
+      if (isPremium) {
+        // Handle downgrade - direct API call
+        const promise = teamService.updateTeam(team.id, {
+          tier: 'free'
+        })
 
-      await toast.promise(promise, {
-        loading: isPremium ? 'A fazer downgrade...' : 'A fazer upgrade...',
-        success: () => {
-          mutate()
-          onOpenChange(false)
-          setTimeout(() => {
-            window.location.reload()
-          }, 1000)
-          return isPremium 
-            ? 'Plano alterado para Free com sucesso!' 
-            : 'Plano alterado para Premium com sucesso!'
-        },
-        error: (err) => {
-          return err instanceof Error 
-            ? err.message 
-            : 'Erro ao atualizar o plano. Por favor tente novamente.'
-        }
-      })
+        await toast.promise(promise, {
+          loading: 'A fazer downgrade...',
+          success: () => {
+            mutate()
+            onOpenChange(false)
+            setTimeout(() => {
+              window.location.reload()
+            }, 1000)
+            return 'Plano alterado para Free com sucesso!'
+          },
+          error: (err) => {
+            return err instanceof Error 
+              ? err.message 
+              : 'Erro ao fazer downgrade. Por favor tente novamente.'
+          }
+        })
+            } else {
+        // Handle upgrade - redirect to Lemon Squeezy checkout
+        await initiateCheckout(team)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -80,7 +90,7 @@ export function TierUpgradeDialog({ open, onOpenChange }: Props) {
             <DialogDescription className="text-base">
               {isPremium 
                 ? 'Ao fazer downgrade, perderá acesso a recursos premium imediatamente'
-                : 'Acesso ilimitado a todas as funcionalidades premium por apenas €29/mês'
+                : 'Será redirecionado para o pagamento seguro. Acesso ilimitado a todas as funcionalidades premium por apenas €19/mês'
               }
             </DialogDescription>
           </DialogHeader>
@@ -119,13 +129,13 @@ export function TierUpgradeDialog({ open, onOpenChange }: Props) {
               </Button>
               <Button
                 onClick={handleTierChange}
-                disabled={isLoading}
+                disabled={isLoading || isCheckoutLoading}
                 className="min-w-[120px]"
                 variant={isPremium ? 'destructive' : 'default'}
               >
-                {isLoading 
-                  ? (isPremium ? 'A fazer downgrade...' : 'A fazer upgrade...') 
-                  : (isPremium ? 'Sim, fazer downgrade' : 'Fazer Upgrade')
+                {(isLoading || isCheckoutLoading)
+                  ? (isPremium ? 'A fazer downgrade...' : 'Redirecionando para pagamento...') 
+                  : (isPremium ? 'Sim, fazer downgrade' : 'Proceder ao Pagamento')
                 }
               </Button>
             </div>

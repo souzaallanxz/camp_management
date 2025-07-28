@@ -11,6 +11,9 @@ import { useCamps } from './hooks/use-camps'
 import { CampDialogsProvider } from './context/camp-dialogs-context'
 import { CampDialogs } from './components/camp-dialogs'
 import { useCampDialogs } from './context/camp-dialogs-context'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 function CampsContent() {
   const { data: camps, isLoading } = useCamps()
@@ -31,7 +34,7 @@ function CampsContent() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Acampamentos</h2>
             <p className="text-muted-foreground">
-              Gerencie os acampamentos do sistema
+              Gere os acampamentos da plataforma.
             </p>
           </div>
           <Button onClick={() => onOpenEdit(null)}>
@@ -56,6 +59,19 @@ function CampsContent() {
 }
 
 export default function CampsPage() {
+  const permissions = useTeamPermissions()
+  const navigate = useNavigate()
+  
+  useEffect(() => {
+    // Só verificar permissões após carregamento completo
+    if (!permissions.isLoading && !permissions.camps.viewList) {
+      navigate({ to: '/' })
+    }
+  }, [permissions, navigate])
+  
+  // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
+  if (permissions.isLoading || !permissions.camps.viewList) return null
+  
   return (
     <CampDialogsProvider>
       <CampsContent />

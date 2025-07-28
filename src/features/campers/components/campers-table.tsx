@@ -28,7 +28,15 @@ import { columns as defaultColumns } from './campers-columns'
 export interface CamperWithActions extends Camper {
   onEdit?: (camper: Camper) => void
   onLoadCard?: (camper: Camper) => void
+  onUpgradeClick?: () => void
+  onLiquidateSnackbar?: (camper: Camper) => void
   total_balance: number
+  camp_name?: string;
+  snack_bar_balance?: string | number;
+  payment_status?: string;
+  totalLoaded?: number;
+  totalSpent?: number;
+  totalLiquidated?: number;
 }
 
 interface DataTableProps {
@@ -65,7 +73,7 @@ export function CampersTable({ data }: DataTableProps) {
 
   return (
     <div className='space-y-4'>
-      <DataTableToolbar table={table} />
+      <DataTableToolbar table={table} data={data} />
       <div className='rounded-md border'>
         <Table>
           <TableHeader>

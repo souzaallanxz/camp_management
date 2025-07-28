@@ -7,20 +7,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Primary Meta Tags -->
-    <title>Shadcn Admin</title>
-    <meta name="title" content="Shadcn Admin" />
+    <title>Campy</title>
+    <meta name="title" content="Campy" />
     <meta
       name="description"
-      content="Admin Dashboard UI built with Shadcn and Vite."
+      content="Plataforma de gestão de acampamentos."
     />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://shadcn-admin.netlify.app" />
-    <meta property="og:title" content="Shadcn Admin" />
+    <meta property="og:url" content="https://campmanagement.vercel.app/" />
+    <meta property="og:title" content="Campy" />
     <meta
       property="og:description"
-      content="Admin Dashboard UI built with Shadcn and Vite."
+      content="Plataforma de gestão de acampamentos."
     />
     <meta
       property="og:image"
@@ -29,11 +29,11 @@
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://shadcn-admin.netlify.app" />
-    <meta property="twitter:title" content="Shadcn Admin" />
+    <meta property="twitter:url" content="https://campmanagement.vercel.app/" />
+    <meta property="twitter:title" content="Campy" />
     <meta
       property="twitter:description"
-      content="Admin Dashboard UI built with Shadcn and Vite."
+      content="Plataforma de gestão de acampamentos."
     />
     <meta
       property="twitter:image"
@@ -45,5 +45,44 @@
   <body class="group/body">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Lemon Squeezy Script - Loaded dynamically to avoid CORS issues -->
+    <script>
+      // Dynamic script loading for Lemon Squeezy
+      function loadLemonSqueezy() {
+        return new Promise((resolve, reject) => {
+          // Check if already loaded
+          if (window.LemonSqueezy) {
+            resolve(window.LemonSqueezy);
+            return;
+          }
+
+          const script = document.createElement('script');
+          script.src = 'https://app.lemonsqueezy.com/js/lemon.js';
+          script.async = true;
+          script.onload = () => {
+            console.log('Lemon Squeezy script loaded successfully');
+            // Wait a bit for initialization
+            setTimeout(() => {
+              if (window.LemonSqueezy) {
+                resolve(window.LemonSqueezy);
+              } else {
+                reject(new Error('Lemon Squeezy not available after loading'));
+              }
+            }, 100);
+          };
+          script.onerror = () => {
+            console.error('Failed to load Lemon Squeezy script');
+            reject(new Error('Failed to load Lemon Squeezy script'));
+          };
+          
+          document.head.appendChild(script);
+        });
+      }
+
+      // Initialize Lemon Squeezy when needed
+      window.loadLemonSqueezy = loadLemonSqueezy;
+    </script>
+    <script src="/lemon-squeezy-init.js" defer></script>
+
   </body>
 </html>

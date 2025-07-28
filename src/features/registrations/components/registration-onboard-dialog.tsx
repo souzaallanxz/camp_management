@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { paymentService } from '../services/payment-service'
 import { formatCurrency } from '@/lib/utils'
-import { camperService } from '@/features/campers/services/camper-service'
+import { camperService, type CreateCamperData } from '@/features/campers/services/camper-service'
 import { useQueryClient } from '@tanstack/react-query'
 import { MBWayService } from '../services/mbway-service'
 
@@ -40,7 +40,7 @@ export function RegistrationOnboardDialog({
   onSuccess,
 }: RegistrationOnboardDialogProps) {
   const [loading, setLoading] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<'MB Way' | 'Transferência Bancária' | 'Dinheiro'>('MB Way')
+  const [paymentMethod, setPaymentMethod] = useState<'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Multibanco'>('MB Way')
   const [phoneNumber, setPhoneNumber] = useState('')
   const queryClient = useQueryClient()
 
@@ -53,11 +53,17 @@ export function RegistrationOnboardDialog({
 
   const createCamper = async () => {
     // Criar o camper com os dados da registration
-    const newCamper = await camperService.create({
+    const camperData: CreateCamperData = {
       name: registration.name,
       email: registration.email,
-      phone: registration.contact
-    });
+      contact: registration.contact || null,
+      registration_id: registration.id,
+      camp: registration.camp?.name || 'Campo',
+      form_id: registration.form_id || null,
+      additional_notes: null
+    };
+    
+    const newCamper = await camperService.create(camperData);
     return newCamper;
   }
 
@@ -94,14 +100,42 @@ export function RegistrationOnboardDialog({
     try {
       setLoading(true)
 
-      // If payment method is MB Way, trigger the payment request first
+      // Gerar request_id se for MB Way
+      // Formato: "R" + form_id + dia + mes + hora + minuto (máx 15 dígitos)
+      let requestId = null
+      if (paymentMethod === 'MB Way' && registration.form_id) {
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, '0');
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const suffix = `${dd}${mm}${hh}${min}`;
+        const base = `R${registration.form_id}`;
+        requestId = (base + suffix).substring(0, 15);
+        
+        // Debug log
+        toast.success(`Request ID gerado: ${requestId}`);
+      }
+
+      // Criar o pagamento PRIMEIRO (para garantir que o request_id seja salvo)
+      await paymentService.createPayment({
+        registration_id: registration.id,
+        amount: remainingAmount,
+        payment_method: paymentMethod,
+        payment_date: new Date().toISOString(),
+        payment_link: null,
+        phone_number: paymentMethod === 'MB Way' ? phoneNumber : null,
+        request_id: requestId
+      })
+
+      // If payment method is MB Way, trigger the payment request AFTER saving
       if (paymentMethod === 'MB Way') {
         try {
           await MBWayService.requestPayment({
             mobileNumber: phoneNumber,
             amount: remainingAmount,
             description: `Pagamento de inscrição - ${registration.name}`,
-            orderId: registration.form_id || `${registration.id}-${Date.now()}`,
+            orderId: requestId,
             email: registration.email
           })
 
@@ -113,16 +147,6 @@ export function RegistrationOnboardDialog({
           return
         }
       }
-
-      // Criar o pagamento
-      await paymentService.createPayment({
-        registration_id: registration.id,
-        amount: remainingAmount,
-        payment_method: paymentMethod,
-        payment_date: new Date().toISOString(),
-        payment_link: null,
-        phone_number: paymentMethod === 'MB Way' ? phoneNumber : null
-      })
       
       // Criar o camper
       await createCamper()
@@ -193,6 +217,7 @@ export function RegistrationOnboardDialog({
                     <SelectItem value="MB Way">MB Way</SelectItem>
                     <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                     <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="Multibanco">Multibanco</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

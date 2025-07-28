@@ -33,30 +33,20 @@ import { type Camp } from '@/features/camps/data/schema'
 import { Separator } from '@/components/ui/separator'
 import { paymentService } from '../services/payment-service'
 import { MBWayService } from '../services/mbway-service'
+import { useState, useEffect } from 'react'
 
 const createRegistrationSchema = z.object({
   // Registration fields
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
   contact: z.string().min(1, 'Contacto é obrigatório'),
-  camp_id: z.string().uuid('Selecione um acampamento'),
-  form_id: z.string().optional().nullable(),
+  camp_id: z.string().min(1, 'Selecione um acampamento'),
+  form_id: z.string().min(1, 'Form ID é obrigatório'),
   
   // Payment fields
-  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro'], {
-    required_error: 'Selecione um método de pagamento',
-  }).optional(),
+  payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro', 'Multibanco']).optional(),
   amount: z.coerce.number().min(0, 'Valor deve ser maior que 0'),
-  phone_number: z.string()
-    .nullable()
-    .optional()
-    .refine((val) => {
-      if (!val) return true
-      // Remove any non-digit characters
-      const digits = val.replace(/\D/g, '')
-      // Check if it's a valid Portuguese phone number (9 digits, starting with 9)
-      return /^9\d{8}$/.test(digits)
-    }, 'Número de telefone inválido. Deve começar com 9 e ter 9 dígitos'),
+  phone_number: z.string().nullable().optional(),
 })
 .refine(
   (data) => {
@@ -99,9 +89,54 @@ export function RegistrationDialog({
     },
   })
 
+  const [formIdValidation, setFormIdValidation] = useState<{
+    isValidating: boolean;
+    exists: boolean;
+    message: string;
+  }>({
+    isValidating: false,
+    exists: false,
+    message: ''
+  })
+
+  // Validação em tempo real do form_id
+  useEffect(() => {
+    const formId = form.watch('form_id')
+    
+    if (formId && formId.length > 0) {
+      setFormIdValidation(prev => ({ ...prev, isValidating: true }))
+      
+      const timeoutId = setTimeout(async () => {
+        try {
+          const result = await registrationService.checkFormIdExists(formId)
+          setFormIdValidation({
+            isValidating: false,
+            exists: result.exists,
+            message: result.message
+          })
+        } catch {
+          setFormIdValidation({
+            isValidating: false,
+            exists: false,
+            message: 'Erro ao validar Form ID'
+          })
+        }
+      }, 500) // Debounce de 500ms
+      
+      return () => clearTimeout(timeoutId)
+    } else {
+      setFormIdValidation({
+        isValidating: false,
+        exists: false,
+        message: ''
+      })
+    }
+  }, [form.watch('form_id')])
+
   const { mutateAsync: createRegistration, isPending: isCreating } = useMutation({
     mutationFn: async (data: CreateRegistrationFormData) => {
       try {
+        
         // Ensure camp_id is a string before sending
         const camp_id = typeof data.camp_id === 'string' 
           ? data.camp_id
@@ -112,7 +147,7 @@ export function RegistrationDialog({
         }
 
         // Cria a inscrição com os dados do futuro camper
-        const registration = await registrationService.create({
+        const registration = await registrationService.createRegistration({
           camp_id,
           name: data.name,
           email: data.email,
@@ -120,15 +155,32 @@ export function RegistrationDialog({
           form_id: data.form_id,
         })
 
+
         // Cria o pagamento associado à inscrição apenas se o valor for maior que 0
         if (registration && data.amount > 0 && data.payment_method) {
           try {
+            
             // Garantir que o método de pagamento seja um dos tipos válidos
             const paymentMethod = data.payment_method === 'MB Way' || 
                                  data.payment_method === 'Transferência Bancária' || 
-                                 data.payment_method === 'Dinheiro' 
+                                 data.payment_method === 'Dinheiro' ||
+                                 data.payment_method === 'Multibanco'
                                  ? data.payment_method 
                                  : 'Dinheiro'; // Valor padrão seguro
+            
+            // Gerar request_id se for MB Way
+            // Formato: "R" + form_id + dia + mes + hora + minuto (máx 15 dígitos)
+            let requestId = null
+            if (paymentMethod === 'MB Way' && data.form_id) {
+              const now = new Date();
+              const dd = String(now.getDate()).padStart(2, '0');
+              const mm = String(now.getMonth() + 1).padStart(2, '0');
+              const hh = String(now.getHours()).padStart(2, '0');
+              const min = String(now.getMinutes()).padStart(2, '0');
+              const suffix = `${dd}${mm}${hh}${min}`;
+              const base = `R${data.form_id}`;
+              requestId = (base + suffix).substring(0, 15);
+            }
             
             const payment = await paymentService.createPayment({
               registration_id: registration.id,
@@ -137,6 +189,7 @@ export function RegistrationDialog({
               payment_date: new Date().toISOString(),
               phone_number: data.phone_number || null,
               payment_link: null,
+              request_id: requestId
             });
 
             // Se o método de pagamento for MB Way, faz o pedido de pagamento
@@ -146,7 +199,7 @@ export function RegistrationDialog({
                   mobileNumber: data.phone_number,
                   amount: data.amount,
                   description: `Pagamento de inscrição - ${data.name}`,
-                  orderId: data.form_id || String(payment.id || '0'),
+                  orderId: requestId,
                   email: data.email,
                 })
                 
@@ -169,6 +222,8 @@ export function RegistrationDialog({
 
         return registration
       } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error in registration creation:', error);
         const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
         throw new Error(message)
       }
@@ -179,6 +234,13 @@ export function RegistrationDialog({
       
       // Resetar o formulário
       form.reset()
+      
+      // Resetar validação do form_id
+      setFormIdValidation({
+        isValidating: false,
+        exists: false,
+        message: ''
+      })
       
       // Fechar o diálogo
       onOpenChange(false);
@@ -192,8 +254,13 @@ export function RegistrationDialog({
       }
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
-      toast.error(message)
+      // Verificar se é um erro específico de form_id duplicado
+      if (error instanceof Error && error.message.includes('Form ID already exists')) {
+        toast.error('Este Form ID já está registado no sistema')
+      } else {
+        const message = error instanceof Error ? error.message : 'Erro ao criar inscrição'
+        toast.error(message)
+      }
     },
   })
 
@@ -213,13 +280,14 @@ export function RegistrationDialog({
           <form 
             onSubmit={form.handleSubmit(async (data) => {
               try {
+                
                 // Verificar se o valor é maior que zero e definir o método de pagamento adequadamente
                 if (data.amount <= 0) {
                   // Se o valor for 0 ou negativo, não criar pagamento
                   data = {
                     ...data,
                     amount: 0,
-                    payment_method: undefined as any // Tipo necessário para satisfazer o TypeScript
+                    payment_method: undefined
                   };
                 }
                 
@@ -332,11 +400,24 @@ export function RegistrationDialog({
                     name="form_id"
                     render={({ field }) => (
                       <FormItem className="flex flex-col space-y-1.5">
-                        <FormLabel>Form ID</FormLabel>
+                        <FormLabel>Form ID *</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ''} />
+                          <Input 
+                            {...field} 
+                            value={field.value || ''} 
+                            placeholder="Digite o Form ID único"
+                          />
                         </FormControl>
                         <FormMessage />
+                        {formIdValidation.isValidating && (
+                          <p className="text-sm text-muted-foreground">Validando Form ID...</p>
+                        )}
+                        {!formIdValidation.isValidating && formIdValidation.exists && (
+                          <p className="text-sm text-destructive">{formIdValidation.message}</p>
+                        )}
+                        {!formIdValidation.isValidating && !formIdValidation.exists && formIdValidation.message && (
+                          <p className="text-sm text-green-600">{formIdValidation.message}</p>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -368,6 +449,8 @@ export function RegistrationDialog({
                               <SelectItem value="MB Way">MB Way</SelectItem>
                               <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                               <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                              <SelectItem value="Desconto">Desconto</SelectItem>
+                              <SelectItem value="Multibanco">Multibanco</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormControl>
@@ -424,8 +507,11 @@ export function RegistrationDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isPending}>
-                Criar
+              <Button 
+                type="submit" 
+                disabled={isPending || formIdValidation.exists}
+              >
+                {isPending ? 'Criando...' : 'Criar'}
               </Button>
             </div>
           </form>

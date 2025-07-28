@@ -5,12 +5,59 @@ import { useState } from 'react'
 import { useTeamData } from '@/features/teams/hooks/use-team-data'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
+import { TestWebhook } from './test-webhook'
+import { LemonSqueezyDebug } from './lemon-squeezy-debug'
+import { SignatureDebug } from './signature-debug'
+import { CorsDebug } from './cors-debug'
+import { WebhookDebug } from './webhook-debug'
+import { toast } from 'sonner'
 
 export default function SettingsBilling() {
   const { teams } = useTeamData()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
   const currentTeam = teams[0]
   const isPremium = currentTeam?.tier === 'premium'
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Função para abrir overlay Lemon Squeezy
+  const handleUpgrade = async () => {
+    try {
+      setIsLoading(true)
+      toast.loading('A preparar pagamento...')
+      const token = localStorage.getItem('token')
+      
+      // Use the buildApiUrl function to get the correct backend URL
+      const { buildApiUrl } = await import('@/services/api')
+      const apiUrl = buildApiUrl('/lemon-squeezy/checkout')
+      
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ planType: 'premium', returnUrl: window.location.origin + '/settings/billing' }),
+      })
+      const data = await res.json()
+      toast.dismiss()
+      if (!res.ok || !data.url) {
+        toast.error('Erro ao criar checkout', { description: data.error || 'Erro desconhecido' })
+        return
+      }
+      
+      // eslint-disable-next-line no-console
+      console.log('Checkout URL received:', data.url)
+      
+      // Sempre abrir em nova janela (overlay desabilitado)
+      toast.success('Abrindo checkout em nova janela...')
+      window.open(data.url, '_blank')
+    } catch (err) {
+      toast.dismiss()
+      toast.error('Erro ao criar checkout', { description: err instanceof Error ? err.message : 'Erro desconhecido' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -81,7 +128,7 @@ export default function SettingsBilling() {
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="text-2xl font-bold">
-              €29 <span className="text-sm font-normal text-muted-foreground">/mês</span>
+              €19 <span className="text-sm font-normal text-muted-foreground">/mês</span>
             </div>
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2">
@@ -108,9 +155,10 @@ export default function SettingsBilling() {
             {!isPremium ? (
               <Button 
                 className="w-full"
-                onClick={() => setShowUpgradeDialog(true)}
+                onClick={handleUpgrade}
+                disabled={isLoading}
               >
-                Fazer Upgrade
+                {isLoading ? 'A preparar...' : 'Fazer Upgrade - €19/mês'}
               </Button>
             ) : (
               <Button variant="outline" className="w-full" disabled>
@@ -125,6 +173,7 @@ export default function SettingsBilling() {
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
       />
+      
     </div>
   )
 } 

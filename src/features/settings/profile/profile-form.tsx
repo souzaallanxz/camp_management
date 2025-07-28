@@ -19,8 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/hooks/use-toast'
-import { db } from '@/lib/db'
 import { useState, useEffect } from 'react'
+import { getCurrentUserProfile, updateCurrentUserProfile } from '@/features/auth/auth-service'
 
 const languages = [
   { value: 'pt', label: 'Português' },
@@ -57,22 +57,10 @@ export function ProfileForm() {
   useEffect(() => {
     async function loadUserData() {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          throw new Error('No token found')
-        }
-
-        const { data: result, error } = await db.query(
-          `SELECT id, email, name, team_id FROM public.users WHERE id = $1::uuid`,
-          [token]
-        )
-
-        if (error) {
-          throw new Error(`Error loading user data: ${String(error)}`)
-        }
-
-        if (result && result.length > 0) {
-          const user = result[0]
+        const profileData = await getCurrentUserProfile()
+        
+        if (profileData && profileData.user) {
+          const user = profileData.user
           form.reset({
             name: user.name || '',
             email: user.email || '',
@@ -98,26 +86,10 @@ export function ProfileForm() {
   async function onSubmit(data: ProfileFormValues) {
     setIsSaving(true)
     try {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        throw new Error('No token found')
-      }
-
-      const { data: result, error } = await db.query(
-        `UPDATE public.users
-         SET name = $1::text
-         WHERE id = $2::uuid
-         RETURNING id, email, name`,
-        [data.name, token]
-      )
-
-      if (error) {
-        throw new Error(`Error updating user data: ${String(error)}`)
-      }
-
-      if (!result || result.length === 0) {
-        throw new Error(`Failed to update user data`)
-      }
+      await updateCurrentUserProfile({
+        name: data.name,
+        language: data.language
+      })
 
       toast({
         title: 'Perfil atualizado',
@@ -202,7 +174,7 @@ export function ProfileForm() {
         />
 
         <Button type="submit" disabled={isLoading || isSaving}>
-          {isSaving ? 'A guardar...' : 'Guardar'}
+          {isSaving ? 'Salvando...' : 'Salvar alterações'}
         </Button>
       </form>
     </Form>

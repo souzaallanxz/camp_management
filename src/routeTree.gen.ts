@@ -13,6 +13,8 @@ import { createFileRoute } from '@tanstack/react-router'
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as TermsImport } from './routes/terms'
+import { Route as PrivacyImport } from './routes/privacy'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedSnackBarImport } from './routes/_authenticated/snack-bar'
@@ -21,6 +23,7 @@ import { Route as authSignInImport } from './routes/(auth)/sign-in'
 import { Route as authSetupPasswordImport } from './routes/(auth)/setup-password'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as auth500Import } from './routes/(auth)/500'
+import { Route as AuthenticatedStaffIndexImport } from './routes/_authenticated/staff/index'
 import { Route as AuthenticatedSnackBarIndexImport } from './routes/_authenticated/snack-bar/index'
 import { Route as AuthenticatedRegistrationsIndexImport } from './routes/_authenticated/registrations/index'
 import { Route as AuthenticatedIntegrationsIndexImport } from './routes/_authenticated/integrations/index'
@@ -81,6 +84,18 @@ const AuthenticatedSettingsAccountLazyImport = createFileRoute(
 )()
 
 // Create/Update Routes
+
+const TermsRoute = TermsImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const PrivacyRoute = PrivacyImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const AuthenticatedRouteRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -271,6 +286,12 @@ const AuthenticatedAppsIndexLazyRoute = AuthenticatedAppsIndexLazyImport.update(
   import('./routes/_authenticated/apps/index.lazy').then((d) => d.Route),
 )
 
+const AuthenticatedStaffIndexRoute = AuthenticatedStaffIndexImport.update({
+  id: '/staff/',
+  path: '/staff/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
 const AuthenticatedSnackBarIndexRoute = AuthenticatedSnackBarIndexImport.update(
   {
     id: '/',
@@ -390,6 +411,20 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: ''
       preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRoute
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyImport
+      parentRoute: typeof rootRoute
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsImport
       parentRoute: typeof rootRoute
     }
     '/(auth)/500': {
@@ -588,6 +623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSnackBarIndexImport
       parentRoute: typeof AuthenticatedSnackBarImport
     }
+    '/_authenticated/staff/': {
+      id: '/_authenticated/staff/'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof AuthenticatedStaffIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
     '/_authenticated/apps/': {
       id: '/_authenticated/apps/'
       path: '/apps'
@@ -689,6 +731,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCampersIndexRoute: typeof AuthenticatedCampersIndexRoute
   AuthenticatedIntegrationsIndexRoute: typeof AuthenticatedIntegrationsIndexRoute
   AuthenticatedRegistrationsIndexRoute: typeof AuthenticatedRegistrationsIndexRoute
+  AuthenticatedStaffIndexRoute: typeof AuthenticatedStaffIndexRoute
   AuthenticatedAppsIndexLazyRoute: typeof AuthenticatedAppsIndexLazyRoute
   AuthenticatedChatsIndexLazyRoute: typeof AuthenticatedChatsIndexLazyRoute
   AuthenticatedHelpCenterIndexLazyRoute: typeof AuthenticatedHelpCenterIndexLazyRoute
@@ -706,6 +749,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCampersIndexRoute: AuthenticatedCampersIndexRoute,
   AuthenticatedIntegrationsIndexRoute: AuthenticatedIntegrationsIndexRoute,
   AuthenticatedRegistrationsIndexRoute: AuthenticatedRegistrationsIndexRoute,
+  AuthenticatedStaffIndexRoute: AuthenticatedStaffIndexRoute,
   AuthenticatedAppsIndexLazyRoute: AuthenticatedAppsIndexLazyRoute,
   AuthenticatedChatsIndexLazyRoute: AuthenticatedChatsIndexLazyRoute,
   AuthenticatedHelpCenterIndexLazyRoute: AuthenticatedHelpCenterIndexLazyRoute,
@@ -718,6 +762,8 @@ const AuthenticatedRouteRouteWithChildren =
 
 export interface FileRoutesByFullPath {
   '': typeof AuthenticatedRouteRouteWithChildren
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/setup-password': typeof authSetupPasswordRoute
@@ -745,6 +791,7 @@ export interface FileRoutesByFullPath {
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
   '/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
+  '/staff': typeof AuthenticatedStaffIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
   '/chats': typeof AuthenticatedChatsIndexLazyRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexLazyRoute
@@ -754,6 +801,8 @@ export interface FileRoutesByFullPath {
 }
 
 export interface FileRoutesByTo {
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/setup-password': typeof authSetupPasswordRoute
@@ -779,6 +828,7 @@ export interface FileRoutesByTo {
   '/integrations': typeof AuthenticatedIntegrationsIndexRoute
   '/registrations': typeof AuthenticatedRegistrationsIndexRoute
   '/snack-bar': typeof AuthenticatedSnackBarIndexRoute
+  '/staff': typeof AuthenticatedStaffIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
   '/chats': typeof AuthenticatedChatsIndexLazyRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexLazyRoute
@@ -790,6 +840,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/(auth)/500': typeof auth500Route
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/setup-password': typeof authSetupPasswordRoute
@@ -818,6 +870,7 @@ export interface FileRoutesById {
   '/_authenticated/integrations/': typeof AuthenticatedIntegrationsIndexRoute
   '/_authenticated/registrations/': typeof AuthenticatedRegistrationsIndexRoute
   '/_authenticated/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
+  '/_authenticated/staff/': typeof AuthenticatedStaffIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexLazyRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexLazyRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexLazyRoute
@@ -830,6 +883,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | ''
+    | '/privacy'
+    | '/terms'
     | '/500'
     | '/otp'
     | '/setup-password'
@@ -857,6 +912,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/registrations'
     | '/snack-bar/'
+    | '/staff'
     | '/apps'
     | '/chats'
     | '/help-center'
@@ -865,6 +921,8 @@ export interface FileRouteTypes {
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/privacy'
+    | '/terms'
     | '/500'
     | '/otp'
     | '/setup-password'
@@ -890,6 +948,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/registrations'
     | '/snack-bar'
+    | '/staff'
     | '/apps'
     | '/chats'
     | '/help-center'
@@ -899,6 +958,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
+    | '/privacy'
+    | '/terms'
     | '/(auth)/500'
     | '/(auth)/otp'
     | '/(auth)/setup-password'
@@ -927,6 +988,7 @@ export interface FileRouteTypes {
     | '/_authenticated/integrations/'
     | '/_authenticated/registrations/'
     | '/_authenticated/snack-bar/'
+    | '/_authenticated/staff/'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
     | '/_authenticated/help-center/'
@@ -938,6 +1000,8 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   auth500Route: typeof auth500Route
   authOtpRoute: typeof authOtpRoute
   authSetupPasswordRoute: typeof authSetupPasswordRoute
@@ -955,6 +1019,8 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   auth500Route: auth500Route,
   authOtpRoute: authOtpRoute,
   authSetupPasswordRoute: authSetupPasswordRoute,
@@ -981,6 +1047,8 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/_authenticated",
+        "/privacy",
+        "/terms",
         "/(auth)/500",
         "/(auth)/otp",
         "/(auth)/setup-password",
@@ -1007,12 +1075,19 @@ export const routeTree = rootRoute
         "/_authenticated/campers/",
         "/_authenticated/integrations/",
         "/_authenticated/registrations/",
+        "/_authenticated/staff/",
         "/_authenticated/apps/",
         "/_authenticated/chats/",
         "/_authenticated/help-center/",
         "/_authenticated/tasks/",
         "/_authenticated/users/"
       ]
+    },
+    "/privacy": {
+      "filePath": "privacy.tsx"
+    },
+    "/terms": {
+      "filePath": "terms.tsx"
     },
     "/(auth)/500": {
       "filePath": "(auth)/500.tsx"
@@ -1124,6 +1199,10 @@ export const routeTree = rootRoute
     "/_authenticated/snack-bar/": {
       "filePath": "_authenticated/snack-bar/index.tsx",
       "parent": "/_authenticated/snack-bar"
+    },
+    "/_authenticated/staff/": {
+      "filePath": "_authenticated/staff/index.tsx",
+      "parent": "/_authenticated"
     },
     "/_authenticated/apps/": {
       "filePath": "_authenticated/apps/index.lazy.tsx",

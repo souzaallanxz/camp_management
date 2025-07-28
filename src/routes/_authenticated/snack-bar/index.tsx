@@ -27,8 +27,9 @@ import { snackBarTransactionSchema } from '@/features/snack-bar/data/schema'
 import type { SnackBarTransaction } from '@/features/snack-bar/data/schema'
 import { TransactionsTable } from '@/features/snack-bar/components/transactions-table'
 import { TransactionsCharts } from '@/features/snack-bar/components/transactions-charts'
+import { AddTransactionDialog } from '@/features/snack-bar/components/add-transaction-dialog'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { IconCoinEuro, IconCashOff } from '@tabler/icons-react'
+import { IconCoinEuro, IconCashOff, IconPlus } from '@tabler/icons-react'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 
@@ -36,7 +37,8 @@ export default function SnackBarPage() {
   const navigate = useNavigate()
   const permissions = useTeamPermissions()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
-  const [selectedCamperId, setSelectedCamperId] = useState<string>('')
+  const [selectedPersonId, setSelectedPersonId] = useState<string>('')
+  const [showAddTransactionDialog, setShowAddTransactionDialog] = useState(false)
   const queryClient = useQueryClient()
 
   const form = useForm<SnackBarTransaction>({
@@ -52,29 +54,29 @@ export default function SnackBarPage() {
     queryFn: () => snackBarService.getCurrentCamp(),
   })
 
-  const { data: balance = 0 } = useQuery({
-    queryKey: ['camper-balance', selectedCamperId],
-    queryFn: () => snackBarService.getCamperBalance(selectedCamperId),
-    enabled: !!selectedCamperId,
-  })
-
-  const { data: transactions = [] } = useQuery({
-    queryKey: ['camper-transactions', selectedCamperId],
-    queryFn: () => snackBarService.getCamperTransactions(selectedCamperId),
-    enabled: !!selectedCamperId,
+  // Query otimizada que busca pessoa, saldo e transações em uma única operação
+  const { data: personData = { balance: 0, payment_status: 'confirmed', person: null, transactions: [] } } = useQuery({
+    queryKey: ['person-data', selectedPersonId],
+    queryFn: () => snackBarService.getPersonData(selectedPersonId),
+    enabled: !!selectedPersonId,
+    staleTime: 2 * 60 * 1000, // 2 minutes - cache for longer since it's only updated on selection
+    gcTime: 5 * 60 * 1000, // 5 minutes
   })
 
   const { data: allTransactions = [] } = useQuery({
     queryKey: ['all-transactions', currentCamp?.id],
     queryFn: () => snackBarService.getAllTransactions(currentCamp?.id),
     enabled: !!currentCamp?.id,
-    refetchInterval: 5000, // Refetch every 5 seconds
+    staleTime: 5 * 60 * 1000, // 5 minutes - cache for longer since it's only updated on selection
+    gcTime: 10 * 60 * 1000, // 10 minutes
   })
 
-  const { data: campers = [], isLoading: isLoadingCampers } = useQuery({
-    queryKey: ['campers', currentCamp?.id],
-    queryFn: () => snackBarService.getCampers(currentCamp?.id),
+  const { data: campers = [] } = useQuery({
+    queryKey: ['campers-and-staff', currentCamp?.id],
+    queryFn: () => snackBarService.getCampersAndStaff(currentCamp?.id),
     enabled: !!currentCamp?.id,
+    staleTime: 10 * 60 * 1000, // 10 minutes - list changes very rarely
+    gcTime: 15 * 60 * 1000, // 15 minutes
   })
 
   const mutation = useMutation({
@@ -84,20 +86,17 @@ export default function SnackBarPage() {
     onSuccess: () => {
       toast.success('Compra realizada com sucesso!')
 
-      // Invalidate all relevant queries
+      // Invalidate only the necessary queries
       queryClient.invalidateQueries({
-        queryKey: ['camper-balance', selectedCamperId],
+        queryKey: ['person-data', selectedPersonId],
       })
       queryClient.invalidateQueries({
-        queryKey: ['camper-transactions', selectedCamperId],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ['all-transactions'],
+        queryKey: ['all-transactions', currentCamp?.id],
       })
 
-      // Reset form and selected camper
+      // Reset form and selected person
       form.reset({ amount: 0, camper_id: '' })
-      setSelectedCamperId('')
+      setSelectedPersonId('')
     },
     onError: (error) => {
       toast.error(
@@ -129,29 +128,46 @@ export default function SnackBarPage() {
             <Button variant="outline" onClick={() => navigate({ to: '/' })}>
               Voltar ao Dashboard
             </Button>
-          </div>
-        </Main>
-      </>
-    )
-  }
+                  </div>
+      </Main>
+
+      <AddTransactionDialog
+        open={showAddTransactionDialog}
+        onOpenChange={setShowAddTransactionDialog}
+        onSuccess={() => {
+          // Refresh data when transaction is added
+          queryClient.invalidateQueries({
+            queryKey: ['all-transactions', currentCamp?.id],
+          })
+        }}
+      />
+    </>
+  )
+}
 
   // Usamos o acampamento real (agora já sabemos que existe)
   const activeCamp = currentCamp
 
   function onSubmit(data: SnackBarTransaction) {
-    if (!selectedCamperId) return
+    if (!selectedPersonId) return
 
     const amount = Number(data.amount)
-    const numericBalance = typeof balance === 'number' ? balance : parseFloat(String(balance)) || 0
+    const numericBalance = personData.balance
     
     if (amount > numericBalance) {
       toast.error('Saldo insuficiente')
       return
     }
 
+    // Verificar se o payment_status é 'confirmed'
+    if (personData.payment_status !== 'confirmed') {
+      toast.error('Não é possível usar saldo que ainda não foi confirmado')
+      return
+    }
+
     const transaction = {
       amount: amount,
-      camper_id: selectedCamperId,
+      camper_id: selectedPersonId,
     }
 
     mutation.mutate(transaction)
@@ -159,9 +175,10 @@ export default function SnackBarPage() {
 
   const amount = form.watch('amount')
   const amountNumber = Number(amount)
-  const numericBalance = typeof balance === 'number' ? balance : parseFloat(String(balance)) || 0
+  const numericBalance = personData.balance
   const isAmountValid =
     !isNaN(amountNumber) && amountNumber > 0 && amountNumber <= numericBalance
+  const isPaymentConfirmed = personData.payment_status === 'confirmed'
 
   // If no access to snack bar, show upgrade dialog or redirect
   if (!permissions.snackBar.access) {
@@ -215,9 +232,13 @@ export default function SnackBarPage() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Snack Bar</h2>
             <p className="text-muted-foreground">
-              Gerencie as compras do snack bar dos campistas.
+              Gere as compras do snack bar dos campistas.
             </p>
           </div>
+                             <Button onClick={() => setShowAddTransactionDialog(true)}>
+                     <IconPlus className="mr-2 h-4 w-4" />
+                     Adicionar Pagamento
+                   </Button>
         </div>
 
         <div className="space-y-8">
@@ -279,16 +300,16 @@ export default function SnackBarPage() {
                   </div>
                   <Separator className="my-4" />
                   <CamperCombobox
-                    value={selectedCamperId}
+                    value={selectedPersonId}
                     onValueChange={(value: string) => {
-                      setSelectedCamperId(value)
+                      setSelectedPersonId(value)
                       form.setValue('camper_id', value)
                     }}
                     campers={campers}
                   />
                 </div>
 
-                {selectedCamperId && (
+                {selectedPersonId && (
                   <>
                     <div>
                       <div className="space-y-1">
@@ -300,10 +321,21 @@ export default function SnackBarPage() {
                         </p>
                       </div>
                       <Separator className="my-4" />
-                      <div
-                        className={`text-2xl font-bold ${balance > 0 ? 'text-green-600' : 'text-red-600'}`}
-                      >
-                        € {typeof balance === 'number' ? balance.toFixed(2) : '0.00'}
+                      <div className="space-y-2">
+                        <div
+                          className={`text-2xl font-bold ${
+                            personData.balance > 0 
+                              ? (personData.payment_status === 'confirmed' ? 'text-green-600' : 'text-yellow-600')
+                              : 'text-red-600'
+                          }`}
+                        >
+                          € {personData.balance.toFixed(2)}
+                        </div>
+                        {personData.balance > 0 && personData.payment_status !== 'confirmed' && (
+                          <div className="text-sm text-yellow-600 font-medium">
+                            ⚠️ Saldo aguarda confirmação de pagamento
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -352,17 +384,20 @@ export default function SnackBarPage() {
                           type="submit"
                           className="w-full"
                           disabled={
-                            !selectedCamperId ||
+                            !selectedPersonId ||
                             mutation.isPending ||
-                            balance <= 0 ||
-                            !isAmountValid
+                            personData.balance <= 0 ||
+                            !isAmountValid ||
+                            !isPaymentConfirmed
                           }
                         >
                           {mutation.isPending
                             ? 'A debitar...'
-                            : balance <= 0
+                            : personData.balance <= 0
                               ? 'Sem saldo disponível'
-                              : 'Debitar valor'}
+                              : !isPaymentConfirmed
+                                ? 'Saldo não confirmado'
+                                : 'Debitar valor'}
                         </Button>
                       </form>
                     </div>
@@ -378,23 +413,23 @@ export default function SnackBarPage() {
                     Histórico de Transações
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Últimas transações realizadas{' '}
-                    {selectedCamperId ? 'pelo campista' : ''}.
+                    Últimas transações realizadas
+                    {selectedPersonId ? 'pela pessoa selecionada' : ''}.
                   </p>
                 </div>
                 <Separator className="my-4" />
               </div>
 
               <div className="-mx-4 flex-1 overflow-auto px-4">
-                <TransactionsTable data={transactions} />
-                {selectedCamperId && transactions.length === 0 && (
+                <TransactionsTable data={personData.transactions} />
+                {selectedPersonId && personData.transactions.length === 0 && (
                   <div className="text-center py-4 text-muted-foreground">
-                    Este campista não possui transações.
+                    Esta pessoa não possui transações.
                   </div>
                 )}
-                {!selectedCamperId && (
+                {!selectedPersonId && (
                   <div className="text-center py-4 text-muted-foreground">
-                    Selecione um campista para ver suas transações.
+                    Selecione uma pessoa para ver suas transações.
                   </div>
                 )}
               </div>
@@ -418,6 +453,17 @@ export default function SnackBarPage() {
           </div>
         </div>
       </Main>
+
+      <AddTransactionDialog
+        open={showAddTransactionDialog}
+        onOpenChange={setShowAddTransactionDialog}
+        onSuccess={() => {
+          // Refresh data when transaction is added
+          queryClient.invalidateQueries({
+            queryKey: ['all-transactions', currentCamp?.id],
+          })
+        }}
+      />
     </>
   )
 }

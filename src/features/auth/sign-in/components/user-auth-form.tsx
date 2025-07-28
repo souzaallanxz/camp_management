@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { useAuth } from '../../auth-context'
 import { toast } from '@/hooks/use-toast'
+import { useCurrentTeam } from '@/features/teams/hooks/use-current-team'
 
 type UserAuthFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -36,7 +37,8 @@ const formSchema = z.object({
 })
 
 export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
-  const { signIn } = useAuth()
+  const { signIn, refetchUser } = useAuth()
+  const { mutate: refetchTeam } = useCurrentTeam()
   const navigate = useNavigate()
   const search = useSearch({ from: '/(auth)/sign-in' })
   const [isLoading, setIsLoading] = useState(false)
@@ -52,7 +54,9 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   async function onSubmit(data: z.infer<typeof formSchema>) {
     try {
       setIsLoading(true)
-      await signIn(data)
+      await signIn(data as { email: string; password: string })
+      await refetchUser() // <-- Aguarda usuário atualizado
+      await refetchTeam() // <-- Aguarda team atualizado
       navigate({ to: search.redirect ?? '/' })
     } catch (error) {
       toast({

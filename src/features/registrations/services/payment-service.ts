@@ -4,22 +4,24 @@ import { api } from '@/lib/api-client'
 export interface Payment {
   id: number;
   registration_id: string;
-  payment_method: 'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Desconto';
+  payment_method: 'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Desconto' | 'Multibanco';
   amount: number;
   payment_date: string;
   phone_number: string | null;
   payment_link: string | null;
+  request_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreatePaymentData {
   registration_id: string;
-  payment_method: 'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Desconto';
+  payment_method: 'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Desconto' | 'Multibanco';
   amount: number;
   payment_date: string;
   phone_number: string | null;
   payment_link: string | null;
+  request_id?: string | null;
 }
 
 class PaymentService {
@@ -27,7 +29,6 @@ class PaymentService {
     // Debug logging only in development
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
-      console.log(`[PaymentService] ${message}`, data)
     }
   }
 

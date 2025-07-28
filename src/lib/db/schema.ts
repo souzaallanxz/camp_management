@@ -1,8 +1,8 @@
 import { pgTable, pgEnum, uuid, text, varchar, timestamp, numeric, date, bigint, jsonb, boolean } from 'drizzle-orm/pg-core';
 
 // Enums
-export const paymentStatusEnum = pgEnum('payment_status_enum', ['not confirmed', 'confirmed']);
-export const paymentMethodEnum = pgEnum('payment_method_enum', ['mbway', 'card', 'transfer']);
+export const paymentStatusEnum = pgEnum('payment_status_enum', ['not confirmed', 'confirmed', 'expired']);
+export const paymentMethodEnum = pgEnum('payment_method_enum', ['MB Way', 'Transferência Bancária', 'Dinheiro', 'Desconto', 'Multibanco']);
 export const registrationStatusEnum = pgEnum('registration_status', ['unpaid', 'paid', 'partial', 'cancelled']);
 export const onboardingStatusTypeEnum = pgEnum('onboarding_status_type', ['Pendente', 'Completo']);
 
@@ -64,12 +64,23 @@ export const campers = pgTable('campers', {
   form_id: text('form_id'),
   name: text('name').notNull(),
   email: text('email').notNull(),
-  contact: text('contact').notNull(),
+  contact: text('contact'),
   camp: text('camp').notNull(),
   additional_notes: text('additional_notes'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   snack_bar_balance: numeric('snack_bar_balance').notNull().default('0.00'),
+});
+
+// Nova tabela para staff
+export const staff = pgTable('staff', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  phone: text('phone').notNull(),
+  camp_id: uuid('camp_id').notNull().references(() => camps.id),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const payments = pgTable('payments', {
@@ -83,14 +94,29 @@ export const payments = pgTable('payments', {
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   phone_number: text('phone_number'),
   payment_status: paymentStatusEnum('payment_status').notNull().default('not confirmed'),
+  request_id: text('request_id'),
 });
 
 export const snackbar_balance = pgTable('snackbar_balance', {
   id: uuid('id').primaryKey().defaultRandom(),
-  registration_id: uuid('registration_id').notNull().references(() => registrations.id),
+  registration_id: uuid('registration_id').references(() => registrations.id),
+  staff_id: uuid('staff_id').references(() => staff.id),
   amount: numeric('amount').notNull(),
   payment_method: varchar('payment_method', { length: 50 }).notNull(),
   phone_number: varchar('phone_number', { length: 20 }),
+  payment_status: paymentStatusEnum('payment_status').notNull().default('not confirmed'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+export const snack_bar_transactions = pgTable('snack_bar_transactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  camper_id: uuid('camper_id').references(() => campers.id),
+  staff_id: uuid('staff_id').references(() => staff.id),
+  amount: numeric('amount').notNull(),
+  type: varchar('type', { length: 20 }).notNull().default('deduction'), // 'deduction' or 'refund'
+  description: text('description'),
+  is_liquidated: boolean('is_liquidated').notNull().default(false),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

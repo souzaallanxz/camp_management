@@ -27,6 +27,28 @@ const columns: ColumnDef<SnackBarTransactionResponse>[] = [
       )
     },
   },
+  {
+    accessorKey: 'is_liquidated',
+    header: 'Tipo',
+    size: 100,
+    cell: ({ row }) => {
+      const isLiquidated = row.original.is_liquidated
+      
+      return (
+        <div className="flex items-center">
+          {isLiquidated ? (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              Liquidado
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              Normal
+            </span>
+          )}
+        </div>
+      )
+    },
+  },
 ]
 
 interface TransactionsTableProps {

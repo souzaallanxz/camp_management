@@ -99,10 +99,10 @@ export function UsersInviteDialog({ open, onOpenChange, onUserAdded }: Props) {
       <DialogContent className='sm:max-w-lg'>
         <DialogHeader className='text-left'>
           <DialogTitle className='flex items-center gap-2'>
-            <IconMailPlus /> Invite New User
+            <IconMailPlus /> Convidar novo utilizador
           </DialogTitle>
           <DialogDescription>
-            Invite a new user to your team. An invitation email will be sent to set up their password.
+            Convidar um novo utilizador para a tua equipa. Um email de convite será enviado para configurar a sua palavra-passe.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -117,7 +117,7 @@ export function UsersInviteDialog({ open, onOpenChange, onUserAdded }: Props) {
                 name='firstName'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name</FormLabel>
+                    <FormLabel>Primeiro nome</FormLabel>
                     <FormControl>
                       <Input placeholder='John' {...field} />
                     </FormControl>
@@ -130,7 +130,7 @@ export function UsersInviteDialog({ open, onOpenChange, onUserAdded }: Props) {
                 name='lastName'
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name</FormLabel>
+                    <FormLabel>Último Nome</FormLabel>
                     <FormControl>
                       <Input placeholder='Doe' {...field} />
                     </FormControl>
@@ -161,7 +161,7 @@ export function UsersInviteDialog({ open, onOpenChange, onUserAdded }: Props) {
               name='role'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Role</FormLabel>
+                  <FormLabel>Função</FormLabel>
                   <Select
                     defaultValue={field.value}
                     onValueChange={field.onChange}
@@ -190,10 +190,10 @@ export function UsersInviteDialog({ open, onOpenChange, onUserAdded }: Props) {
         </Form>
         <DialogFooter className='gap-y-2'>
           <DialogClose asChild>
-            <Button variant='outline'>Cancel</Button>
+            <Button variant='outline'>Cancelar</Button>
           </DialogClose>
           <Button type='submit' form='user-invite-form'>
-            Invite User <IconSend className="ml-2 h-4 w-4" />
+            Convidar Utilizador <IconSend className="ml-2 h-4 w-4" />
           </Button>
         </DialogFooter>
       </DialogContent>

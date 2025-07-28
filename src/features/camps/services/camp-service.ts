@@ -98,6 +98,16 @@ class CampService {
       return false
     }
   }
+
+  async canDelete(id: string): Promise<{ canDelete: boolean; hasRegistrations: boolean; registrationCount: number }> {
+    try {
+      const response = await api.get(`/camps/${id}/can-delete`)
+      return response.data
+    } catch (error) {
+      this.debugError(`Error checking if camp ${id} can be deleted:`, error)
+      return { canDelete: false, hasRegistrations: true, registrationCount: 0 }
+    }
+  }
 }
 
 export const campService = new CampService() 

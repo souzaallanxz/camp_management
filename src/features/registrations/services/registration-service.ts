@@ -1,7 +1,7 @@
 import { api } from '@/lib/api-client'
 
 // Interface para a resposta da API
-interface ApiRegistration {
+export interface ApiRegistration {
   id: string
   form_id?: string
   name?: string
@@ -16,6 +16,13 @@ interface ApiRegistration {
   camper_email?: string
   total_paid?: number | string
   onboarding_status?: string
+  id_number?: string
+  sns_number?: string
+  date_of_birth?: string
+  dietary_restrictions?: string
+  guardian_name?: string
+  guardian_email?: string
+  guardian_phone?: string
   // For other fields that might exist
   [key: string]: unknown
 }
@@ -83,8 +90,22 @@ class RegistrationService {
     try {
       const response = await api.post('/registrations', registration)
       return response.data
-    } catch (error) {
+    } catch (error: unknown) {
       this.debugError('Error creating registration:', error)
+      
+      // Capturar erro específico de form_id duplicado
+      if (error && typeof error === 'object' && 'response' in error) {
+        const responseError = error as { response?: { data?: { error?: string; message?: string } } }
+        
+        if (responseError.response?.data?.error === 'Form ID already exists') {
+          throw new Error('Form ID already exists')
+        }
+        
+        if (responseError.response?.data?.message) {
+          throw new Error(responseError.response.data.message)
+        }
+      }
+      
       throw error
     }
   }
@@ -139,6 +160,17 @@ class RegistrationService {
       return response.data
     } catch (error) {
       this.debugError(`Error updating registration ${id} onboarding status:`, error)
+      throw error
+    }
+  }
+
+  // Check if form_id already exists
+  async checkFormIdExists(formId: string): Promise<{ exists: boolean; message: string }> {
+    try {
+      const response = await api.get(`/registrations/check-form-id/${formId}`)
+      return response.data
+    } catch (error) {
+      this.debugError(`Error checking form_id ${formId}:`, error)
       throw error
     }
   }

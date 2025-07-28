@@ -4,7 +4,7 @@ export const camperSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
-  contact: z.string().min(1, 'Contacto é obrigatório'),
+  contact: z.string().optional().nullable(),
   registration_id: z.string().uuid().optional(),
   form_id: z.string().optional().nullable(),
   camp: z.string().optional(),
@@ -19,6 +19,10 @@ export const camperSchema = z.object({
   guardian_email: z.string().email('Email inválido').optional().nullable(),
   guardian_phone: z.string().optional().nullable(),
   snack_bar_balance: z.number().or(z.string()).default(0),
+  payment_status: z.string().optional(),
+  totalLoaded: z.number().optional(),
+  totalSpent: z.number().optional(),
+  camp_name: z.string().optional(),
 })
 
 export type Camper = z.infer<typeof camperSchema>

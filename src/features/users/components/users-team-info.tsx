@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react'
-import { getCurrentUserTeam } from '@/features/auth/auth-service'
+import { getCurrentUserProfile } from '@/features/auth/auth-service'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { db } from '@/lib/db'
 import { useQuery } from '@tanstack/react-query'
 
 interface TeamInfo {
@@ -11,23 +9,13 @@ interface TeamInfo {
 
 async function getTeamInfo(): Promise<TeamInfo | null> {
   try {
-    const teamId = await getCurrentUserTeam();
+    const profileData = await getCurrentUserProfile();
     
-    if (!teamId) {
+    if (!profileData || !profileData.team) {
       return null;
     }
     
-    const { data, error } = await db
-      .from('teams')
-      .select('id, name')
-      .eq('id', teamId)
-      .single();
-    
-    if (error || !data) {
-      return null;
-    }
-    
-    return data as TeamInfo;
+    return profileData.team as TeamInfo;
   } catch {
     return null;
   }
@@ -38,7 +26,7 @@ export function UsersTeamInfo() {
     queryKey: ['team-info'],
     queryFn: getTeamInfo,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (replaced cacheTime)
     refetchOnWindowFocus: false
   });
   

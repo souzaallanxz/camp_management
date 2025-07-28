@@ -14,7 +14,6 @@ import { useCamperDialogs } from '../context/camper-dialogs-context'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { insertCamperSchema, type InsertCamper } from '../data/schema'
-import { db } from '@/lib/db'
 import { toast } from 'sonner'
 import { useCamps } from '@/features/camps/hooks/use-camps'
 import {
@@ -24,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { camperService, type CreateManualCamperData } from '../services/camper-service'
 
 interface CamperDialogsProps {
   onCamperCreated?: () => void
@@ -39,7 +39,7 @@ export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
       form_id: '',
       name: '',
       email: '',
-      contact: '',
+      contact: null,
       camp: '',
       additional_notes: '',
     },
@@ -47,31 +47,21 @@ export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
 
   const onSubmit = async (data: InsertCamper) => {
     try {
-      const { error } = await db.query(
-        `INSERT INTO campers (
-          form_id,
-          name,
-          email,
-          contact,
-          camp,
-          additional_notes,
-          created_at,
-          updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING *`,
-        [
-          data.form_id || null,
-          data.name,
-          data.email,
-          data.contact,
-          data.camp || null,
-          data.additional_notes || null,
-          new Date().toISOString(),
-          new Date().toISOString(),
-        ]
-      )
+      // Convert form data to camper service format
+      const camperData: CreateManualCamperData = {
+        name: data.name,
+        email: data.email,
+        contact: data.contact || null,
+        camp: data.camp,
+        form_id: data.form_id || null,
+        additional_notes: data.additional_notes || null
+      }
 
-      if (error) throw error
+      const result = await camperService.create(camperData)
+
+      if (!result) {
+        throw new Error('Failed to create camper')
+      }
 
       toast.success('Campista criado com sucesso!')
       closeCreateDialog()
@@ -124,7 +114,7 @@ export function CamperDialogs({ onCamperCreated }: CamperDialogsProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="contact">Contato</Label>
+            <Label htmlFor="contact">Contato (opcional)</Label>
             <Input
               id="contact"
               {...form.register('contact')}

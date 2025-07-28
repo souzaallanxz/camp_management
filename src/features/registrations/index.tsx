@@ -14,6 +14,9 @@ import { columns, type RegistrationWithActions } from './components/registration
 import { RegistrationDialogsProvider } from './context/registration-dialogs-context'
 import { Actions } from './components/registrations-columns'
 import { Registration } from './data/schema'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 // Interface para mapear a resposta da API
 interface ApiRegistration {
@@ -82,7 +85,7 @@ function RegistrationsContent() {
           <div>
             <h2 className='text-2xl font-bold tracking-tight'>Inscrições</h2>
             <p className='text-muted-foreground'>
-              Gerencie todas as inscrições registradas no sistema.
+              Gere todas as inscrições registradas na plataforma.
             </p>
           </div>
           <div>
@@ -112,7 +115,20 @@ function RegistrationsContent() {
   )
 }
 
-export function RegistrationsFeature() {
+export default function RegistrationsPage() {
+  const permissions = useTeamPermissions()
+  const navigate = useNavigate()
+  
+  useEffect(() => {
+    // Só verificar permissões após carregamento completo
+    if (!permissions.isLoading && !permissions.registrations.viewList) {
+      navigate({ to: '/' })
+    }
+  }, [permissions, navigate])
+  
+  // Se ainda está carregando as permissões ou não tem acesso, não mostrar o conteúdo
+  if (permissions.isLoading || !permissions.registrations.viewList) return null
+  
   return (
     <RegistrationDialogsProvider>
       <RegistrationsContent />
