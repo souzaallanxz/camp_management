@@ -33,6 +33,7 @@ interface AuthContextType {
     }
   }>
   signOut: () => Promise<void>
+  refetchUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -138,6 +139,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const handleRefetchUser = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
   const value = {
     user,
     isAuthenticated: !!user,
@@ -145,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn: handleSignIn,
     signUp: handleSignUp,
     signOut: handleSignOut,
+    refetchUser: handleRefetchUser,
   }
 
   return (

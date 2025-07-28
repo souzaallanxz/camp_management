@@ -63,7 +63,7 @@ const CASHIER_ROLE_PERMISSIONS: FeaturePermissions = {
     delete: false,
   },
   campers: {
-    viewList: false,
+    viewList: true, // Cashier agora pode ver a lista de campistas
     create: false,
     rechargeCard: false,
   },

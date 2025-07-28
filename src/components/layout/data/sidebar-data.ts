@@ -143,6 +143,13 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
         url: '/',
         icon: IconLayoutDashboard,
       })
+      if (permissions.campers?.viewList) {
+        items.push({
+          title: 'Campistas',
+          url: '/campers',
+          icon: IconTent,
+        })
+      }
       if (permissions.snackBar.access) {
         items.push({
           title: 'Snack Bar',
@@ -201,7 +208,7 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
     }
 
     return items
-  }, [isLoading, user?.role, permissions.snackBar.access, permissions.staff?.viewList])
+  }, [isLoading, user?.role, permissions.snackBar.access, permissions.campers?.viewList, permissions.staff?.viewList])
 
   // Memoize the entire sidebar data to prevent unnecessary re-renders
   const sidebarDataValue = useMemo(() => ({
