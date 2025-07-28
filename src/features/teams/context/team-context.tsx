@@ -4,6 +4,8 @@ import {
   useEffect,
   useState,
   ReactNode,
+  useCallback,
+  useMemo,
 } from 'react'
 import { useAuth } from '@/features/auth/auth-context'
 import { Team } from '../types'
@@ -25,7 +27,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
-  const fetchTeam = async () => {
+  // Memoize fetchTeam to prevent unnecessary re-creations
+  const fetchTeam = useCallback(async () => {
     if (!user || isAuthLoading) {
       setTeam(null);
       setShowOnboarding(false);
@@ -46,7 +49,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       }
       const shouldShowOnboarding = !team;
       setShowOnboarding(shouldShowOnboarding);
-    } catch (error) {
+    } catch {
       setTeam(null);
       setShowOnboarding(true);
       localStorage.removeItem('teamId');
@@ -58,14 +61,14 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [user, isAuthLoading])
 
   // Fetch team whenever auth state changes
   useEffect(() => {
     if (!isAuthLoading) {
       fetchTeam()
     }
-  }, [user, isAuthLoading])
+  }, [fetchTeam, isAuthLoading])
 
   // Ensure dialog stays open if no team
   useEffect(() => {
@@ -84,22 +87,22 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     setShowOnboarding(open)
   }
 
-  const handleTeamCreated = async () => {
+  const handleTeamCreated = useCallback(async () => {
     
     await fetchTeam()
-  }
+  }, [fetchTeam])
 
   const shouldShowDialog = user && !isLoading && showOnboarding
-  
+
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
+    team,
+    isLoading: isLoading || isAuthLoading,
+    refetchTeam: fetchTeam,
+  }), [team, isLoading, isAuthLoading, fetchTeam])
 
   return (
-    <TeamContext.Provider
-      value={{
-        team,
-        isLoading: isLoading || isAuthLoading,
-        refetchTeam: fetchTeam,
-      }}
-    >
+    <TeamContext.Provider value={contextValue}>
       {children}
       {shouldShowDialog && (
         <CreateTeamDialog
@@ -116,11 +119,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 export function useTeam() {
   const context = useContext(TeamContext)
   if (!context) {
-    console.warn('useTeam must be used within a TeamProvider')
     return {
-      data: null,
+      team: null,
       isLoading: true,
-      mutate: async () => {},
+      refetchTeam: async () => {},
     }
   }
   return context

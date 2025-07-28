@@ -22,6 +22,16 @@ interface StaffWithBalance {
   type: 'staff'
 }
 
+interface SimplePerson {
+  id: string
+  name: string
+  email: string
+  contact: string
+  form_id?: string | null
+  camp_name: string
+  type: 'camper' | 'staff'
+}
+
 export const snackBarService = {
   async getCurrentCamp() {
     // First check if we have a team ID
@@ -79,21 +89,74 @@ export const snackBarService = {
 
   async getCampersAndStaff(campId?: string): Promise<(CamperWithBalance | StaffWithBalance)[]> {
     try {
-      // Buscar campistas do acampamento atual
-      const campers = await this.getCampers(campId)
+      // Use the new optimized endpoint that returns both campers and staff in one call
+      const url = campId ? `/people/simple?camp_id=${campId}` : '/people/simple'
+      const response = await api.get(url)
       
-      // Buscar todos os membros do staff
-      const staff = await this.getStaff()
-      
-      // Combinar os dois arrays
-      const allPeople = [
-        ...campers,
-        ...staff
-      ]
-      
-      return allPeople
+      // Transform the simple data to match the expected format
+      return response.data.map((person: SimplePerson) => {
+        if (person.type === 'staff') {
+          return {
+            id: person.id,
+            name: person.name,
+            total_balance: 0, // Will be calculated when needed
+            camp_id: person.camp_name, // Using camp_name as camp_id for compatibility
+            type: 'staff' as const
+          }
+        } else {
+          return {
+            id: person.id,
+            name: person.name,
+            snack_bar_balance: 0, // Will be calculated when needed
+            registration: {
+              id: '', // Not available in simple endpoint
+              camp_id: person.camp_name // Using camp_name as camp_id for compatibility
+            },
+            form_id: person.form_id,
+            type: 'camper' as const
+          }
+        }
+      })
     } catch {
       return []
+    }
+  },
+
+  async getPersonById(id: string): Promise<CamperWithBalance | StaffWithBalance | null> {
+    try {
+      // Primeiro tentar buscar como camper
+      try {
+        const response = await api.get(`/campers/${id}`)
+        const camper = response.data as CamperResponse & { form_id?: string | null }
+        return {
+          id: camper.id,
+          name: camper.name,
+          snack_bar_balance: Number(camper.snack_bar_balance) || 0,
+          registration: {
+            id: camper.registration_id,
+            camp_id: camper.camp_id
+          },
+          form_id: camper.form_id ?? null,
+          type: 'camper' as const
+        }
+      } catch {
+        // Se não for camper, tentar como staff
+        try {
+          const response = await api.get(`/staff/${id}`)
+          const staff = response.data
+          return {
+            id: staff.id,
+            name: staff.name,
+            total_balance: Number(staff.total_balance) || 0,
+            camp_id: staff.camp_id,
+            type: 'staff' as const
+          }
+        } catch {
+          return null
+        }
+      }
+    } catch {
+      return null
     }
   },
 
@@ -192,33 +255,84 @@ export const snackBarService = {
     await this.createTransaction(transaction)
   },
 
-  async getCamperBalance(camperId: string): Promise<{ balance: number; payment_status: string }> {
-    if (!camperId) {
-      return { balance: 0, payment_status: 'confirmed' }
+
+
+  async getPersonData(personId: string): Promise<{ 
+    person: CamperWithBalance | StaffWithBalance | null; 
+    balance: number; 
+    payment_status: string; 
+    transactions: SnackBarTransactionResponse[] 
+  }> {
+    if (!personId) {
+      return { 
+        person: null, 
+        balance: 0, 
+        payment_status: 'confirmed', 
+        transactions: [] 
+      }
     }
     
     try {
-      // Determinar se é um camper ou staff baseado no tipo
-      const allPeople = await this.getCampersAndStaff()
-      const person = allPeople.find(p => p.id === camperId)
-      const isStaff = person?.type === 'staff'
+      // Use the new optimized endpoint that gets person with balance in one call
+      const personResponse = await api.get(`/people/${personId}`)
+      const person = personResponse.data
       
-      if (isStaff) {
-        // Para staff, sempre usar o endpoint específico para obter o saldo correto
-        const response = await api.get(`/snackbar-balance/staff/${camperId}`)
-        const balance = response.data.balance || 0
-        const payment_status = response.data.payment_status || 'confirmed'
-        return { balance, payment_status }
-      } else {
-        // Para campers, usar o snack_bar_balance
-        const balance = (person as CamperWithBalance).snack_bar_balance
-        // For campers, we need to get payment_status from the API
-        const response = await api.get(`/snackbar-balance/${camperId}`)
-        const payment_status = response.data.payment_status || 'confirmed'
-        return { balance, payment_status }
+      if (!person) {
+        return { 
+          person: null, 
+          balance: 0, 
+          payment_status: 'confirmed', 
+          transactions: [] 
+        }
+      }
+      
+      const isStaff = person.type === 'staff'
+      
+      // Get transactions using the appropriate endpoint
+      const transactionsResponse = await api.get(
+        isStaff 
+          ? `/snackbar-transactions/staff/${personId}`
+          : `/snackbar-transactions/${personId}`
+      )
+      
+      const balance = person.snack_bar_balance || 0
+      const payment_status = person.payment_status || 'confirmed'
+      const transactions = transactionsResponse.data || []
+      
+      // Transform person to match expected format
+      const transformedPerson = isStaff 
+        ? {
+            id: person.id,
+            name: person.name,
+            total_balance: balance,
+            camp_id: person.camp_name,
+            type: 'staff' as const
+          }
+        : {
+            id: person.id,
+            name: person.name,
+            snack_bar_balance: balance,
+            registration: {
+              id: '', // Not available in this endpoint
+              camp_id: person.camp_name
+            },
+            form_id: person.form_id,
+            type: 'camper' as const
+          }
+      
+      return {
+        person: transformedPerson,
+        balance,
+        payment_status,
+        transactions
       }
     } catch {
-      return { balance: 0, payment_status: 'confirmed' }
+      return { 
+        person: null, 
+        balance: 0, 
+        payment_status: 'confirmed', 
+        transactions: [] 
+      }
     }
   },
 

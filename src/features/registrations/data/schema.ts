@@ -49,14 +49,14 @@ export const updateRegistrationSchema = registrationSchema
 export type UpdateRegistration = z.infer<typeof updateRegistrationSchema>
 
 export type PaymentMethod = 'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Desconto' | 'Multibanco'
-export type PaymentStatus = 'confirmed' | 'not confirmed'
+export type PaymentStatus = 'confirmed' | 'not confirmed' | 'expired'
 
 export const paymentSchema = z.object({
   id: z.number(),
   registration_id: z.string().uuid(),
   payment_date: z.string(),
   payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro', 'Desconto', 'Multibanco']),
-  payment_status: z.enum(['confirmed', 'not confirmed']),
+  payment_status: z.enum(['confirmed', 'not confirmed', 'expired']),
   amount: z.number(),
   payment_link: z.string().nullable(),
   phone_number: z.string().nullable(),

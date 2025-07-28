@@ -1,0 +1,32 @@
+name: Cron Clean Pending Payments
+
+on:
+  schedule:
+    - cron: '*/20 * * * *'  # a cada 20 minutos
+  workflow_dispatch:        # permite correr manualmente se precisares
+
+jobs:
+  clean-pending:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run cleaning script
+        run: pnpm run cron:clean-payments
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }} 

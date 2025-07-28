@@ -36,7 +36,7 @@ export default function SnackBarPage() {
   const navigate = useNavigate()
   const permissions = useTeamPermissions()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
-  const [selectedCamperId, setSelectedCamperId] = useState<string>('')
+  const [selectedPersonId, setSelectedPersonId] = useState<string>('')
   const queryClient = useQueryClient()
 
   const form = useForm<SnackBarTransaction>({
@@ -52,20 +52,13 @@ export default function SnackBarPage() {
     queryFn: () => snackBarService.getCurrentCamp(),
   })
 
-  const { data: balanceData = { balance: 0, payment_status: 'confirmed' } } = useQuery({
-    queryKey: ['camper-balance', selectedCamperId],
-    queryFn: () => snackBarService.getCamperBalance(selectedCamperId),
-    enabled: !!selectedCamperId,
-    staleTime: 5 * 60 * 1000, // 5 minutes - cache for longer since it's only updated on selection
-    gcTime: 10 * 60 * 1000, // 10 minutes
-  })
-
-  const { data: transactions = [] } = useQuery({
-    queryKey: ['camper-transactions', selectedCamperId],
-    queryFn: () => snackBarService.getCamperTransactions(selectedCamperId),
-    enabled: !!selectedCamperId,
-    staleTime: 5 * 60 * 1000, // 5 minutes - cache for longer since it's only updated on selection
-    gcTime: 10 * 60 * 1000, // 10 minutes
+  // Query otimizada que busca pessoa, saldo e transações em uma única operação
+  const { data: personData = { balance: 0, payment_status: 'confirmed', person: null, transactions: [] } } = useQuery({
+    queryKey: ['person-data', selectedPersonId],
+    queryFn: () => snackBarService.getPersonData(selectedPersonId),
+    enabled: !!selectedPersonId,
+    staleTime: 2 * 60 * 1000, // 2 minutes - cache for longer since it's only updated on selection
+    gcTime: 5 * 60 * 1000, // 5 minutes
   })
 
   const { data: allTransactions = [] } = useQuery({
@@ -93,18 +86,15 @@ export default function SnackBarPage() {
 
       // Invalidate only the necessary queries
       queryClient.invalidateQueries({
-        queryKey: ['camper-balance', selectedCamperId],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ['camper-transactions', selectedCamperId],
+        queryKey: ['person-data', selectedPersonId],
       })
       queryClient.invalidateQueries({
         queryKey: ['all-transactions', currentCamp?.id],
       })
 
-      // Reset form and selected camper
+      // Reset form and selected person
       form.reset({ amount: 0, camper_id: '' })
-      setSelectedCamperId('')
+      setSelectedPersonId('')
     },
     onError: (error) => {
       toast.error(
@@ -146,10 +136,10 @@ export default function SnackBarPage() {
   const activeCamp = currentCamp
 
   function onSubmit(data: SnackBarTransaction) {
-    if (!selectedCamperId) return
+    if (!selectedPersonId) return
 
     const amount = Number(data.amount)
-    const numericBalance = balanceData.balance
+    const numericBalance = personData.balance
     
     if (amount > numericBalance) {
       toast.error('Saldo insuficiente')
@@ -157,14 +147,14 @@ export default function SnackBarPage() {
     }
 
     // Verificar se o payment_status é 'confirmed'
-    if (balanceData.payment_status !== 'confirmed') {
+    if (personData.payment_status !== 'confirmed') {
       toast.error('Não é possível usar saldo que ainda não foi confirmado')
       return
     }
 
     const transaction = {
       amount: amount,
-      camper_id: selectedCamperId,
+      camper_id: selectedPersonId,
     }
 
     mutation.mutate(transaction)
@@ -172,10 +162,10 @@ export default function SnackBarPage() {
 
   const amount = form.watch('amount')
   const amountNumber = Number(amount)
-  const numericBalance = balanceData.balance
+  const numericBalance = personData.balance
   const isAmountValid =
     !isNaN(amountNumber) && amountNumber > 0 && amountNumber <= numericBalance
-  const isPaymentConfirmed = balanceData.payment_status === 'confirmed'
+  const isPaymentConfirmed = personData.payment_status === 'confirmed'
 
   // If no access to snack bar, show upgrade dialog or redirect
   if (!permissions.snackBar.access) {
@@ -293,16 +283,16 @@ export default function SnackBarPage() {
                   </div>
                   <Separator className="my-4" />
                   <CamperCombobox
-                    value={selectedCamperId}
+                    value={selectedPersonId}
                     onValueChange={(value: string) => {
-                      setSelectedCamperId(value)
+                      setSelectedPersonId(value)
                       form.setValue('camper_id', value)
                     }}
                     campers={campers}
                   />
                 </div>
 
-                {selectedCamperId && (
+                {selectedPersonId && (
                   <>
                     <div>
                       <div className="space-y-1">
@@ -317,14 +307,14 @@ export default function SnackBarPage() {
                       <div className="space-y-2">
                         <div
                           className={`text-2xl font-bold ${
-                            balanceData.balance > 0 
-                              ? (balanceData.payment_status === 'confirmed' ? 'text-green-600' : 'text-yellow-600')
+                            personData.balance > 0 
+                              ? (personData.payment_status === 'confirmed' ? 'text-green-600' : 'text-yellow-600')
                               : 'text-red-600'
                           }`}
                         >
-                          € {balanceData.balance.toFixed(2)}
+                          € {personData.balance.toFixed(2)}
                         </div>
-                        {balanceData.balance > 0 && balanceData.payment_status !== 'confirmed' && (
+                        {personData.balance > 0 && personData.payment_status !== 'confirmed' && (
                           <div className="text-sm text-yellow-600 font-medium">
                             ⚠️ Saldo aguarda confirmação de pagamento
                           </div>
@@ -377,16 +367,16 @@ export default function SnackBarPage() {
                           type="submit"
                           className="w-full"
                           disabled={
-                            !selectedCamperId ||
+                            !selectedPersonId ||
                             mutation.isPending ||
-                            balanceData.balance <= 0 ||
+                            personData.balance <= 0 ||
                             !isAmountValid ||
                             !isPaymentConfirmed
                           }
                         >
                           {mutation.isPending
                             ? 'A debitar...'
-                            : balanceData.balance <= 0
+                            : personData.balance <= 0
                               ? 'Sem saldo disponível'
                               : !isPaymentConfirmed
                                 ? 'Saldo não confirmado'
@@ -407,22 +397,22 @@ export default function SnackBarPage() {
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     Últimas transações realizadas
-                    {selectedCamperId ? 'pelo campista' : ''}.
+                    {selectedPersonId ? 'pela pessoa selecionada' : ''}.
                   </p>
                 </div>
                 <Separator className="my-4" />
               </div>
 
               <div className="-mx-4 flex-1 overflow-auto px-4">
-                <TransactionsTable data={transactions} />
-                {selectedCamperId && transactions.length === 0 && (
+                <TransactionsTable data={personData.transactions} />
+                {selectedPersonId && personData.transactions.length === 0 && (
                   <div className="text-center py-4 text-muted-foreground">
-                    Este campista não possui transações.
+                    Esta pessoa não possui transações.
                   </div>
                 )}
-                {!selectedCamperId && (
+                {!selectedPersonId && (
                   <div className="text-center py-4 text-muted-foreground">
-                    Selecione um campista para ver suas transações.
+                    Selecione uma pessoa para ver suas transações.
                   </div>
                 )}
               </div>

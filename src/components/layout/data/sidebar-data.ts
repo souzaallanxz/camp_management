@@ -18,6 +18,7 @@ import { type SidebarData, type NavItem } from '../types'
 import { useUser } from '@/features/auth/hooks/use-user'
 import { useTeamData } from '@/features/teams/hooks/use-team-data'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
+import { useMemo } from 'react'
 
 // Default sidebar data without user info
 export const sidebarData: SidebarData = {
@@ -108,7 +109,7 @@ export const sidebarData: SidebarData = {
   ],
 }
 
-// Hook version with user info
+// Hook version with user info - OPTIMIZED to prevent unnecessary API calls
 export function useSidebarData(): SidebarData & { isLoading: boolean } {
   const user = useUser()
   const { teams: dbTeams, isLoading: teamsLoading } = useTeamData()
@@ -117,50 +118,56 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
   // Se ainda está carregando informações do usuário ou permissões, não mostrar itens
   const isLoading = user.isLoading || permissions.isLoading || teamsLoading
 
-  const teams = dbTeams.map(team => ({
-    name: team.name,
-    logo: Command,
-    plan: team.tier === 'premium' ? 'Premium' : 'Free',
-  }))
+  // Memoize teams to prevent unnecessary re-renders
+  const teams = useMemo(() => {
+    return dbTeams.map(team => ({
+      name: team.name,
+      logo: Command,
+      plan: team.tier === 'premium' ? 'Premium' : 'Free',
+    }))
+  }, [dbTeams])
 
-  const generalItems: NavItem[] = [];
+  // Memoize general items to prevent unnecessary re-computations
+  const generalItems = useMemo((): NavItem[] => {
+    // Se ainda está carregando, não mostrar nenhum item
+    if (isLoading) {
+      return []
+    }
 
-  // Se ainda está carregando, não mostrar nenhum item
-  if (isLoading) {
-    // Não adicionar itens enquanto carrega
-  } else {
+    const items: NavItem[] = []
+
     // Se for cashier, só mostra Dashboard e Snack Bar
     if (user?.role === 'cashier') {
-      generalItems.push({
+      items.push({
         title: 'Dashboard',
         url: '/',
         icon: IconLayoutDashboard,
       })
       if (permissions.snackBar.access) {
-        generalItems.push({
+        items.push({
           title: 'Snack Bar',
           url: '/snack-bar',
           icon: IconIceCream,
         })
       }
     } else {
-      generalItems.push({
+      items.push({
         title: 'Dashboard',
         url: '/',
         icon: IconLayoutDashboard,
       })
-      generalItems.push({
+      items.push({
         title: 'Inscrições',
         url: '/registrations',
         icon: IconFileDescription,
       })
-      generalItems.push({
+      items.push({
         title: 'Campistas',
         url: '/campers',
         icon: IconTent,
       })
       if (permissions.staff?.viewList) {
-        generalItems.push({
+        items.push({
           title: 'Staff',
           url: '/staff',
           icon: IconUsersGroup,
@@ -168,40 +175,42 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
       }
       // Only show Users menu item for superadmin and admin roles
       if (user?.role === 'superadmin' || user?.role === 'admin') {
-        generalItems.push({
+        items.push({
           title: 'Utilizadores',
           url: '/users',
           icon: IconUsers,
         })
       }
-      generalItems.push({
+      items.push({
         title: 'Acampamentos',
         url: '/camps',
         icon: IconCampfire,
       })
       if (permissions.snackBar.access) {
-        generalItems.push({
+        items.push({
           title: 'Snack Bar',
           url: '/snack-bar',
           icon: IconIceCream,
         })
       }
-      generalItems.push({
+      items.push({
         title: 'Integrações',
         url: '/integrations',
         icon: IconWebhook,
       })
     }
-  }
 
-  return {
+    return items
+  }, [isLoading, user?.role, permissions.snackBar.access, permissions.staff?.viewList])
+
+  // Memoize the entire sidebar data to prevent unnecessary re-renders
+  const sidebarDataValue = useMemo(() => ({
     user: {
       name: user?.user?.name ?? user?.email ?? 'User',
       email: user?.email ?? '',
       avatar: '/avatars/shadcn.jpg',
     },
     teams,
-    isLoading,
     navGroups: [
       {
         title: 'Geral',
@@ -239,5 +248,10 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
         ],
       },
     ],
+  }), [user?.user?.name, user?.email, teams, generalItems])
+
+  return {
+    ...sidebarDataValue,
+    isLoading,
   }
 }

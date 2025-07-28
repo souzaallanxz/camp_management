@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import { teamService } from '../services/team-service'
 import { toast } from '@/hooks/use-toast'
 import type { Team } from '../types'
@@ -43,5 +43,12 @@ export function useTeamData() {
     fetchTeams()
   }, [fetchTeams])
 
-  return { teams, isLoading, mutate: fetchTeams }
+  // Memoize the return value to prevent unnecessary re-renders
+  const result = useMemo(() => ({
+    teams,
+    isLoading,
+    mutate: fetchTeams
+  }), [teams, isLoading, fetchTeams])
+
+  return result
 } 

@@ -1,7 +1,7 @@
 import { pgTable, pgEnum, uuid, text, varchar, timestamp, numeric, date, bigint, jsonb, boolean } from 'drizzle-orm/pg-core';
 
 // Enums
-export const paymentStatusEnum = pgEnum('payment_status_enum', ['not confirmed', 'confirmed']);
+export const paymentStatusEnum = pgEnum('payment_status_enum', ['not confirmed', 'confirmed', 'expired']);
 export const paymentMethodEnum = pgEnum('payment_method_enum', ['MB Way', 'Transferência Bancária', 'Dinheiro', 'Desconto', 'Multibanco']);
 export const registrationStatusEnum = pgEnum('registration_status', ['unpaid', 'paid', 'partial', 'cancelled']);
 export const onboardingStatusTypeEnum = pgEnum('onboarding_status_type', ['Pendente', 'Completo']);
@@ -104,6 +104,7 @@ export const snackbar_balance = pgTable('snackbar_balance', {
   amount: numeric('amount').notNull(),
   payment_method: varchar('payment_method', { length: 50 }).notNull(),
   phone_number: varchar('phone_number', { length: 20 }),
+  payment_status: paymentStatusEnum('payment_status').notNull().default('not confirmed'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

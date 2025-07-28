@@ -7,6 +7,10 @@ export interface UpdateTeamData {
   tier?: TeamTier
 }
 
+// Cache for team data to prevent unnecessary API calls
+let teamCache: { data: Team | null; timestamp: number } | null = null
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
 export const teamService = {
   async getTeams() {
     const token = localStorage.getItem('token')
@@ -14,145 +18,120 @@ export const teamService = {
       throw new Error('No authenticated user found')
     }
 
+    const response = await fetch(buildApiUrl('/teams'), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch teams')
+    }
+
+    return response.json()
+  },
+
+  async getCurrentUserTeam(): Promise<Team | null> {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      return null
+    }
+
+    // Check if we have valid cached data
+    if (teamCache && (Date.now() - teamCache.timestamp) < CACHE_DURATION) {
+      return teamCache.data
+    }
+
     try {
-      const response = await fetch(buildApiUrl('/teams'), {
+      const response = await fetch(buildTeamApiUrl(), {
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        credentials: 'include',
+        credentials: 'include'
       })
 
       if (!response.ok) {
-        throw new Error(`Error fetching teams: ${response.statusText}`)
+        // Clear cache on error
+        teamCache = null
+        return null
       }
 
-      const teams = await response.json()
-      return teams as Team[]
-    } catch (error) {
-      throw new Error(`Error fetching teams: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-  },
-
-  async getCurrentUserTeam() {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authenticated user found');
-    }
-    
-    
-    try {
-      // Usa a função especial para construir URLs de equipe, evitando problemas de redirecionamento
-      const teamUrl = buildTeamApiUrl();
+      const teamData = await response.json()
       
-      const response = await fetch(teamUrl, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include',
-      });
+      // Update cache
+      teamCache = { data: teamData, timestamp: Date.now() }
       
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        return null;
-      }
-      
-      // Verificar o Content-Type para garantir que é JSON antes de fazer o parse
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        
-        // Se já temos o ID da equipe no localStorage, podemos criar um objeto "simulado"
-        const teamId = localStorage.getItem('teamId') || localStorage.getItem('team_id');
-        if (teamId) {
-          return { id: teamId };
-        }
-        
-        return null;
-      }
-      
-      try {
-        const data = await response.json();
-        return data;
-      } catch {
-        // Se já temos o ID da equipe no localStorage, podemos criar um objeto "simulado"
-        const teamId = localStorage.getItem('teamId') || localStorage.getItem('team_id');
-        if (teamId) {
-          return { id: teamId };
-        }
-        
-        return null;
-      }
+      return teamData
     } catch {
-      // Se já temos o ID da equipe no localStorage, podemos criar um objeto "simulado"
-      const teamId = localStorage.getItem('teamId') || localStorage.getItem('team_id');
-      if (teamId) {
-        return { id: teamId };
-      }
-      
-      return null;
+      // Clear cache on error
+      teamCache = null
+      return null
     }
   },
 
-  async createTeam(dto: CreateTeamDto) {
+  async createTeam(data: CreateTeamDto): Promise<Team> {
     const token = localStorage.getItem('token')
     if (!token) {
       throw new Error('No authenticated user found')
     }
 
-    // Criar a equipe via API 
     const response = await fetch(buildApiUrl('/teams'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(dto),
-      credentials: 'include',
-    });
-    
+      body: JSON.stringify(data),
+      credentials: 'include'
+    })
+
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error creating team: ${errorText}`);
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to create team')
     }
+
+    const teamData = await response.json()
     
-    const team = await response.json();
+    // Clear cache when team is created
+    teamCache = null
     
-    // Salvar o team_id no localStorage
-    if (team && team.id) {
-      localStorage.setItem('teamId', team.id);
-      localStorage.setItem('team_id', team.id);
-    }
-    
-    return team;
+    return teamData
   },
 
-  async updateTeam(id: string, data: UpdateTeamData) {
+  async updateTeam(teamId: string, data: UpdateTeamData): Promise<Team> {
     const token = localStorage.getItem('token')
-    
     if (!token) {
       throw new Error('No authenticated user found')
     }
 
-    const response = await fetch(buildApiUrl(`/teams/${id}`), {
+    const response = await fetch(buildApiUrl(`/teams/${teamId}`), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify(data),
-      credentials: 'include',
+      credentials: 'include'
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Error updating team: ${errorText}`)
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to update team')
     }
 
-    const team = await response.json()
-    return team as Team
+    const teamData = await response.json()
+    
+    // Clear cache when team is updated
+    teamCache = null
+    
+    return teamData
+  },
+
+  // Function to clear team cache (call this when team data might have changed)
+  clearTeamCache() {
+    teamCache = null
   }
 } 

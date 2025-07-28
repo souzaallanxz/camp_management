@@ -824,7 +824,7 @@ app.get('/api/dashboard/recent-registrations', (async (req: Request, res: Respon
         COALESCE(SUM(CASE WHEN p.payment_status = 'confirmed' THEN p.amount ELSE 0 END), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      LEFT JOIN payments p ON r.id = p.registration_id
+      LEFT JOIN payments p ON r.id = p.registration_id AND p.payment_status != 'expired'
       WHERE c.team_id = ${teamId}
       GROUP BY r.id, r.name, r.email, r.created_at, c.name
       ORDER BY r.created_at DESC
@@ -880,7 +880,7 @@ app.get('/api/registrations', (async (req: Request, res: Response) => {
         COALESCE(SUM(CASE WHEN p.payment_status = 'confirmed' THEN p.amount ELSE 0 END), 0) as total_paid
       FROM registrations r
       JOIN camps c ON r.camp_id = c.id
-      LEFT JOIN payments p ON r.id = p.registration_id
+      LEFT JOIN payments p ON r.id = p.registration_id AND p.payment_status != 'expired'
       WHERE c.team_id = ${teamId}
       GROUP BY r.id, r.form_id, r.name, r.email, r.contact, r.status, r.created_at, r.updated_at, r.user_id, r.camp_id, r.onboarding_status, r.snack_bar_balance, r.id_number, r.sns_number, r.date_of_birth, r.dietary_restrictions, r.guardian_name, r.guardian_email, r.guardian_phone, c.name, c.start_date, c.end_date, c.price
       ORDER BY r.created_at DESC
@@ -1047,7 +1047,7 @@ app.get('/api/camps/current', (async (req: Request, res: Response) => {
   }
 }) as any);
 
-// List all campers for the current team
+// List all campers for the current team (optimized with single query)
 app.get('/api/campers', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   if (!teamId) {
@@ -1055,106 +1055,129 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
   }
   try {
     const { camp_id } = req.query;
+    
+    // Single optimized query that calculates all balances in one go
     let campers;
     if (camp_id) {
       campers = await sql`
-        SELECT ca.*, 
-               c.name as camp_name
+        SELECT 
+          ca.*,
+          c.name as camp_name,
+          r.form_id,
+          COALESCE(sb.total_loaded, 0) as total_loaded,
+          COALESCE(sbt_spent.total_spent, 0) as total_spent,
+          COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+          (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+          CASE 
+            WHEN sb.total_loaded IS NULL THEN 'confirmed'
+            WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
         FROM campers ca
         JOIN registrations r ON ca.registration_id = r.id
         JOIN camps c ON r.camp_id = c.id
+        LEFT JOIN (
+          SELECT 
+            registration_id,
+            SUM(amount) as total_loaded,
+            CASE 
+              WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+              ELSE 'not confirmed'
+            END as payment_status
+          FROM snackbar_balance
+          WHERE payment_status = 'confirmed'
+          GROUP BY registration_id
+        ) sb ON r.id = sb.registration_id
+        LEFT JOIN (
+          SELECT 
+            camper_id,
+            SUM(amount) as total_spent
+          FROM snack_bar_transactions
+          WHERE is_liquidated = false
+          GROUP BY camper_id
+        ) sbt_spent ON ca.id = sbt_spent.camper_id
+        LEFT JOIN (
+          SELECT 
+            camper_id,
+            SUM(amount) as total_liquidated
+          FROM snack_bar_transactions
+          WHERE is_liquidated = true
+          GROUP BY camper_id
+        ) sbt_liquidated ON ca.id = sbt_liquidated.camper_id
         WHERE c.team_id = ${teamId} AND c.id = ${camp_id}
         ORDER BY ca.created_at DESC
       `;
     } else {
       campers = await sql`
-        SELECT ca.*, 
-               c.name as camp_name
+        SELECT 
+          ca.*,
+          c.name as camp_name,
+          r.form_id,
+          COALESCE(sb.total_loaded, 0) as total_loaded,
+          COALESCE(sbt_spent.total_spent, 0) as total_spent,
+          COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+          (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+          CASE 
+            WHEN sb.total_loaded IS NULL THEN 'confirmed'
+            WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
         FROM campers ca
         JOIN registrations r ON ca.registration_id = r.id
         JOIN camps c ON r.camp_id = c.id
-        WHERE c.team_id = ${teamId}
-        ORDER BY ca.created_at DESC
-      `;
-    }
-    
-
-    // For each camper, calculate the correct snack_bar_balance, payment status, total loaded and total spent
-    const camperBalances = await Promise.all(campers.map(async (camper: any) => {
-      try {
-        // Get total balance and payment status from snackbar_balance (confirmed payments only)
-        const balanceResult = await sql`
+        LEFT JOIN (
           SELECT 
-            COALESCE(SUM(amount), 0) as total_loaded,
+            registration_id,
+            SUM(amount) as total_loaded,
             CASE 
-              WHEN COUNT(*) = 0 THEN 'confirmed'
               WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
               ELSE 'not confirmed'
             END as payment_status
           FROM snackbar_balance
-          WHERE registration_id = ${camper.registration_id}
-            AND payment_status = 'confirmed'
-        `;
-        
-        // Get total spent from snack_bar_transactions (non-liquidated)
-        const spentResult = await sql`
-          SELECT COALESCE(SUM(amount), 0) as total_spent
+          WHERE payment_status = 'confirmed'
+          GROUP BY registration_id
+        ) sb ON r.id = sb.registration_id
+        LEFT JOIN (
+          SELECT 
+            camper_id,
+            SUM(amount) as total_spent
           FROM snack_bar_transactions
-          WHERE camper_id = ${camper.id}
-            AND is_liquidated = false
-        `;
-        
-        // Get total liquidated from snack_bar_transactions (liquidated)
-        const liquidatedResult = await sql`
-          SELECT COALESCE(SUM(amount), 0) as total_liquidated
+          WHERE is_liquidated = false
+          GROUP BY camper_id
+        ) sbt_spent ON ca.id = sbt_spent.camper_id
+        LEFT JOIN (
+          SELECT 
+            camper_id,
+            SUM(amount) as total_liquidated
           FROM snack_bar_transactions
-          WHERE camper_id = ${camper.id}
-            AND is_liquidated = true
-        `;
-        
-        const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
-        const totalSpent = Number(spentResult[0]?.total_spent || 0);
-        const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
-        const snack_bar_balance = totalLoaded - totalSpent - totalLiquidated;
-        const payment_status = balanceResult[0]?.payment_status || 'confirmed';
-        
-        // Get form_id from registration
-        const formIdResult = await sql`
-          SELECT r.form_id FROM registrations r
-          WHERE r.id = ${camper.registration_id}
-        `;
-        
-        return {
-          ...camper,
-          camp: { name: camper.camp_name },
-          snack_bar_balance,
-          payment_status,
-          totalLoaded,
-          totalSpent,
-          totalLiquidated,
-          form_id: formIdResult[0]?.form_id || null
-        };
-      } catch (error) {
-        console.error(`Error processing camper ${camper.id}:`, error);
-        return {
-          ...camper,
-          camp: { name: camper.camp_name },
-          snack_bar_balance: 0,
-          payment_status: 'confirmed',
-          totalLoaded: 0,
-          totalSpent: 0,
-          totalLiquidated: 0
-        };
-      }
+          WHERE is_liquidated = true
+          GROUP BY camper_id
+        ) sbt_liquidated ON ca.id = sbt_liquidated.camper_id
+        WHERE c.team_id = ${teamId}
+        ORDER BY ca.created_at DESC
+      `;
+    }
+
+    // Process results to match expected format
+    const processedCampers = campers.map((camper: any) => ({
+      ...camper,
+      camp: { name: camper.camp_name },
+      snack_bar_balance: Number(camper.snack_bar_balance) || 0,
+      totalLoaded: Number(camper.total_loaded) || 0,
+      totalSpent: Number(camper.total_spent) || 0,
+      totalLiquidated: Number(camper.total_liquidated) || 0,
+      payment_status: camper.payment_status || 'confirmed',
+      form_id: camper.form_id || null
     }));
-    res.json(camperBalances);
+
+    res.json(processedCampers);
   } catch (error) {
     console.error('Error fetching campers:', error);
     res.status(500).json({ error: 'Erro ao buscar campistas.', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 }) as any);
 
-// Get a single camper by ID
+// Get a single camper by ID with balance
 app.get('/api/campers/:id', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   if (!teamId) {
@@ -1163,18 +1186,72 @@ app.get('/api/campers/:id', (async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const camper = await sql`
-      SELECT ca.*
+      SELECT 
+        ca.*,
+        c.name as camp_name,
+        r.form_id,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
       FROM campers ca
       JOIN registrations r ON ca.registration_id = r.id
       JOIN camps c ON r.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          registration_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY registration_id
+      ) sb ON r.id = sb.registration_id
+      LEFT JOIN (
+        SELECT 
+          camper_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY camper_id
+      ) sbt_spent ON ca.id = sbt_spent.camper_id
+      LEFT JOIN (
+        SELECT 
+          camper_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY camper_id
+      ) sbt_liquidated ON ca.id = sbt_liquidated.camper_id
       WHERE ca.id = ${id} AND c.team_id = ${teamId}
       LIMIT 1
     `;
     if (!camper[0]) {
       return res.status(404).json({ error: 'Camper not found' });
     }
-    res.json(camper[0]);
-  } catch {
+    
+    // Process result to match expected format
+    const processedCamper = {
+      ...camper[0],
+      camp: { name: camper[0].camp_name },
+      snack_bar_balance: Number(camper[0].snack_bar_balance) || 0,
+      totalLoaded: Number(camper[0].total_loaded) || 0,
+      totalSpent: Number(camper[0].total_spent) || 0,
+      totalLiquidated: Number(camper[0].total_liquidated) || 0,
+      payment_status: camper[0].payment_status || 'confirmed',
+      form_id: camper[0].form_id || null
+    };
+    
+    res.json(processedCamper);
+  } catch (error) {
+    console.error('Error fetching camper:', error);
     res.status(500).json({ error: 'Erro ao buscar campista.' });
   }
 }) as any);
@@ -1548,7 +1625,7 @@ app.get('/api/registrations/:id', (async (req: Request, res: Response) => {
     const totalPaidResult = await sql`
       SELECT COALESCE(SUM(amount), 0) as total_paid
       FROM payments 
-      WHERE registration_id = ${id}::uuid AND payment_status = 'confirmed'
+      WHERE registration_id = ${id}::uuid AND payment_status = 'confirmed' AND payment_status != 'expired'
     `;
     
     const totalPaid = parseFloat(totalPaidResult[0]?.total_paid || '0');
@@ -1708,10 +1785,10 @@ app.patch('/api/registrations/:id/onboarding-status', (async (req: Request, res:
 
 // Helper to update registration status after payment changes
 async function updateRegistrationStatus(registrationId: string) {
-  // Get total paid amount - only confirmed payments (exclude pending)
+  // Get total paid amount - only confirmed payments (exclude pending and expired)
   const totalPaid = await sql`
     SELECT COALESCE(SUM(amount), 0) as total FROM payments 
-    WHERE registration_id = ${registrationId} AND payment_status = 'confirmed'
+    WHERE registration_id = ${registrationId} AND payment_status = 'confirmed' AND payment_status != 'expired'
   `;
   // Get the registration with its camp
   const registration = await sql`
@@ -1910,6 +1987,8 @@ app.get('/api/snackbar-balance/:camperId', (async (req: Request, res: Response) 
     res.status(500).json({ error: 'Error fetching snackbar balance' });
   }
 }) as any);
+
+
 
 // Get snackbar balance for a staff member
 app.get('/api/snackbar-balance/staff/:staffId', (async (req: Request, res: Response) => {
@@ -3697,87 +3776,79 @@ app.get('/api/teams/:id/tier', (async (req: Request, res: Response) => {
 
 // STAFF ENDPOINTS
 
-// List all staff for the current team
+// List all staff for the current team (optimized with single query)
 app.get('/api/staff', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   if (!teamId) {
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
+    // Single optimized query that calculates all balances in one go
     const staff = await sql`
-      SELECT s.*, c.name as camp_name
+      SELECT 
+        s.*,
+        c.name as camp_name,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
       FROM staff s
       JOIN camps c ON s.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY staff_id
+      ) sb ON s.id = sb.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY staff_id
+      ) sbt_spent ON s.id = sbt_spent.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY staff_id
+      ) sbt_liquidated ON s.id = sbt_liquidated.staff_id
       WHERE c.team_id = ${teamId}
       ORDER BY s.created_at DESC
     `;
 
-    // For each staff member, calculate the correct snack_bar_balance, payment status, total loaded and total spent
-    const staffWithBalances = await Promise.all(staff.map(async (staffMember) => {
-      try {
-        // Get total balance and payment status from snackbar_balance (confirmed payments only)
-        const balanceResult = await sql`
-          SELECT 
-            COALESCE(SUM(amount), 0) as total_loaded,
-            CASE 
-              WHEN COUNT(*) = 0 THEN 'confirmed'
-              WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
-              ELSE 'not confirmed'
-            END as payment_status
-          FROM snackbar_balance
-          WHERE staff_id = ${staffMember.id}
-            AND payment_status = 'confirmed'
-        `;
-        
-        // Get total spent from snack_bar_transactions (non-liquidated)
-        const spentResult = await sql`
-          SELECT COALESCE(SUM(amount), 0) as total_spent
-          FROM snack_bar_transactions
-          WHERE staff_id = ${staffMember.id}
-            AND is_liquidated = false
-        `;
-        
-        // Get total liquidated from snack_bar_transactions (liquidated)
-        const liquidatedResult = await sql`
-          SELECT COALESCE(SUM(amount), 0) as total_liquidated
-          FROM snack_bar_transactions
-          WHERE staff_id = ${staffMember.id}
-            AND is_liquidated = true
-        `;
-        
-        const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
-        const totalSpent = Number(spentResult[0]?.total_spent || 0);
-        const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
-        const snack_bar_balance = totalLoaded - totalSpent - totalLiquidated;
-        const payment_status = balanceResult[0]?.payment_status || 'confirmed';
-        
-        return {
-          ...staffMember,
-          snack_bar_balance,
-          payment_status,
-          totalLoaded,
-          totalSpent,
-          totalLiquidated
-        };
-      } catch (error) {
-        console.error(`Error processing staff member ${staffMember.id}:`, error);
-        return {
-          ...staffMember,
-          snack_bar_balance: 0,
-          payment_status: 'confirmed',
-          totalLoaded: 0,
-          totalSpent: 0,
-          totalLiquidated: 0
-        };
-      }
+    // Process results to match expected format
+    const processedStaff = staff.map((staffMember: any) => ({
+      ...staffMember,
+      snack_bar_balance: Number(staffMember.snack_bar_balance) || 0,
+      totalLoaded: Number(staffMember.total_loaded) || 0,
+      totalSpent: Number(staffMember.total_spent) || 0,
+      totalLiquidated: Number(staffMember.total_liquidated) || 0,
+      payment_status: staffMember.payment_status || 'confirmed'
     }));
-    res.json(staffWithBalances);
+
+    res.json(processedStaff);
   } catch (error) {
+    console.error('Error fetching staff:', error);
     res.status(500).json({ error: 'Erro ao buscar staff.' });
   }
 }) as any);
 
-// Get a single staff member by ID
+// Get a single staff member by ID with balance
 app.get('/api/staff/:id', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   if (!teamId) {
@@ -3786,18 +3857,383 @@ app.get('/api/staff/:id', (async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const staff = await sql`
-      SELECT s.*
+      SELECT 
+        s.*,
+        c.name as camp_name,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
       FROM staff s
       JOIN camps c ON s.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY staff_id
+      ) sb ON s.id = sb.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY staff_id
+      ) sbt_spent ON s.id = sbt_spent.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY staff_id
+      ) sbt_liquidated ON s.id = sbt_liquidated.staff_id
       WHERE s.id = ${id} AND c.team_id = ${teamId}
       LIMIT 1
     `;
     if (!staff[0]) {
       return res.status(404).json({ error: 'Staff member not found' });
     }
-    res.json(staff[0]);
-  } catch {
+    
+    // Process result to match expected format
+    const processedStaff = {
+      ...staff[0],
+      snack_bar_balance: Number(staff[0].snack_bar_balance) || 0,
+      totalLoaded: Number(staff[0].total_loaded) || 0,
+      totalSpent: Number(staff[0].total_spent) || 0,
+      totalLiquidated: Number(staff[0].total_liquidated) || 0,
+      payment_status: staff[0].payment_status || 'confirmed'
+    };
+    
+    res.json(processedStaff);
+  } catch (error) {
+    console.error('Error fetching staff member:', error);
     res.status(500).json({ error: 'Erro ao buscar membro do staff.' });
+  }
+}) as any);
+
+// Get simple list of campers for dropdowns (without balance calculations)
+app.get('/api/campers/simple', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camp_id } = req.query;
+    
+    let campers;
+    if (camp_id) {
+      campers = await sql`
+        SELECT 
+          ca.id,
+          ca.name,
+          ca.email,
+          ca.contact,
+          r.form_id,
+          c.name as camp_name,
+          'camper' as type
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId} AND c.id = ${camp_id}
+        ORDER BY ca.name ASC
+      `;
+    } else {
+      campers = await sql`
+        SELECT 
+          ca.id,
+          ca.name,
+          ca.email,
+          ca.contact,
+          r.form_id,
+          c.name as camp_name,
+          'camper' as type
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}
+        ORDER BY ca.name ASC
+      `;
+    }
+
+    res.json(campers);
+  } catch (error) {
+    console.error('Error fetching simple campers list:', error);
+    res.status(500).json({ error: 'Erro ao buscar lista de campistas.' });
+  }
+}) as any);
+
+// Get simple list of staff for dropdowns (without balance calculations)
+app.get('/api/staff/simple', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const staff = await sql`
+      SELECT 
+        s.id,
+        s.name,
+        s.email,
+        s.phone,
+        c.name as camp_name,
+        'staff' as type
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY s.name ASC
+    `;
+
+    res.json(staff);
+  } catch (error) {
+    console.error('Error fetching simple staff list:', error);
+    res.status(500).json({ error: 'Erro ao buscar lista de staff.' });
+  }
+}) as any);
+
+// Get combined simple list of campers and staff for dropdowns
+app.get('/api/people/simple', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { camp_id } = req.query;
+    
+    // Get campers
+    let campers;
+    if (camp_id) {
+      campers = await sql`
+        SELECT 
+          ca.id,
+          ca.name,
+          ca.email,
+          ca.contact,
+          r.form_id,
+          c.name as camp_name,
+          'camper' as type
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId} AND c.id = ${camp_id}
+        ORDER BY ca.name ASC
+      `;
+    } else {
+      campers = await sql`
+        SELECT 
+          ca.id,
+          ca.name,
+          ca.email,
+          ca.contact,
+          r.form_id,
+          c.name as camp_name,
+          'camper' as type
+        FROM campers ca
+        JOIN registrations r ON ca.registration_id = r.id
+        JOIN camps c ON r.camp_id = c.id
+        WHERE c.team_id = ${teamId}
+        ORDER BY ca.name ASC
+      `;
+    }
+
+    // Get staff
+    const staff = await sql`
+      SELECT 
+        s.id,
+        s.name,
+        s.email,
+        s.phone as contact,
+        NULL as form_id,
+        c.name as camp_name,
+        'staff' as type
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY s.name ASC
+    `;
+
+    // Combine and sort by name
+    const allPeople = [...campers, ...staff].sort((a, b) => 
+      a.name.localeCompare(b.name)
+    );
+
+    res.json(allPeople);
+  } catch (error) {
+    console.error('Error fetching simple people list:', error);
+    res.status(500).json({ error: 'Erro ao buscar lista de pessoas.' });
+  }
+}) as any);
+
+// Get a single person by ID with balance (for snack-bar selection)
+app.get('/api/people/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req);
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' });
+  }
+  try {
+    const { id } = req.params;
+    
+    // First try to find as camper
+    let person = await sql`
+      SELECT 
+        ca.id,
+        ca.name,
+        ca.email,
+        ca.contact,
+        r.form_id,
+        c.name as camp_name,
+        'camper' as type,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM campers ca
+      JOIN registrations r ON ca.registration_id = r.id
+      JOIN camps c ON r.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          registration_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY registration_id
+      ) sb ON r.id = sb.registration_id
+      LEFT JOIN (
+        SELECT 
+          camper_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY camper_id
+      ) sbt_spent ON ca.id = sbt_spent.camper_id
+      LEFT JOIN (
+        SELECT 
+          camper_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY camper_id
+      ) sbt_liquidated ON ca.id = sbt_liquidated.camper_id
+      WHERE ca.id = ${id} AND c.team_id = ${teamId}
+      LIMIT 1
+    `;
+    
+    if (person.length > 0) {
+      // Found as camper
+      const camper = person[0];
+      return res.json({
+        id: camper.id,
+        name: camper.name,
+        email: camper.email,
+        contact: camper.contact,
+        form_id: camper.form_id,
+        camp_name: camper.camp_name,
+        type: 'camper',
+        snack_bar_balance: Number(camper.snack_bar_balance) || 0,
+        totalLoaded: Number(camper.total_loaded) || 0,
+        totalSpent: Number(camper.total_spent) || 0,
+        totalLiquidated: Number(camper.total_liquidated) || 0,
+        payment_status: camper.payment_status || 'confirmed'
+      });
+    }
+    
+    // If not found as camper, try as staff
+    person = await sql`
+      SELECT 
+        s.id,
+        s.name,
+        s.email,
+        s.phone as contact,
+        NULL as form_id,
+        c.name as camp_name,
+        'staff' as type,
+        COALESCE(sb.total_loaded, 0) as total_loaded,
+        COALESCE(sbt_spent.total_spent, 0) as total_spent,
+        COALESCE(sbt_liquidated.total_liquidated, 0) as total_liquidated,
+        (COALESCE(sb.total_loaded, 0) - COALESCE(sbt_spent.total_spent, 0) - COALESCE(sbt_liquidated.total_liquidated, 0)) as snack_bar_balance,
+        CASE 
+          WHEN sb.total_loaded IS NULL THEN 'confirmed'
+          WHEN sb.payment_status = 'confirmed' THEN 'confirmed'
+          ELSE 'not confirmed'
+        END as payment_status
+      FROM staff s
+      JOIN camps c ON s.camp_id = c.id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_loaded,
+          CASE 
+            WHEN COUNT(*) = COUNT(CASE WHEN payment_status = 'confirmed' THEN 1 END) THEN 'confirmed'
+            ELSE 'not confirmed'
+          END as payment_status
+        FROM snackbar_balance
+        WHERE payment_status = 'confirmed'
+        GROUP BY staff_id
+      ) sb ON s.id = sb.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_spent
+        FROM snack_bar_transactions
+        WHERE is_liquidated = false
+        GROUP BY staff_id
+      ) sbt_spent ON s.id = sbt_spent.staff_id
+      LEFT JOIN (
+        SELECT 
+          staff_id,
+          SUM(amount) as total_liquidated
+        FROM snack_bar_transactions
+        WHERE is_liquidated = true
+        GROUP BY staff_id
+      ) sbt_liquidated ON s.id = sbt_liquidated.staff_id
+      WHERE s.id = ${id} AND c.team_id = ${teamId}
+      LIMIT 1
+    `;
+    
+    if (person.length > 0) {
+      // Found as staff
+      const staff = person[0];
+      return res.json({
+        id: staff.id,
+        name: staff.name,
+        email: staff.email,
+        contact: staff.contact,
+        form_id: staff.form_id,
+        camp_name: staff.camp_name,
+        type: 'staff',
+        snack_bar_balance: Number(staff.snack_bar_balance) || 0,
+        totalLoaded: Number(staff.total_loaded) || 0,
+        totalSpent: Number(staff.total_spent) || 0,
+        totalLiquidated: Number(staff.total_liquidated) || 0,
+        payment_status: staff.payment_status || 'confirmed'
+      });
+    }
+    
+    // Person not found
+    return res.status(404).json({ error: 'Person not found' });
+  } catch (error) {
+    console.error('Error fetching person:', error);
+    res.status(500).json({ error: 'Erro ao buscar pessoa.' });
   }
 }) as any);
 
