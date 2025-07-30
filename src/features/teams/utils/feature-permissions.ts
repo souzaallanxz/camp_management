@@ -20,6 +20,7 @@ interface CampersPermissions {
   viewList: boolean
   create: boolean
   rechargeCard: boolean
+  liquidateSnackbar: boolean
 }
 
 interface CampsPermissions {
@@ -35,6 +36,7 @@ interface StaffPermissions {
   viewList: boolean
   create: boolean
   rechargeCard: boolean
+  liquidateSnackbar: boolean
 }
 
 export interface FeaturePermissions {
@@ -65,7 +67,8 @@ const CASHIER_ROLE_PERMISSIONS: FeaturePermissions = {
   campers: {
     viewList: true, // Cashier agora pode ver a lista de campistas
     create: false,
-    rechargeCard: false,
+    rechargeCard: true, // Cashier pode carregar cartões dos campistas
+    liquidateSnackbar: true, // Cashier pode liquidar saldo do snackbar
   },
   camps: {
     viewList: false,
@@ -75,9 +78,10 @@ const CASHIER_ROLE_PERMISSIONS: FeaturePermissions = {
     access: true, // Cashier deve ter acesso apenas ao Snackbar
   },
   staff: {
-    viewList: false,
+    viewList: true, // Cashier pode ver a lista de staff
     create: false,
-    rechargeCard: false,
+    rechargeCard: true, // Cashier pode carregar cartões do staff
+    liquidateSnackbar: true, // Cashier pode liquidar saldo do snackbar do staff
   },
 }
 
@@ -100,6 +104,7 @@ const FREE_TIER_PERMISSIONS: FeaturePermissions = {
     viewList: true,
     create: true,
     rechargeCard: false,
+    liquidateSnackbar: true,
   },
   camps: {
     viewList: true,
@@ -112,6 +117,7 @@ const FREE_TIER_PERMISSIONS: FeaturePermissions = {
     viewList: true,
     create: true,
     rechargeCard: false,
+    liquidateSnackbar: true,
   },
 }
 
@@ -134,6 +140,7 @@ const PREMIUM_TIER_PERMISSIONS: FeaturePermissions = {
     viewList: true,
     create: true,
     rechargeCard: true,
+    liquidateSnackbar: true,
   },
   camps: {
     viewList: true,
@@ -146,6 +153,7 @@ const PREMIUM_TIER_PERMISSIONS: FeaturePermissions = {
     viewList: true,
     create: true,
     rechargeCard: true,
+    liquidateSnackbar: true,
   },
 }
 

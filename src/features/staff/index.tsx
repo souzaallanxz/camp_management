@@ -22,6 +22,7 @@ import { useEffect } from 'react'
 
 
 function StaffContent() {
+  const permissions = useTeamPermissions()
   // Query simplificada para buscar staff e seus saldos
   const { data: staff = [], refetch } = useQuery({
     queryKey: ['staff-with-balance'],
@@ -74,6 +75,8 @@ function StaffContent() {
           </div>
           <Button 
             onClick={openCreateDialog}
+            disabled={!permissions.staff?.create}
+            title={!permissions.staff?.create ? "Funcionalidade não disponível para o seu role" : undefined}
           >
             <IconPlus className='mr-2 h-4 w-4' />
             Novo Membro do Staff

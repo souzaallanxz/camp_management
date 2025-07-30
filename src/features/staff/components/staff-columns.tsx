@@ -160,22 +160,33 @@ export const columns: ColumnDef<StaffWithActions>[] = [
                 </TooltipTrigger>
                 {!permissions.staff?.rechargeCard && (
                   <TooltipContent>
-                    <p>Disponível apenas no plano Premium</p>
+                    <p>Funcionalidade não disponível para o seu role</p>
                   </TooltipContent>
                 )}
               </Tooltip>
             </TooltipProvider>
             
-            <DropdownMenuItem
-              onClick={() => staff.onLiquidateSnackbar?.(staff as Staff)}
-              className='flex items-center'
-              disabled={!staff.snack_bar_balance || Number(staff.snack_bar_balance) <= 0}
-            >
-              Liquidar Snackbar
-              <DropdownMenuShortcut>
-                <IconCash size={16} />
-              </DropdownMenuShortcut>
-            </DropdownMenuItem>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuItem
+                    onClick={() => permissions.staff?.liquidateSnackbar ? staff.onLiquidateSnackbar?.(staff as Staff) : undefined}
+                    className='flex items-center'
+                    disabled={!permissions.staff?.liquidateSnackbar || !staff.snack_bar_balance || Number(staff.snack_bar_balance) <= 0}
+                  >
+                    Liquidar Snackbar
+                    <DropdownMenuShortcut>
+                      <IconCash size={16} />
+                    </DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </TooltipTrigger>
+                {!permissions.staff?.liquidateSnackbar && (
+                  <TooltipContent>
+                    <p>Funcionalidade não disponível para o seu role</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </DropdownMenuContent>
         </DropdownMenu>
       )

@@ -367,7 +367,8 @@ export const snackBarService = {
     payment_method: string
     phone_number?: string | null
     description?: string | null
-  }): Promise<any> {
+    request_id?: string | null
+  }): Promise<Record<string, unknown>> {
     try {
       const response = await api.post('/snackbar-transactions/independent', data)
       return response.data

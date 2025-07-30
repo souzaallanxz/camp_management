@@ -2245,7 +2245,7 @@ app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Re
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { amount, payment_method, phone_number, description } = req.body;
+    const { amount, payment_method, phone_number, description, request_id } = req.body;
 
     if (!amount) {
       return res.status(400).json({ error: 'Amount is required' });
@@ -2258,6 +2258,9 @@ app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Re
     const now = new Date().toISOString();
 
     // Create payment in the payments table with NULL registration_id
+    // Determinar payment_status baseado no método de pagamento
+    const paymentStatus = payment_method === 'MB Way' ? 'not confirmed' : 'confirmed';
+    
     const result = await sql`
       INSERT INTO payments (
         registration_id,
@@ -2267,6 +2270,7 @@ app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Re
         payment_status,
         phone_number,
         description,
+        request_id,
         created_at,
         updated_at
       ) VALUES (
@@ -2274,9 +2278,10 @@ app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Re
         ${now},
         ${payment_method},
         ${amount},
-        'confirmed',
+        ${paymentStatus},
         ${phone_number || null},
         ${description || null},
+        ${request_id || null},
         ${now},
         ${now}
       ) RETURNING *
@@ -2354,10 +2359,8 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       return res.status(400).json({ error: 'Camper has no balance to liquidate' });
     }
     
-    // Verificar se o payment_status é 'confirmed' para permitir liquidação
-    if (paymentStatus !== 'confirmed') {
-      return res.status(400).json({ error: 'Cannot liquidate balance that is not confirmed' });
-    }
+    // Para acampamentos que já acabaram, permitir liquidação mesmo com pagamentos não confirmados
+    // Apenas verificar se há saldo disponível
     
     // Get the registration_id for this camper
     const registrationResult = await sql`
@@ -2458,10 +2461,8 @@ app.post('/api/snackbar-balance/staff/:staffId/liquidate', (async (req: Request,
       return res.status(400).json({ error: 'Staff member has no balance to liquidate' });
     }
     
-    // Verificar se o payment_status é 'confirmed' para permitir liquidação
-    if (paymentStatus !== 'confirmed') {
-      return res.status(400).json({ error: 'Cannot liquidate balance that is not confirmed' });
-    }
+    // Para acampamentos que já acabaram, permitir liquidação mesmo com pagamentos não confirmados
+    // Apenas verificar se há saldo disponível
     
     // Create a transaction record with the total liquidated amount
     const now = new Date().toISOString();
