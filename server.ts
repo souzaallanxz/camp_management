@@ -3310,8 +3310,19 @@ app.get('/api/registrations/check-form-id/:formId', (async (req: Request, res: R
 // Recebe webhooks de pagamentos
 app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
   try {
-    const { teamId } = req.params;
-    const { request_id, amount, phone_number, email, payment_method, payment_date, payment_status, payment_link, status } = req.query;
+    // Desestruturação correta dos parâmetros
+    const teamId = req.params.teamId;
+    // req.query é do tipo ParsedQs, então os valores podem ser string | string[] | undefined
+    // Para garantir que temos strings, vamos forçar o cast
+    const request_id = req.query.request_id as string | undefined;
+    const amount = req.query.amount as string | undefined;
+    const phone_number = req.query.phone_number as string | undefined;
+    const email = req.query.email as string | undefined;
+    const payment_method = req.query.payment_method as string | undefined;
+    const payment_date = req.query.payment_date as string | undefined;
+    const payment_status = req.query.payment_status as string | undefined;
+    const payment_link = req.query.payment_link as string | undefined;
+    const status = req.query.status as string | undefined;
 
     // Debug logging
     console.log('Webhook received:', {
@@ -3342,7 +3353,7 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
 
     // Lógica baseada no tipo de request_id
     if (request_id) {
-      const requestIdStr = request_id as string;
+      const requestIdStr = request_id;
       
       console.log('Processing request_id:', requestIdStr);
       
@@ -3379,7 +3390,7 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
         // UPDATE na tabela snackbar_balance - confirmar pagamento existente
         console.log('Processing S-type or SV-type snackbar payment');
         
-        // If it's an SV format, first try to find in payments table (independent payments)
+        // Se for SV, tenta primeiro na payments (pagamento independente)
         if (requestIdStr.startsWith('SV')) {
           console.log('Trying to find SV payment in payments table first');
           
@@ -3393,7 +3404,7 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
           console.log('Independent payment update result:', independentPaymentUpdate.length);
           
           if (independentPaymentUpdate.length > 0) {
-            // Create a mock registration object for independent payments
+            // Mock registration para pagamentos independentes
             registration = {
               id: independentPaymentUpdate[0].id,
               name: 'Pagamento Independente',
@@ -3404,9 +3415,8 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
           }
         }
         
-        // If no independent payment found, try snackbar_balance table
+        // Se não encontrou pagamento independente, tenta na snackbar_balance
         if (!result) {
-          // First, let's check what snackbar payments exist for this team
           const existingSnackbarPayments = await sql`
             SELECT sb.*, r.name as camper_name, s.name as staff_name
             FROM snackbar_balance sb
@@ -3420,18 +3430,16 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
           
           console.log('Existing snackbar payments for team:', existingSnackbarPayments);
           
-          // Try exact match first
+          // Tenta match exato
           let snackbarUpdate = await sql`
             UPDATE snackbar_balance 
             SET payment_status = 'confirmed', updated_at = ${now}
             WHERE request_id = ${request_id} AND (
-              -- Caso seja de camper, valida o registration_id
               (registration_id IS NOT NULL AND registration_id IN (
                 SELECT r.id FROM registrations r
                 JOIN camps c ON r.camp_id = c.id
                 WHERE c.team_id = ${teamId}::uuid
               ))
-              -- Caso seja de staff, valida o staff_id
               OR (staff_id IS NOT NULL AND staff_id IN (
                 SELECT s.id FROM staff s
                 JOIN camps c ON s.camp_id = c.id
@@ -3443,124 +3451,118 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
           
           console.log('Snackbar update result (exact match):', snackbarUpdate.length);
         
-        // If no exact match and it's an SV format, try to find by partial match
-        if (snackbarUpdate.length === 0 && requestIdStr.startsWith('SV')) {
-          console.log('Trying partial match for SV format');
-          
-          // Try to find any unconfirmed snackbar payment for this team
-          snackbarUpdate = await sql`
-            UPDATE snackbar_balance 
-            SET payment_status = 'confirmed', updated_at = ${now}
-            WHERE payment_status = 'not confirmed' AND (
-              -- Caso seja de camper, valida o registration_id
-              (registration_id IS NOT NULL AND registration_id IN (
-                SELECT r.id FROM registrations r
-                JOIN camps c ON r.camp_id = c.id
-                WHERE c.team_id = ${teamId}::uuid
-              ))
-              -- Caso seja de staff, valida o staff_id
-              OR (staff_id IS NOT NULL AND staff_id IN (
-                SELECT s.id FROM staff s
-                JOIN camps c ON s.camp_id = c.id
-                WHERE c.team_id = ${teamId}::uuid
-              ))
-            )
-            ORDER BY created_at DESC
-            LIMIT 1
-            RETURNING *
-          `;
-          
-          console.log('Snackbar update result (partial match):', snackbarUpdate.length);
-          
-          // If still no match, try to find in payments table (independent payments)
-          if (snackbarUpdate.length === 0) {
-            console.log('Trying to find independent payment in payments table');
+          // Se não encontrou e for SV, tenta match parcial
+          if (snackbarUpdate.length === 0 && requestIdStr.startsWith('SV')) {
+            console.log('Trying partial match for SV format');
             
-            const independentPaymentUpdate = await sql`
-              UPDATE payments 
+            snackbarUpdate = await sql`
+              UPDATE snackbar_balance 
               SET payment_status = 'confirmed', updated_at = ${now}
-              WHERE request_id = ${request_id} AND registration_id IS NULL
+              WHERE payment_status = 'not confirmed' AND (
+                (registration_id IS NOT NULL AND registration_id IN (
+                  SELECT r.id FROM registrations r
+                  JOIN camps c ON r.camp_id = c.id
+                  WHERE c.team_id = ${teamId}::uuid
+                ))
+                OR (staff_id IS NOT NULL AND staff_id IN (
+                  SELECT s.id FROM staff s
+                  JOIN camps c ON s.camp_id = c.id
+                  WHERE c.team_id = ${teamId}::uuid
+                ))
+              )
+              ORDER BY created_at DESC
+              LIMIT 1
               RETURNING *
             `;
             
-            console.log('Independent payment update result:', independentPaymentUpdate.length);
+            console.log('Snackbar update result (partial match):', snackbarUpdate.length);
             
-            if (independentPaymentUpdate.length > 0) {
-              // Create a mock registration object for independent payments
-              registration = {
-                id: independentPaymentUpdate[0].id,
-                name: 'Pagamento Independente',
-                email: 'independent@snackbar.com',
-                status: 'confirmed'
-              };
-              result = independentPaymentUpdate[0];
+            // Se ainda não encontrou, tenta novamente na payments (independente)
+            if (snackbarUpdate.length === 0) {
+              console.log('Trying to find independent payment in payments table');
+              
+              const independentPaymentUpdate = await sql`
+                UPDATE payments 
+                SET payment_status = 'confirmed', updated_at = ${now}
+                WHERE request_id = ${request_id} AND registration_id IS NULL
+                RETURNING *
+              `;
+              
+              console.log('Independent payment update result:', independentPaymentUpdate.length);
+              
+              if (independentPaymentUpdate.length > 0) {
+                registration = {
+                  id: independentPaymentUpdate[0].id,
+                  name: 'Pagamento Independente',
+                  email: 'independent@snackbar.com',
+                  status: 'confirmed'
+                };
+                result = independentPaymentUpdate[0];
+              }
             }
           }
-        }
-        
-        if (snackbarUpdate.length === 0) {
-          // Try to find any snackbar payment with a similar request_id pattern
-          const similarRequestId = await sql`
-            SELECT sb.*, r.name as camper_name, s.name as staff_name
-            FROM snackbar_balance sb
-            LEFT JOIN registrations r ON sb.registration_id = r.id
-            LEFT JOIN staff s ON sb.staff_id = s.id
-            LEFT JOIN camps c ON (r.camp_id = c.id OR s.camp_id = c.id)
-            WHERE c.team_id = ${teamId}::uuid
-            AND sb.request_id LIKE 'S%'
-            AND sb.payment_status = 'not confirmed'
-            ORDER BY sb.created_at DESC
-            LIMIT 5
-          `;
           
-          return res.status(404).json({ 
-            error: 'Snackbar payment not found or does not belong to your team',
-            debug: {
-              request_id,
-              teamId,
-              existingPayments: existingSnackbarPayments.map(p => ({
-                id: p.id,
-                request_id: p.request_id,
-                registration_id: p.registration_id,
-                staff_id: p.staff_id,
-                payment_status: p.payment_status
-              })),
-              similarRequestIds: similarRequestId.map(p => ({
-                id: p.id,
-                request_id: p.request_id,
-                registration_id: p.registration_id,
-                staff_id: p.staff_id,
-                payment_status: p.payment_status,
-                camper_name: p.camper_name,
-                staff_name: p.staff_name
-              }))
-            }
-          });
-        }
-        
-        result = snackbarUpdate[0];
-        
-        // Buscar registration ou staff para resposta
-        if (result.registration_id) {
-          // É um camper
-          const regResult = await sql`
-            SELECT r.* FROM registrations r
-            WHERE r.id = ${result.registration_id}
-          `;
-          registration = regResult[0];
-        } else if (result.staff_id) {
-          // É um staff
-          const staffResult = await sql`
-            SELECT s.* FROM staff s
-            WHERE s.id = ${result.staff_id}
-          `;
-          // Criar um objeto similar ao registration para manter compatibilidade
-          registration = staffResult[0] ? {
-            id: staffResult[0].id,
-            name: staffResult[0].name,
-            email: staffResult[0].email,
-            status: 'confirmed'
-          } : null;
+          if (snackbarUpdate.length === 0) {
+            // Busca pagamentos similares para debug
+            const similarRequestId = await sql`
+              SELECT sb.*, r.name as camper_name, s.name as staff_name
+              FROM snackbar_balance sb
+              LEFT JOIN registrations r ON sb.registration_id = r.id
+              LEFT JOIN staff s ON sb.staff_id = s.id
+              LEFT JOIN camps c ON (r.camp_id = c.id OR s.camp_id = c.id)
+              WHERE c.team_id = ${teamId}::uuid
+              AND sb.request_id LIKE 'S%'
+              AND sb.payment_status = 'not confirmed'
+              ORDER BY sb.created_at DESC
+              LIMIT 5
+            `;
+            
+            return res.status(404).json({ 
+              error: 'Snackbar payment not found or does not belong to your team',
+              debug: {
+                request_id,
+                teamId,
+                existingPayments: existingSnackbarPayments.map((p: any) => ({
+                  id: p.id,
+                  request_id: p.request_id,
+                  registration_id: p.registration_id,
+                  staff_id: p.staff_id,
+                  payment_status: p.payment_status
+                })),
+                similarRequestIds: similarRequestId.map((p: any) => ({
+                  id: p.id,
+                  request_id: p.request_id,
+                  registration_id: p.registration_id,
+                  staff_id: p.staff_id,
+                  payment_status: p.payment_status,
+                  camper_name: p.camper_name,
+                  staff_name: p.staff_name
+                }))
+              }
+            });
+          }
+          
+          result = snackbarUpdate[0];
+          
+          // Buscar registration ou staff para resposta
+          if (result.registration_id) {
+            const regResult = await sql`
+              SELECT r.* FROM registrations r
+              WHERE r.id = ${result.registration_id}
+            `;
+            registration = regResult[0];
+          } else if (result.staff_id) {
+            const staffResult = await sql`
+              SELECT s.* FROM staff s
+              WHERE s.id = ${result.staff_id}
+            `;
+            registration = staffResult[0] ? {
+              id: staffResult[0].id,
+              name: staffResult[0].name,
+              email: staffResult[0].email,
+              status: 'confirmed'
+            } : null;
+          }
         }
         
       } else {
@@ -3636,6 +3638,7 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
     `;
     const totalPaid = Number(totalPaidResult[0]?.total_paid || 0);
 
+    // Atenção ao uso de {}: garantir que não há undefined ou null em campos obrigatórios
     return res.status(200).json({
       success: true,
       message: 'Payment processed successfully',
@@ -3650,8 +3653,8 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
         amount: Number(amount),
         total_paid: totalPaid,
         status: updatedRegistration.status,
-        payment_method: result?.payment_method || 'MB Way',
-        payment_status: result?.payment_status || 'confirmed'
+        payment_method: result && result.payment_method ? result.payment_method : 'MB Way',
+        payment_status: result && result.payment_status ? result.payment_status : 'confirmed'
       }
     });
   } catch (error) {
