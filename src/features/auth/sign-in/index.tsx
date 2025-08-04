@@ -4,10 +4,13 @@ import CampImage from '@/assets/camp.jpg'
 import Logo from '@/assets/logo.png'
 import { UserAuthForm } from './components/user-auth-form'
 import { useAuth } from '../auth-context'
+import { useTranslation } from '@/i18n'
+
 
 export default function SignIn() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
+  const { t } = useTranslation()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -38,27 +41,26 @@ export default function SignIn() {
       <div className='lg:p-8'>
         <div className='mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[350px]'>
           <div className='flex flex-col space-y-2 text-left'>
-            <h1 className='text-2xl font-semibold tracking-tight'>Entrar</h1>
+            <h1 className='text-2xl font-semibold tracking-tight'>{t('auth.signIn')}</h1>
             <p className='text-sm text-muted-foreground'>
-              Digite seu e-mail e senha abaixo <br />
-              para acessar sua conta
+              {t('auth.loginToAccount')}
             </p>
           </div>
           <UserAuthForm />
           <p className='px-8 text-center text-sm text-muted-foreground'>
-            Ao entrar, você concorda com nossos{' '}
+            {t('auth.termsAgreement')}{' '}
             <a
               href='/terms'
               className='underline underline-offset-4 hover:text-primary'
             >
-              Termos e Condições
+              {t('common.terms')}
             </a>{' '}
-            e{' '}
+            {t('common.and')}{' '}
             <a
               href='/privacy'
               className='underline underline-offset-4 hover:text-primary'
             >
-              Política de Privacidade
+              {t('common.privacy')}
             </a>
             .
           </p>

@@ -151,8 +151,8 @@ export default function SnackBarPage() {
   function onSubmit(data: SnackBarTransaction) {
     if (!selectedPersonId) return
 
-    const amount = Number(data.amount)
-    const numericBalance = personData.balance
+    const amount = Number(parseFloat(data.amount.toString()).toFixed(2))
+    const numericBalance = Number(personData.balance.toFixed(2))
     
     if (amount > numericBalance) {
       toast.error('Saldo insuficiente')
@@ -174,8 +174,8 @@ export default function SnackBarPage() {
   }
 
   const amount = form.watch('amount')
-  const amountNumber = Number(amount)
-  const numericBalance = personData.balance
+  const amountNumber = Number(parseFloat(amount.toString()).toFixed(2))
+  const numericBalance = Number(personData.balance.toFixed(2))
   const isAmountValid =
     !isNaN(amountNumber) && amountNumber > 0 && amountNumber <= numericBalance
   const isPaymentConfirmed = personData.payment_status === 'confirmed'

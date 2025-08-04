@@ -301,7 +301,7 @@ app.get('/api/auth/profile', (async (req: Request, res: Response) => {
 
     // Find user by token (which is the user ID)
     const userResult = await sql`
-      SELECT id, email, first_name, last_name, team_id, role, created_at, updated_at
+      SELECT id, email, first_name, last_name, team_id, role, language, created_at, updated_at
       FROM public.users
       WHERE id = ${token}::uuid
     `
@@ -319,9 +319,10 @@ app.get('/api/auth/profile', (async (req: Request, res: Response) => {
       user: {
         id: user.id,
         email: user.email,
-        name: fullName || null,
+        name: fullName,
         team_id: user.team_id,
-        role: user.role
+        role: user.role,
+        language: user.language
       }
     })
   } catch (error) {
@@ -342,11 +343,11 @@ app.put('/api/auth/profile', (async (req: Request, res: Response) => {
     }
 
     const token = authHeader.split(' ')[1]
-    const { name, language, theme } = req.body
+    const { firstName, lastName, language, theme } = req.body
 
     // Find user by token (which is the user ID)
     const userResult = await sql`
-      SELECT id, first_name, last_name
+      SELECT id, first_name, last_name, email, team_id, role, language
       FROM public.users
       WHERE id = ${token}::uuid
     `
@@ -358,13 +359,11 @@ app.put('/api/auth/profile', (async (req: Request, res: Response) => {
     }
 
     // Update user profile
-    // For now, we'll update the first_name field with the full name
-    // In the future, you might want to add separate fields for language and theme preferences
     const updateResult = await sql`
       UPDATE public.users
-      SET first_name = ${name}, updated_at = NOW()
+      SET first_name = ${firstName}, last_name = ${lastName}, language = ${language}, updated_at = NOW()
       WHERE id = ${token}::uuid
-      RETURNING id, email, first_name, last_name, team_id, role
+      RETURNING id, email, first_name, last_name, team_id, role, language
     `
 
     const updatedUser = updateResult[0]
@@ -380,9 +379,10 @@ app.put('/api/auth/profile', (async (req: Request, res: Response) => {
       user: {
         id: updatedUser.id,
         email: updatedUser.email,
-        name: fullName || null,
+        name: fullName,
         team_id: updatedUser.team_id,
-        role: updatedUser.role
+        role: updatedUser.role,
+        language: updatedUser.language
       }
     })
   } catch (error) {
@@ -2162,10 +2162,11 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
       const totalSpent = Number(spentResult[0]?.total_spent || 0);
       const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
-      const currentBalance = totalLoaded - totalSpent - totalLiquidated;
+      const currentBalance = Number((totalLoaded - totalSpent - totalLiquidated).toFixed(2));
       const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
       
-      if (currentBalance < amount) {
+      // Use a more precise comparison for floating point numbers
+      if (currentBalance < Number(amount.toFixed(2))) {
         return res.status(400).json({ error: 'Insufficient balance' });
       }
       
@@ -2211,9 +2212,10 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       `;
       
       const totalSpent = Number(spentResult[0]?.total_spent || 0);
-      const currentBalance = totalDeposit - totalSpent;
+      const currentBalance = Number((totalDeposit - totalSpent).toFixed(2));
       
-      if (currentBalance < amount) {
+      // Use a more precise comparison for floating point numbers
+      if (currentBalance < Number(amount.toFixed(2))) {
         return res.status(400).json({ error: 'Insufficient balance' });
       }
       
@@ -4458,6 +4460,22 @@ app.get('/api/debug/schema', (async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error checking schema:', error);
     res.status(500).json({ error: 'Error checking schema', details: error.message });
+  }
+}) as any)
+
+// Debug endpoint to check user data
+app.get('/api/debug/user/:id', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const result = await sql`
+      SELECT id, email, first_name, last_name, team_id, role, language, created_at, updated_at
+      FROM public.users
+      WHERE id = ${id}::uuid
+    `
+    res.json(result[0] || { error: 'User not found' })
+  } catch (error) {
+    console.error('Error checking user data:', error)
+    res.status(500).json({ error: 'Error checking user data', details: error.message })
   }
 }) as any);
 

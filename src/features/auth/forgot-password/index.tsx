@@ -2,8 +2,11 @@ import { Link } from '@tanstack/react-router'
 import CampImage from '@/assets/camp.jpg'
 import Logo from '@/assets/logo.png'
 import { ForgotForm } from './components/forgot-password-form'
+import { useTranslation } from '@/i18n'
 
 export default function ForgotPassword() {
+  const { t } = useTranslation()
+
   return (
     <div className='container relative grid h-svh flex-col items-center justify-center lg:max-w-none lg:grid-cols-2 lg:px-0'>
       <div className='relative hidden h-full flex-col bg-muted text-white dark:border-r lg:flex overflow-hidden'>
@@ -28,21 +31,20 @@ export default function ForgotPassword() {
         <div className='mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[350px]'>
           <div className='flex flex-col space-y-2 text-left'>
             <h1 className='text-2xl font-semibold tracking-tight'>
-              Recuperar senha
+              {t('auth.resetPassword')}
             </h1>
             <p className='text-sm text-muted-foreground'>
-              Digite seu e-mail cadastrado e<br />
-              enviaremos um link para redefinir sua senha.
+              {t('auth.resetPasswordDescription')}
             </p>
           </div>
           <ForgotForm />
           <p className='px-8 text-center text-sm text-muted-foreground'>
-            Lembrou sua senha?{' '}
+            {t('auth.rememberPassword')}{' '}
             <Link
               to='/sign-in'
               className='underline underline-offset-4 hover:text-primary'
             >
-              Entrar
+              {t('auth.signIn')}
             </Link>
           </p>
         </div>

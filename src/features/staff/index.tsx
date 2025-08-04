@@ -13,6 +13,7 @@ import { StaffDialogsProvider, useStaffDialogs } from './context/staff-dialogs-c
 import { StaffDetails } from './components/staff-details'
 import { useState } from 'react'
 import { StaffSnackbarBalanceDialog } from './components/staff-snackbar-balance-dialog'
+import { StaffLiquidateSnackbarDialog } from './components/staff-liquidate-snackbar-dialog'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { type StaffWithActions } from './components/staff-table'
 import { staffService } from './services/staff-service'
@@ -38,12 +39,28 @@ function StaffContent() {
 
   const { openCreateDialog, selectedStaffId, openEditDialog, closeEditDialog } = useStaffDialogs()
   const [showSnackbarBalanceDialog, setShowSnackbarBalanceDialog] = useState(false)
+  const [showLiquidateSnackbarDialog, setShowLiquidateSnackbarDialog] = useState(false)
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
   const [selectedStaffForBalance, setSelectedStaffForBalance] = useState<string | null>(null)
+  const [selectedStaffForLiquidate, setSelectedStaffForLiquidate] = useState<{ id: string; name: string; balance: number } | null>(null)
 
   const handleLoadCard = (staff: Staff) => {
     setSelectedStaffForBalance(staff.id)
     setShowSnackbarBalanceDialog(true)
+  }
+
+  const handleLiquidateSnackbar = (staff: StaffWithActions) => {
+    const totalLoaded = Number(staff.totalLoaded) || 0
+    const totalSpent = Number(staff.totalSpent) || 0
+    const totalLiquidated = Number(staff.totalLiquidated) || 0
+    const currentBalance = totalLoaded - totalSpent - totalLiquidated
+    
+    setSelectedStaffForLiquidate({
+      id: staff.id,
+      name: staff.name,
+      balance: currentBalance
+    })
+    setShowLiquidateSnackbarDialog(true)
   }
 
   // Adicionar as funções de ação para cada membro do staff
@@ -52,6 +69,7 @@ function StaffContent() {
     onEdit: () => openEditDialog(staffMember.id),
     onLoadCard: () => handleLoadCard(staffMember),
     onUpgradeClick: () => setShowUpgradeDialog(true),
+    onLiquidateSnackbar: () => handleLiquidateSnackbar(staffMember as StaffWithActions),
     total_balance: staffMember.total_balance || 0
   }));
 
@@ -103,6 +121,14 @@ function StaffContent() {
       <TierUpgradeDialog
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
+      />
+      <StaffLiquidateSnackbarDialog
+        open={showLiquidateSnackbarDialog}
+        onOpenChange={setShowLiquidateSnackbarDialog}
+        staffId={selectedStaffForLiquidate?.id || ''}
+        staffName={selectedStaffForLiquidate?.name || ''}
+        currentBalance={selectedStaffForLiquidate?.balance || 0}
+        onSuccess={refetch}
       />
     </>
   )

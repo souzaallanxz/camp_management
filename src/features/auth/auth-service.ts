@@ -131,7 +131,7 @@ export async function getCurrentUserProfile() {
 }
 
 // Update current user profile
-export async function updateCurrentUserProfile(profileData: { name: string; language?: string; theme?: string }) {
+export async function updateCurrentUserProfile(profileData: { firstName: string; lastName: string; language?: string; theme?: string }) {
   const token = localStorage.getItem('token')
   if (!token) throw new Error('No token found')
 

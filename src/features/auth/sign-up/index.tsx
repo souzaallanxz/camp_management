@@ -5,10 +5,12 @@ import CampImage from '@/assets/camp.jpg'
 import Logo from '@/assets/logo.png'
 import { SignUpForm } from './components/sign-up-form'
 import { useAuth } from '../auth-context'
+import { useTranslation } from '@/i18n'
 
 export default function SignUp() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
+  const { t } = useTranslation()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -40,34 +42,34 @@ export default function SignUp() {
         <div className='mx-auto flex w-full flex-col justify-center space-y-2 sm:w-[350px]'>
           <div className='flex flex-col space-y-2 text-left'>
             <h1 className='text-2xl font-semibold tracking-tight'>
-              Criar conta
+              {t('auth.signUp')}
             </h1>
             <p className='text-sm text-muted-foreground'>
-              Digite seu e-mail e senha para criar uma conta. <br />
-              Já tem uma conta?{' '}
+              {t('auth.signUpDescription')}{' '}
+              {t('auth.alreadyHaveAccount')}{' '}
               <Link
                 to='/sign-in'
                 className='underline underline-offset-4 hover:text-primary'
               >
-                Entrar
+                {t('auth.signIn')}
               </Link>
             </p>
           </div>
           <SignUpForm />
           <p className='px-8 text-center text-sm text-muted-foreground'>
-            Ao criar uma conta, você concorda com nossos{' '}
+            {t('auth.termsAgreement')}{' '}
             <a
               href='/terms'
               className='underline underline-offset-4 hover:text-primary'
             >
-              Termos e Condições
+              {t('common.terms')}
             </a>{' '}
-            e{' '}
+            {t('common.and')}{' '}
             <a
               href='/privacy'
               className='underline underline-offset-4 hover:text-primary'
             >
-              Política de Privacidade
+              {t('common.privacy')}
             </a>
             .
           </p>

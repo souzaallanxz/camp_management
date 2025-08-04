@@ -187,8 +187,8 @@ export const snackBarService = {
       const person = allPeople.find(p => p.id === transaction.camper_id)
       const isStaff = person?.type === 'staff'
       
-      // Garantir que o amount seja um número
-      const amount = Number(transaction.amount)
+      // Garantir que o amount seja um número e usar toFixed(2) para evitar problemas de precisão
+      const amount = Number(parseFloat(transaction.amount.toString()).toFixed(2))
       
       const payload = isStaff 
         ? { staff_id: transaction.camper_id, amount: amount }
@@ -246,8 +246,11 @@ export const snackBarService = {
     }
     const currentBalance = balanceResponse.data.balance
     
-    // Verify if has sufficient balance
-    if (currentBalance < transaction.amount) {
+    // Verify if has sufficient balance - use precise comparison for floating point numbers
+    const preciseBalance = Number(currentBalance.toFixed(2))
+    const preciseAmount = Number(transaction.amount.toFixed(2))
+    
+    if (preciseBalance < preciseAmount) {
       throw new Error('Saldo insuficiente')
     }
     

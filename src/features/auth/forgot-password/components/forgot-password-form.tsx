@@ -1,4 +1,4 @@
-import { HTMLAttributes, useState } from 'react'
+import { HTMLAttributes, useState, useMemo } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,21 +18,23 @@ import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { emailService } from '@/services/email.service'
 import { forgotPassword } from '@/features/auth/auth-service'
+import { useTranslation } from '@/i18n'
 
 type ForgotFormProps = HTMLAttributes<HTMLDivElement>
 
-const formSchema = z.object({
-  email: z
-    .string()
-    .min(1, { message: 'Por favor, digite seu e-mail' })
-    .email({ message: 'E-mail inválido' }),
-})
-
 export function ForgotForm({ className, ...props }: ForgotFormProps) {
+  const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [recoveryEmail, setRecoveryEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  const formSchema = useMemo(() => z.object({
+    email: z
+      .string()
+      .min(1, { message: t('validation.required') })
+      .email({ message: t('validation.email') }),
+  }), [t])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -46,12 +48,12 @@ export function ForgotForm({ className, ...props }: ForgotFormProps) {
     try {
       setRecoveryEmail(data.email)
       await forgotPassword(data.email)
-      toast.success('Email de recuperação enviado com sucesso!')
+      toast.success(t('auth.passwordResetSent'))
       setEmailSent(true)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      const errorMessage = error instanceof Error ? error.message : t('errors.general')
       setError(errorMessage)
-      toast.error('Erro ao enviar email. Tente novamente.')
+      toast.error(t('auth.passwordResetError'))
     } finally {
       setIsLoading(false)
     }
@@ -64,9 +66,9 @@ export function ForgotForm({ className, ...props }: ForgotFormProps) {
           <div className="mx-auto h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-4">
             <CheckCircle className="h-6 w-6 text-green-600" />
           </div>
-          <h3 className="text-lg font-medium">Email enviado</h3>
+          <h3 className="text-lg font-medium">{t('auth.emailSent')}</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Enviamos instruções de recuperação para
+            {t('auth.recoveryInstructionsSent')}
             <br />
             <span className="font-medium">{recoveryEmail}</span>
           </p>
@@ -74,20 +76,20 @@ export function ForgotForm({ className, ...props }: ForgotFormProps) {
         
         <Alert className="bg-blue-50 border-blue-200 text-blue-800">
           <Mail className="h-4 w-4 text-blue-600" />
-          <AlertTitle>Verifique sua caixa de entrada</AlertTitle>
+          <AlertTitle>{t('auth.checkInbox')}</AlertTitle>
           <AlertDescription className="text-blue-700">
-            Verifique também sua pasta de spam caso não encontre o email em alguns minutos.
+            {t('auth.checkSpamFolder')}
           </AlertDescription>
         </Alert>
 
         {emailService.isInDemoMode && (
           <Alert className="bg-amber-50 border-amber-200 text-amber-800">
             <AlertCircle className="h-4 w-4 text-amber-600" />
-            <AlertTitle>Modo de demonstração</AlertTitle>
+            <AlertTitle>{t('auth.demoMode')}</AlertTitle>
             <AlertDescription className="text-amber-700">
-              O link de recuperação foi exibido no console do navegador.
+              {t('auth.demoModeDescription')}
               <br />
-              <span className="text-xs">Pressione F12 &gt; Console para visualizar</span>
+              <span className="text-xs">{t('auth.demoModeConsole')}</span>
             </AlertDescription>
           </Alert>
         )}
@@ -100,7 +102,7 @@ export function ForgotForm({ className, ...props }: ForgotFormProps) {
             setEmailSent(false)
           }}
         >
-          Voltar para o formulário
+          {t('auth.backToForm')}
         </Button>
       </div>
     )
@@ -122,7 +124,7 @@ export function ForgotForm({ className, ...props }: ForgotFormProps) {
             name='email'
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>{t('auth.email')}</FormLabel>
                 <FormControl>
                   <Input placeholder='nome@exemplo.com' type="email" {...field} />
                 </FormControl>
@@ -131,7 +133,7 @@ export function ForgotForm({ className, ...props }: ForgotFormProps) {
             )}
           />
           <Button type="submit" className='w-full' disabled={isLoading}>
-            {isLoading ? 'Enviando...' : 'Enviar link de recuperação'}
+            {isLoading ? t('auth.sending') : t('auth.sendRecoveryLink')}
           </Button>
         </form>
       </Form>
@@ -139,10 +141,9 @@ export function ForgotForm({ className, ...props }: ForgotFormProps) {
       {emailService.isInDemoMode && (
         <Alert className="bg-amber-50 border-amber-200">
           <AlertCircle className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-800">Modo de demonstração</AlertTitle>
+          <AlertTitle className="text-amber-800">{t('auth.demoMode')}</AlertTitle>
           <AlertDescription className="text-amber-700 text-xs">
-            Neste ambiente, o envio de emails é simulado. O link de recuperação será 
-            exibido no console do navegador para testes.
+            {t('auth.demoModeEmailDescription')}
           </AlertDescription>
         </Alert>
       )}

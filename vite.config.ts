@@ -18,4 +18,12 @@ export default defineConfig({
   server: {
     // Remove the UploadThing proxy configuration
   },
+  publicDir: 'public',
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+      },
+    },
+  },
 })
