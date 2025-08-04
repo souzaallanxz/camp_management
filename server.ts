@@ -3337,8 +3337,8 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
     }
 
     const now = new Date().toISOString();
-    let registration = null;
-    let result = null;
+    let registration: any = null;
+    let result: any = null;
 
     // Lógica baseada no tipo de request_id
     if (request_id) {
