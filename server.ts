@@ -1172,7 +1172,6 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
 
     res.json(processedCampers);
   } catch (error) {
-    console.error('Error fetching campers:', error);
     res.status(500).json({ error: 'Erro ao buscar campistas.', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 }) as any);
