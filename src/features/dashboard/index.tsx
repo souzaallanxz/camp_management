@@ -298,6 +298,12 @@ const topNav = [
     isActive: true,
     disabled: false,
   },
+  {
+    title: 'Integrações',
+    href: '/settings/integrations',
+    isActive: false,
+    disabled: false,
+  },
   /*{
     title: 'Customers',
     href: 'dashboard/customers',

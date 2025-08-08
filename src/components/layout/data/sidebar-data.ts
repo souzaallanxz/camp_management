@@ -98,6 +98,11 @@ export const sidebarData: SidebarData = {
               url: '/settings/appearance',
               icon: IconPalette,
             },
+            {
+              title: 'Integrações',
+              url: '/settings/integrations',
+              icon: IconWebhook,
+            },
           ],
         },
       ],
@@ -248,6 +253,11 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
                 title: 'Aparência',
                 url: '/settings/appearance',
                 icon: IconPalette,
+              },
+              {
+                title: 'Integrações',
+                url: '/settings/integrations',
+                icon: IconWebhook,
               }
             ],
           },
