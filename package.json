@@ -34,7 +34,8 @@
     "seed-users": "tsx scripts/seed-sample-users.ts",
     "fix-user-team": "tsx scripts/fix-user-team.ts",
     "cron:clean-payments": "node cron/cleanPendingPayments.js",
-    "add-translation": "node scripts/add-translation.js"
+    "add-translation": "node scripts/add-translation.js",
+    "encrypt-mbway-keys": "tsx scripts/encrypt-mbway-keys.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "3.10.0",
@@ -72,7 +73,6 @@
     "autoprefixer": "^10.4.20",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
-    "body-parser": "^2.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",

@@ -68,11 +68,7 @@ export const sidebarData: SidebarData = {
           url: '/snack-bar',
           icon: IconIceCream,
         },
-        {
-          title: 'Integrações',
-          url: '/integrations',
-          icon: IconWebhook,
-        },
+
       ],
     },
     {
@@ -207,11 +203,7 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
           icon: IconIceCream,
         })
       }
-      items.push({
-        title: 'Integrações',
-        url: '/integrations',
-        icon: IconWebhook,
-      })
+
     }
 
     return items

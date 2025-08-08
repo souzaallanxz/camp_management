@@ -6,6 +6,7 @@ import {
   IconUser,
   IconCreditCard,
   IconBuildingCommunity,
+  IconPlug,
 } from '@tabler/icons-react'
 import { Separator } from '@/components/ui/separator'
 import { Header } from '@/components/layout/header'
@@ -36,6 +37,11 @@ export default function Settings() {
             title: 'Faturação',
             icon: <IconCreditCard size={18} />,
             href: '/settings/billing',
+          },
+          {
+            title: 'Integrações',
+            icon: <IconPlug size={18} />,
+            href: '/settings/integrations',
           },
         ]
       : []),

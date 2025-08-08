@@ -34,6 +34,7 @@ import { Separator } from '@/components/ui/separator'
 import { paymentService } from '../services/payment-service'
 import { MBWayService } from '../services/mbway-service'
 import { useState, useEffect } from 'react'
+import { useMBWayIntegration } from '../hooks/use-mbway-integration'
 
 const createRegistrationSchema = z.object({
   // Registration fields
@@ -74,6 +75,7 @@ export function RegistrationDialog({
 }: RegistrationDialogProps) {
   const queryClient = useQueryClient()
   const { data: camps = [] } = useCamps()
+  const { isActive: mbwayActive, loading: mbwayLoading } = useMBWayIntegration()
   
   const form = useForm<CreateRegistrationFormData>({
     resolver: zodResolver(createRegistrationSchema),
@@ -439,14 +441,16 @@ export function RegistrationDialog({
                       <FormItem className="flex flex-col space-y-1.5">
                         <FormLabel>Método de Pagamento</FormLabel>
                         <FormControl>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={mbwayLoading}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Selecione o método de pagamento" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="MB Way">MB Way</SelectItem>
+                              {mbwayActive && (
+                                <SelectItem value="MB Way">MB Way</SelectItem>
+                              )}
                               <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                               <SelectItem value="Dinheiro">Dinheiro</SelectItem>
                               <SelectItem value="Desconto">Desconto</SelectItem>

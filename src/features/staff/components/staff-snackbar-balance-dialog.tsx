@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { MBWayService } from '@/features/registrations/services/mbway-service'
 import { type PaymentMethod } from '@/features/registrations/data/schema'
+import { useMBWayIntegration } from '@/features/registrations/hooks/use-mbway-integration'
 
 interface StaffSnackbarBalanceDialogProps {
   open: boolean
@@ -61,9 +62,10 @@ export function StaffSnackbarBalanceDialog({
   onSuccess 
 }: StaffSnackbarBalanceDialogProps) {
   const [amount, setAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('MB Way')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Transferência Bancária')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const { isActive: mbwayActive, loading: mbwayLoading } = useMBWayIntegration()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -162,12 +164,15 @@ export function StaffSnackbarBalanceDialog({
             <Select
               value={paymentMethod}
               onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}
+              disabled={mbwayLoading}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um método de pagamento" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="MB Way">MB Way</SelectItem>
+                {mbwayActive && (
+                  <SelectItem value="MB Way">MB Way</SelectItem>
+                )}
                 <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                 <SelectItem value="Dinheiro">Dinheiro</SelectItem>
                 <SelectItem value="Multibanco">Multibanco</SelectItem>

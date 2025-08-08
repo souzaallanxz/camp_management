@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/form'
 import { snackBarService } from '../services/snack-bar-service'
 import { MBWayService } from '@/features/registrations/services/mbway-service'
+import { useMBWayIntegration } from '@/features/registrations/hooks/use-mbway-integration'
 
 const independentTransactionSchema = z.object({
   amount: z.string()
@@ -64,12 +65,13 @@ export function AddTransactionDialog({
 }: AddTransactionDialogProps) {
   const queryClient = useQueryClient()
   const [loading, setLoading] = useState(false)
+  const { isActive: mbwayActive, loading: mbwayLoading } = useMBWayIntegration()
 
   const form = useForm<IndependentTransaction>({
     resolver: zodResolver(independentTransactionSchema),
     defaultValues: {
       amount: '',
-      payment_method: 'MB Way',
+      payment_method: 'Transferência Bancária',
       phone_number: '',
       description: '',
     },
@@ -188,14 +190,16 @@ export function AddTransactionDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Método de Pagamento</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={mbwayLoading}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione um método de pagamento" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="MB Way">MB Way</SelectItem>
+                      {mbwayActive && (
+                        <SelectItem value="MB Way">MB Way</SelectItem>
+                      )}
                       <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                       <SelectItem value="Dinheiro">Dinheiro</SelectItem>
                       <SelectItem value="Multibanco">Multibanco</SelectItem>

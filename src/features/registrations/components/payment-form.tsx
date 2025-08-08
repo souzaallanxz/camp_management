@@ -13,6 +13,7 @@ import { PaymentMethod } from '../data/schema'
 import { paymentService } from '../services/payment-service'
 import { MBWayService } from '../services/mbway-service'
 import { registrationService, ApiRegistration } from '../services/registration-service'
+import { useMBWayIntegration } from '../hooks/use-mbway-integration'
 
 interface PaymentFormProps {
   registrationId: string
@@ -29,9 +30,10 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
   const [amount, setAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('MB Way')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Transferência Bancária')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [registration, setRegistration] = useState<ExtendedRegistration | null>(null)
+  const { isActive: mbwayActive, loading: mbwayLoading } = useMBWayIntegration()
 
   useEffect(() => {
     async function loadRegistration() {
@@ -161,12 +163,15 @@ export function PaymentForm({ registrationId, onSuccess, onCancel }: PaymentForm
             <Select
               value={paymentMethod}
               onValueChange={(value) => setPaymentMethod(value as PaymentMethod)}
+              disabled={mbwayLoading}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="MB Way">MB Way</SelectItem>
+                {mbwayActive && (
+                  <SelectItem value="MB Way">MB Way</SelectItem>
+                )}
                 <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                 <SelectItem value="Dinheiro">Dinheiro</SelectItem>
                 <SelectItem value="Desconto">Desconto</SelectItem>

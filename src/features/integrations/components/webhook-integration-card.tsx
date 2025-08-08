@@ -1,6 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import { IconWebhook, IconSettings, IconCheck } from '@tabler/icons-react'
 import { useState, useEffect } from 'react'
 import { WebhookConfigDialog } from './webhook-config-dialog'
@@ -101,60 +104,75 @@ export function WebhookIntegrationCard() {
 
   return (
     <>
-      <Card className="relative overflow-hidden">
+      <Card className="relative overflow-hidden h-full">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <IconWebhook className="h-5 w-5 text-primary" />
+            <div className="flex items-center space-x-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <IconWebhook className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-lg">Webhook</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-base">Webhook</CardTitle>
+                <CardDescription className="text-xs">
                   Receba notificações em tempo real
                 </CardDescription>
               </div>
             </div>
-            <Badge variant={config.isConnected ? "default" : "secondary"}>
-              {config.isConnected ? (
-                <>
-                  <IconCheck className="mr-1 h-3 w-3" />
-                  Conectado
-                </>
-              ) : (
-                "Desconectado"
-              )}
-            </Badge>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="webhook-active" className="text-sm font-medium">
+                {config.isConnected ? 'Ativo' : 'Inativo'}
+              </Label>
+              <Switch
+                id="webhook-active"
+                checked={config.isConnected}
+                onCheckedChange={(checked) => {
+                  if (checked && !config.isConnected) {
+                    handleConnect()
+                  } else if (!checked && config.isConnected) {
+                    handleConnect()
+                  }
+                }}
+                disabled={isLoading}
+              />
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm text-muted-foreground">
-              Configure webhooks para receber notificações automáticas sobre eventos importantes como novas inscrições, pagamentos e atualizações de status.
-            </p>
-            {config.isConnected && (
-              <p className="text-xs text-muted-foreground mt-2">
-                {getWebhookDescription()}
+        <CardContent className="space-y-3 flex-1 flex flex-col">
+          <div className="flex-1">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Configure webhooks para receber notificações automáticas sobre eventos importantes como novas inscrições, pagamentos e atualizações de status.
               </p>
-            )}
+              {config.isConnected && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {getWebhookDescription()}
+                </p>
+              )}
+            </div>
           </div>
-          
-          <div className="flex space-x-2">
-            <Button 
-              onClick={handleConnect}
-              variant={config.isConnected ? "outline" : "default"}
-              className="flex-1"
+
+          <Separator className="my-3" />
+
+          <div className="flex justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                // Reload config
+                window.location.reload()
+              }}
               disabled={isLoading}
             >
-              {isLoading ? "Processando..." : (config.isConnected ? "Desconectar" : "Conectar")}
+              Cancelar
             </Button>
-            <Button 
-              variant="outline" 
-              size="icon"
+            <Button
+              type="button"
+              size="sm"
               onClick={handleConfigClick}
-              disabled={!config.isConnected}
+              disabled={isLoading}
             >
-              <IconSettings className="h-4 w-4" />
+              <IconSettings className="mr-2 h-4 w-4" />
+              Configurar
             </Button>
           </div>
         </CardContent>

@@ -25,6 +25,7 @@ import { formatCurrency } from '@/lib/utils'
 import { camperService, type CreateCamperData } from '@/features/campers/services/camper-service'
 import { useQueryClient } from '@tanstack/react-query'
 import { MBWayService } from '../services/mbway-service'
+import { useMBWayIntegration } from '../hooks/use-mbway-integration'
 
 interface RegistrationOnboardDialogProps {
   open: boolean
@@ -40,9 +41,10 @@ export function RegistrationOnboardDialog({
   onSuccess,
 }: RegistrationOnboardDialogProps) {
   const [loading, setLoading] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Multibanco'>('MB Way')
+  const [paymentMethod, setPaymentMethod] = useState<'MB Way' | 'Transferência Bancária' | 'Dinheiro' | 'Multibanco'>('Transferência Bancária')
   const [phoneNumber, setPhoneNumber] = useState('')
   const queryClient = useQueryClient()
+  const { isActive: mbwayActive, loading: mbwayLoading } = useMBWayIntegration()
 
   if (!registration) return null
 
@@ -209,12 +211,15 @@ export function RegistrationOnboardDialog({
                 <Select
                   value={paymentMethod}
                   onValueChange={(value) => setPaymentMethod(value as typeof paymentMethod)}
+                  disabled={mbwayLoading}
                 >
                   <SelectTrigger id="payment-method" className="h-9">
                     <SelectValue placeholder="Selecione o método de pagamento" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="MB Way">MB Way</SelectItem>
+                    {mbwayActive && (
+                      <SelectItem value="MB Way">MB Way</SelectItem>
+                    )}
                     <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                     <SelectItem value="Dinheiro">Dinheiro</SelectItem>
                     <SelectItem value="Multibanco">Multibanco</SelectItem>

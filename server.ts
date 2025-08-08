@@ -5,7 +5,6 @@ import { Resend } from 'resend'
 import { neon } from '@neondatabase/serverless'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import bodyParser from 'body-parser'
 
 // Load environment variables
 dotenv.config()
@@ -15,6 +14,15 @@ type AsyncRequestHandler = (req: Request, res: Response) => Promise<Response>
 
 const app: Application = express()
 
+// Configure express JSON parser - BEFORE CORS
+app.use(express.json({ 
+  limit: '10mb'
+}))
+app.use(express.urlencoded({ 
+  extended: true,
+  limit: '10mb'
+}))
+
 // Enable CORS
 app.use(cors({
   origin: ['http://localhost:5173', 'https://campmanagement-pwsm6m1g4-souzaallanxzs-projects.vercel.app', 'https://campmanagement.vercel.app'],
@@ -22,16 +30,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id']
 }))
-
-// Capturar corpo RAW do webhook Lemon Squeezy antes do express.json()
-app.post('/api/webhooks/lemon-squeezy', bodyParser.json({
-  verify: (req, res, buf) => {
-    (req as any).rawBody = buf.toString('utf8')
-  }
-}))
-
-// Parse JSON request bodies (para o resto da app)
-app.use(express.json())
 
 // Health check endpoint for Render
 app.get('/api/health', (req: Request, res: Response) => {
@@ -42,11 +40,38 @@ app.get('/api/health', (req: Request, res: Response) => {
   })
 })
 
+
+
+
+
 // Initialize Neon database connection
 const sql = neon(process.env.DATABASE_URL!)
 
 // Initialize Resend
 const resend = new Resend(process.env.VITE_RESEND_API_KEY)
+
+// Encryption functions for sensitive data
+function encrypt(text: string): string {
+  const algorithm = 'aes-256-cbc'
+  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-key-change-in-production', 'salt', 32)
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipheriv(algorithm, key, iv)
+  let encrypted = cipher.update(text, 'utf8', 'hex')
+  encrypted += cipher.final('hex')
+  return iv.toString('hex') + ':' + encrypted
+}
+
+function decrypt(encryptedText: string): string {
+  const algorithm = 'aes-256-cbc'
+  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-key-change-in-production', 'salt', 32)
+  const textParts = encryptedText.split(':')
+  const iv = Buffer.from(textParts.shift()!, 'hex')
+  const encryptedData = textParts.join(':')
+  const decipher = crypto.createDecipheriv(algorithm, key, iv)
+  let decrypted = decipher.update(encryptedData, 'hex', 'utf8')
+  decrypted += decipher.final('utf8')
+  return decrypted
+}
 
 // Sign in route
 app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
@@ -600,7 +625,7 @@ app.put('/api/teams/:id', (async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid tier value. Must be "free" or "premium"' })
     }
 
-    // For now, we'll focus on tier updates (the main use case for Lemon Squeezy)
+    // For now, we'll focus on tier updates
     if (tier === undefined) {
       return res.status(400).json({ error: 'Tier field is required' })
     }
@@ -3030,164 +3055,7 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
   }
 }) as any)
 
-// ===== LEMON SQUEEZY WEBHOOKS =====
 
-// Função utilitária para validar assinatura do Lemon Squeezy
-function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
-  const signature = req.headers['x-signature'] as string
-  if (!signature) {
-    return false
-  }
-  
-  // Usar sempre o corpo RAW se disponível
-  const rawBody = (req as any).rawBody || JSON.stringify(req.body)
-  
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(rawBody)
-    .digest('hex')
-  
-  return signature === expectedSignature
-}
-
-// Process Lemon Squeezy payment confirmations
-app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
-  try {
-    // Validar assinatura do webhook
-    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    
-    if (secret) {
-      const isValid = isValidLemonSqueezySignature(req, secret)
-      
-      if (!isValid) {
-        // Temporariamente permitir webhooks com assinatura inválida para debug
-        // return res.status(401).json({ error: 'Invalid webhook signature' })
-      }
-    }
-    
-    const { meta, data } = req.body
-
-    if (!meta || !data) {
-      return res.status(400).json({ error: 'Invalid webhook payload' })
-    }
-
-    const eventName = meta.event_name
-    
-    // Handle subscription or order events
-    if (eventName === 'subscription_created' || eventName === 'order_created' || eventName === 'checkout_completed' || eventName === 'order_created') {
-      // O custom_data está no meta, não no data.attributes
-      const customData = meta.custom_data
-      
-      // Try to get teamId from different possible locations
-      let teamId = null
-      let planType = 'premium'
-      
-      if (meta.custom_data && meta.custom_data.teamId) {
-        teamId = meta.custom_data.teamId
-        planType = meta.custom_data.planType || 'premium'
-      } else if (customData && customData.teamId) {
-        teamId = customData.teamId
-        planType = customData.planType || 'premium'
-      } else if (data.attributes?.custom_data?.teamId) {
-        teamId = data.attributes.custom_data.teamId
-        planType = data.attributes.custom_data.planType || 'premium'
-      } else if (data.attributes?.custom?.teamId) {
-        teamId = data.attributes.custom.teamId
-        planType = data.attributes.custom.planType || 'premium'
-      }
-      
-      if (!teamId) {
-        return res.status(200).json({ message: 'Processed but no team ID found' })
-      }
-
-      try {
-        // Update team to premium tier
-        const result = await sql`
-          UPDATE teams 
-          SET tier = ${planType}, updated_at = NOW()
-          WHERE id = ${teamId}::uuid
-          RETURNING *
-        `
-
-        if (result.length > 0) {
-          // Store subscription data for future reference
-          const subscriptionData = {
-            team_id: teamId,
-            subscription_id: data.id,
-            variant_id: data.attributes?.variant_id || null,
-            status: data.attributes?.status || 'active',
-            event_name: eventName,
-            custom_data: meta.custom_data || customData || data.attributes?.custom_data || data.attributes?.custom
-          }
-          
-          await sql`
-            INSERT INTO lemon_squeezy_subscriptions (
-              team_id, 
-              subscription_id, 
-              variant_id,
-              status,
-              event_name,
-              custom_data,
-              created_at,
-              updated_at
-            ) VALUES (
-              ${teamId}::uuid, 
-              ${data.id}, 
-              ${data.attributes?.variant_id || null},
-              ${data.attributes?.status || 'active'},
-              ${eventName},
-              ${JSON.stringify(meta.custom_data || customData || data.attributes?.custom_data || data.attributes?.custom)},
-              NOW(),
-              NOW()
-            )
-            ON CONFLICT (team_id, subscription_id) DO UPDATE SET
-              status = EXCLUDED.status,
-              event_name = EXCLUDED.event_name,
-              custom_data = EXCLUDED.custom_data,
-              updated_at = NOW()
-          `
-          
-        } else {
-          // Team not found for upgrade
-        }
-      } catch {
-        // Don't fail the webhook response
-      }
-    }
-
-    // Handle subscription cancellation
-    if (eventName === 'subscription_cancelled') {
-      const customData = data.attributes?.custom_data
-      
-      if (customData && customData.teamId) {
-        const teamId = customData.teamId
-
-        try {
-          // Downgrade team to free tier
-          await sql`
-            UPDATE teams 
-            SET tier = 'free', updated_at = NOW()
-            WHERE id = ${teamId}::uuid
-          `
-
-          // Update subscription status
-          await sql`
-            UPDATE lemon_squeezy_subscriptions 
-            SET status = 'cancelled', updated_at = NOW()
-            WHERE team_id = ${teamId}::uuid AND subscription_id = ${data.id}
-          `
-
-        } catch {
-          // Database error processing subscription cancellation
-        }
-      }
-    }
-
-    return res.status(200).json({ message: 'Webhook processed successfully' })
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}) as any)
 
 // Recebe webhooks de inscrições
 app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Response) => {
@@ -3663,294 +3531,7 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
   }
 });
 
-// POST /api/lemon-squeezy/checkout
-app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const token = authHeader.split(' ')[1];
-    // Buscar o usuário pelo token (id)
-    const userResult = await sql`SELECT team_id, first_name FROM public.users WHERE id = ${token}::uuid`;
-    const user = userResult[0];
-    if (!user || !user.team_id) {
-      return res.status(401).json({ error: 'User not found or no team associated' });
-    }
-    const { planType } = req.body;
-    // Chamar o serviço Lemon Squeezy (API)
-    const lemonApiKey = process.env.LEMON_SQUEEZY_API_KEY;
-    if (!lemonApiKey) {
-      return res.status(500).json({ error: 'Lemon Squeezy API key not configured' });
-    }
-    // IDs fixos do plano premium
-    const storeId = '181507';
-    const variantId = '883664';
-    const returnUrl = req.body.returnUrl || (process.env.NEXT_PUBLIC_APP_URL + '/settings/billing');
-    // Montar payload baseado na documentação oficial do Lemon Squeezy
-    const payload = {
-      data: {
-        type: 'checkouts',
-        attributes: {
-          checkout_options: {
-            embed: false, // false para desabilitar overlay - abrir em nova página
-            media: true,
-            logo: true,
-            desc: true,
-            discount: true,
-            subscription_preview: true
-          },
-          product_options: {
-            redirect_url: returnUrl // URL de redirecionamento após pagamento bem-sucedido
-          },
-          checkout_data: {
-            name: user.first_name || 'Campy User',
-            custom: {
-              teamId: user.team_id,
-              planType: planType || 'premium',
-              timestamp: new Date().toISOString(),
-            },
-          },
-          test_mode: process.env.NODE_ENV !== 'production',
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Expira em 24 horas
-        },
-        relationships: {
-          store: { data: { type: 'stores', id: storeId } },
-          variant: { data: { type: 'variants', id: variantId } },
-        },
-      },
-    };
-    
-    // Fazer request à API Lemon Squeezy
-    const response = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/vnd.api+json',
-        'Content-Type': 'application/vnd.api+json',
-        'Authorization': `Bearer ${lemonApiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(500).json({ error: 'Lemon Squeezy API error', details: errorText });
-    }
-    const data = await response.json();
-    return res.status(200).json({ url: data.data.attributes.url });
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
-// Test endpoint for Lemon Squeezy webhook signature validation
-app.post('/api/lemon-squeezy/test-signature', (async (req: Request, res: Response) => {
-  try {
-    
-    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    
-    
-    if (!secret) {
-      return res.status(400).json({ 
-        error: 'No webhook secret configured',
-        envVars: {
-          LEMON_SQUEEZY_WEBHOOK_SECRET: !!process.env.LEMON_SQUEEZY_WEBHOOK_SECRET,
-          NODE_ENV: process.env.NODE_ENV
-        }
-      })
-    }
-    
-    const isValid = isValidLemonSqueezySignature(req, secret)
-    
-    return res.status(200).json({ 
-      success: true,
-      signatureValid: isValid,
-      secretConfigured: !!secret,
-      secretLength: secret.length,
-      secretPreview: secret.substring(0, 10) + '...',
-      headers: req.headers,
-      body: req.body,
-      envVars: {
-        NODE_ENV: process.env.NODE_ENV
-      }
-    })
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}) as any)
-
-// Test endpoint with real webhook payload
-app.post('/api/lemon-squeezy/test-real-signature', (async (req: Request, res: Response) => {
-  try {
-    
-    
-    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    if (!secret) {
-      return res.status(400).json({ error: 'No webhook secret configured' })
-    }
-    
-    // Payload real do webhook que recebemos
-    const realPayload = {
-      "meta": {
-        "test_mode": true,
-        "event_name": "subscription_created",
-        "custom_data": {
-          "teamId": "e4333e4d-c348-4a8e-bf74-09a32194d6d5",
-          "planType": "premium",
-          "timestamp": "2025-07-03T14:38:46.307Z"
-        },
-        "webhook_id": "test-webhook-id"
-      },
-      "data": {
-        "id": "test-subscription-id",
-        "type": "subscriptions",
-        "attributes": {
-          "status": "active",
-          "variant_id": "883664"
-        }
-      }
-    }
-    
-    const signature = "a96de36c1478ad4ec6f54ef9067b6e34f835d2ad6226fbd28a9a16afb1f1bb30"
-    
-    // Testar diferentes métodos
-    const payload1 = JSON.stringify(realPayload)
-    const signature1 = crypto.createHmac('sha256', secret).update(payload1).digest('hex')
-    
-    const payload2 = JSON.stringify(realPayload).replace(/\s+/g, '')
-    const signature2 = crypto.createHmac('sha256', secret).update(payload2).digest('hex')
-    
-    const payload3 = JSON.stringify(realPayload, null, 0)
-    const signature3 = crypto.createHmac('sha256', secret).update(payload3).digest('hex')
-    
-    return res.status(200).json({
-      success: true,
-      realSignature: signature,
-      method1: {
-        payload: payload1.substring(0, 100) + '...',
-        signature: signature1,
-        matches: signature === signature1
-      },
-      method2: {
-        payload: payload2.substring(0, 100) + '...',
-        signature: signature2,
-        matches: signature === signature2
-      },
-      method3: {
-        payload: payload3.substring(0, 100) + '...',
-        signature: signature3,
-        matches: signature === signature3
-      },
-      secretPreview: secret.substring(0, 10) + '...'
-    })
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}) as any)
-
-// Test endpoint for Lemon Squeezy webhook accessibility
-app.get('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
-  
-  
-  return res.status(200).json({ 
-    message: 'Lemon Squeezy webhook endpoint is accessible',
-    method: 'GET',
-    timestamp: new Date().toISOString(),
-    note: 'This endpoint only accepts POST requests from Lemon Squeezy'
-  })
-}) as any)
-
-// Test endpoint for Lemon Squeezy webhook
-app.get('/api/lemon-squeezy/test', (async (req: Request, res: Response) => {
-  try {
-    const teamId = req.query.teamId as string
-    if (!teamId) {
-      return res.status(400).json({ error: 'Team ID is required' })
-    }
-
-    // Simulate a webhook payload for testing
-    const testPayload = {
-      meta: {
-        event_name: 'checkout_completed'
-      },
-      data: {
-        id: 'test-subscription-id',
-        attributes: {
-          status: 'active',
-          variant_id: '883664',
-          custom_data: {
-            teamId: teamId,
-            planType: 'premium',
-            timestamp: new Date().toISOString()
-          }
-        }
-      }
-    }
-
-    
-
-    // Process the test webhook
-    const { meta, data } = testPayload
-    const eventName = meta.event_name
-    const customData = data.attributes?.custom_data
-
-    if (customData && customData.teamId) {
-      const planType = customData.planType || 'premium'
-
-      // Update team to premium tier
-      const result = await sql`
-        UPDATE teams 
-        SET tier = ${planType}, updated_at = NOW()
-        WHERE id = ${customData.teamId}::uuid
-        RETURNING *
-      `
-
-      if (result.length > 0) {
-        
-        
-        // Store subscription data
-        await sql`
-          INSERT INTO lemon_squeezy_subscriptions (
-            team_id, 
-            subscription_id, 
-            variant_id,
-            status,
-            event_name,
-            custom_data,
-            created_at,
-            updated_at
-          ) VALUES (
-            ${customData.teamId}::uuid, 
-            ${data.id}, 
-            ${data.attributes?.variant_id || null},
-            ${data.attributes?.status || 'active'},
-            ${eventName},
-            ${JSON.stringify(customData)},
-            NOW(),
-            NOW()
-          )
-          ON CONFLICT (team_id, subscription_id) DO UPDATE SET
-            status = EXCLUDED.status,
-            event_name = EXCLUDED.event_name,
-            custom_data = EXCLUDED.custom_data,
-            updated_at = NOW()
-        `
-        
-        return res.status(200).json({ 
-          success: true, 
-          message: 'Test webhook processed successfully',
-          teamId: customData.teamId,
-          planType: planType
-        })
-      } else {
-        return res.status(404).json({ error: 'Team not found' })
-      }
-    } else {
-      return res.status(400).json({ error: 'Invalid test payload' })
-    }
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}) as any)
 
 // Endpoint to check current team tier
 app.get('/api/teams/:id/tier', (async (req: Request, res: Response) => {
@@ -4707,6 +4288,199 @@ app.get('/api/snackbar-balance/camper/:camperId', (async (req: Request, res: Res
     res.status(500).json({ error: 'Error fetching snackbar balance records' });
   }
 }) as any);
+
+// MBWay Integration Endpoints
+
+// Get MBWay integration for current team
+app.get('/api/integrations/mbway', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const result = await sql`
+      SELECT id, mbway_key, is_active, created_at, updated_at
+      FROM mbway_integrations 
+      WHERE team_id = ${teamId}::uuid
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'MBWay integration not found' })
+    }
+
+    // Decrypt the mbway_key before sending to frontend
+    const integration = result[0]
+    if (integration.mbway_key) {
+      try {
+        integration.mbway_key = decrypt(integration.mbway_key)
+      } catch {
+        return res.status(500).json({ error: 'Error decrypting integration data' })
+      }
+    }
+
+    res.json(integration)
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar integração MBWay.' })
+  }
+}) as any)
+
+// Create MBWay integration
+app.post('/api/integrations/mbway', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const { mbway_key, is_active } = req.body
+    if (!mbway_key) {
+      return res.status(400).json({ error: 'MBWay key is required' })
+    }
+
+    // Encrypt the mbway_key before storing in database
+    const encryptedKey = encrypt(mbway_key)
+
+    const result = await sql`
+      INSERT INTO mbway_integrations (team_id, mbway_key, is_active, created_at, updated_at)
+      VALUES (${teamId}::uuid, ${encryptedKey}, ${is_active}, NOW(), NOW())
+      RETURNING id, mbway_key, is_active, created_at, updated_at
+    `
+
+    // Decrypt the key before sending response
+    const integration = result[0]
+    if (integration.mbway_key) {
+      integration.mbway_key = decrypt(integration.mbway_key)
+    }
+
+    res.status(201).json(integration)
+  } catch {
+    res.status(500).json({ error: 'Erro ao criar integração MBWay.' })
+  }
+}) as any)
+
+// Update MBWay integration
+app.put('/api/integrations/mbway/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const { id } = req.params
+    const { mbway_key, is_active } = req.body
+
+    if (!mbway_key) {
+      return res.status(400).json({ error: 'MBWay key is required' })
+    }
+
+    // Encrypt the mbway_key before storing in database
+    const encryptedKey = encrypt(mbway_key)
+
+    const result = await sql`
+      UPDATE mbway_integrations 
+      SET mbway_key = ${encryptedKey}, is_active = ${is_active}, updated_at = NOW()
+      WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid
+      RETURNING id, mbway_key, is_active, created_at, updated_at
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'MBWay integration not found' })
+    }
+
+    // Decrypt the key before sending response
+    const integration = result[0]
+    if (integration.mbway_key) {
+      integration.mbway_key = decrypt(integration.mbway_key)
+    }
+
+    res.json(integration)
+  } catch {
+    res.status(500).json({ error: 'Erro ao atualizar integração MBWay.' })
+  }
+}) as any)
+
+// Delete MBWay integration
+app.delete('/api/integrations/mbway/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const { id } = req.params
+
+    const result = await sql`
+      DELETE FROM mbway_integrations 
+      WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid
+      RETURNING id
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'MBWay integration not found' })
+    }
+
+    res.status(200).json({ message: 'MBWay integration deleted successfully' })
+  } catch {
+    res.status(500).json({ error: 'Erro ao deletar integração MBWay.' })
+  }
+}) as any)
+
+// Test MBWay connection
+app.post('/api/integrations/mbway/test', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    // Get the MBWay key for this team
+    const integrationResult = await sql`
+      SELECT mbway_key FROM mbway_integrations 
+      WHERE team_id = ${teamId}::uuid AND is_active = true
+    `
+
+    if (integrationResult.length === 0) {
+      return res.status(400).json({ error: 'No active MBWay integration found' })
+    }
+
+    // Decrypt the mbway_key before using it
+    let mbwayKey: string
+    try {
+      mbwayKey = decrypt(integrationResult[0].mbway_key)
+    } catch (error) {
+      console.error('Error decrypting mbway_key for test:', error)
+      return res.status(500).json({ success: false, error: 'Error decrypting integration key' })
+    }
+
+    // Test the connection by making a minimal request to IfthenPay
+    const testResponse = await fetch('https://api.ifthenpay.com/spg/payment/mbway', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        mbWayKey: mbwayKey,
+        orderId: 'TEST' + Date.now(),
+        amount: '0.01',
+        mobileNumber: '351#999999999',
+        description: 'Test connection',
+      }),
+    })
+
+    const responseText = await testResponse.text()
+    let result
+    try {
+      result = JSON.parse(responseText)
+    } catch {
+      return res.status(200).json({ success: false, error: 'Invalid response from IfthenPay' })
+    }
+
+    // Check if the response indicates a valid key (even if it's a test payment)
+    const success = testResponse.ok && result.Success !== false
+
+    return res.status(200).json({ success })
+  } catch (error) {
+    console.error('Error testing MBWay connection:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+}) as any)
 
 // Start the server
 const PORT = process.env.PORT || 3001;
