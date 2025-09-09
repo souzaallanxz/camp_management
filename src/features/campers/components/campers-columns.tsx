@@ -169,22 +169,33 @@ export const columns: ColumnDef<CamperWithActions>[] = [
                 </TooltipTrigger>
                 {!permissions.campers.rechargeCard && (
                   <TooltipContent>
-                    <p>Disponível apenas no plano Premium</p>
+                    <p>Funcionalidade não disponível para o seu role</p>
                   </TooltipContent>
                 )}
               </Tooltip>
             </TooltipProvider>
             
-            <DropdownMenuItem
-              onClick={() => camper.onLiquidateSnackbar?.(camper as Camper)}
-              className='flex items-center'
-              disabled={!camper.snack_bar_balance || Number(camper.snack_bar_balance) <= 0}
-            >
-              Liquidar Snackbar
-              <DropdownMenuShortcut>
-                <IconCash size={16} />
-              </DropdownMenuShortcut>
-            </DropdownMenuItem>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuItem
+                    onClick={() => permissions.campers.liquidateSnackbar ? camper.onLiquidateSnackbar?.(camper as Camper) : undefined}
+                    className='flex items-center'
+                    disabled={!permissions.campers.liquidateSnackbar || !camper.snack_bar_balance || Number(camper.snack_bar_balance) <= 0}
+                  >
+                    Liquidar Snackbar
+                    <DropdownMenuShortcut>
+                      <IconCash size={16} />
+                    </DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                </TooltipTrigger>
+                {!permissions.campers.liquidateSnackbar && (
+                  <TooltipContent>
+                    <p>Funcionalidade não disponível para o seu role</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </DropdownMenuContent>
         </DropdownMenu>
       )

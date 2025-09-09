@@ -1,4 +1,4 @@
-import { HTMLAttributes, useState } from 'react'
+import { HTMLAttributes, useState, useMemo } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from '@tanstack/react-router'
@@ -17,33 +17,35 @@ import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { useAuth } from '../../auth-context'
 import { toast } from '@/components/ui/use-toast'
+import { useTranslation } from '@/i18n'
 
 type SignUpFormProps = HTMLAttributes<HTMLDivElement>
 
-const formSchema = z
-  .object({
-    name: z
-      .string()
-      .min(1, { message: 'Por favor, informe seu nome' }),
-    email: z
-      .string()
-      .min(1, { message: 'Please enter your email' })
-      .email({ message: 'Invalid email address' }),
-    password: z
-      .string()
-      .min(1, { message: 'Please enter your password' })
-      .min(7, { message: 'Password must be at least 7 characters long' }),
-    confirmPassword: z.string().min(1, { message: 'Please confirm your password' }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ['confirmPassword'],
-  })
-
 export function SignUpForm({ className, ...props }: SignUpFormProps) {
+  const { t } = useTranslation()
   const { signUp } = useAuth()
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
+
+  const formSchema = useMemo(() => z
+    .object({
+      name: z
+        .string()
+        .min(1, { message: t('validation.required') }),
+      email: z
+        .string()
+        .min(1, { message: t('validation.required') })
+        .email({ message: t('validation.email') }),
+      password: z
+        .string()
+        .min(1, { message: t('validation.required') })
+        .min(7, { message: t('auth.passwordTooShort') }),
+      confirmPassword: z.string().min(1, { message: t('validation.required') }),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t('validation.passwordMatch'),
+      path: ['confirmPassword'],
+    }), [t])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -67,8 +69,8 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'Erro',
-        description: error instanceof Error ? error.message : 'Falha ao criar conta. Por favor, tente novamente.',
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('auth.accountCreationError'),
       })
     } finally {
       setIsLoading(false)
@@ -85,9 +87,9 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
               name='name'
               render={({ field }) => (
                 <FormItem className='space-y-1'>
-                  <FormLabel>Nome</FormLabel>
+                  <FormLabel>{t('auth.name')}</FormLabel>
                   <FormControl>
-                    <Input placeholder='Seu nome completo' {...field} />
+                    <Input placeholder={t('auth.namePlaceholder')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -98,7 +100,7 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
               name='email'
               render={({ field }) => (
                 <FormItem className='space-y-1'>
-                  <FormLabel>E-mail</FormLabel>
+                  <FormLabel>{t('auth.email')}</FormLabel>
                   <FormControl>
                     <Input placeholder='nome@exemplo.com' {...field} />
                   </FormControl>
@@ -111,9 +113,9 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
               name='password'
               render={({ field }) => (
                 <FormItem className='space-y-1'>
-                  <FormLabel>Senha</FormLabel>
+                  <FormLabel>{t('auth.password')}</FormLabel>
                   <FormControl>
-                    <PasswordInput placeholder='Digite sua senha' {...field} />
+                    <PasswordInput placeholder={t('auth.passwordPlaceholder')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -124,16 +126,16 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
               name='confirmPassword'
               render={({ field }) => (
                 <FormItem className='space-y-1'>
-                  <FormLabel>Confirmar Senha</FormLabel>
+                  <FormLabel>{t('auth.confirmPassword')}</FormLabel>
                   <FormControl>
-                    <PasswordInput placeholder='Confirme sua senha' {...field} />
+                    <PasswordInput placeholder={t('auth.confirmPasswordPlaceholder')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <Button className='mt-2' disabled={isLoading}>
-              Criar Conta
+              {t('auth.signUp')}
             </Button>
           </div>
         </form>

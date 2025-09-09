@@ -13,6 +13,7 @@ import { PaymentMethod } from '../data/schema'
 import { MBWayService } from '../services/mbway-service'
 import { api } from '@/lib/api-client'
 import { registrationService } from '../services/registration-service'
+import { useMBWayIntegration } from '../hooks/use-mbway-integration'
 
 interface SnackbarBalanceFormProps {
   registrationId: string
@@ -36,9 +37,10 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
   const [amount, setAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('MB Way')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Transferência Bancária')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [registration, setRegistration] = useState<{ form_id?: string } | null>(null)
+  const { isActive: mbwayActive, loading: mbwayLoading } = useMBWayIntegration()
 
   useEffect(() => {
     async function loadRegistration() {
@@ -167,12 +169,15 @@ export function SnackbarBalanceForm({ registrationId, onSuccess, onCancel }: Sna
         <Select
           value={paymentMethod}
           onValueChange={(value: PaymentMethod) => setPaymentMethod(value)}
+          disabled={mbwayLoading}
         >
           <SelectTrigger>
             <SelectValue placeholder="Selecione um método de pagamento" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="MB Way">MB Way</SelectItem>
+            {mbwayActive && (
+              <SelectItem value="MB Way">MB Way</SelectItem>
+            )}
             <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
             <SelectItem value="Dinheiro">Dinheiro</SelectItem>
             <SelectItem value="Multibanco">Multibanco</SelectItem>

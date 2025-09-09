@@ -16,7 +16,6 @@ interface Token {
 class TokenService {
   private storageKey = 'password_reset_tokens';
   private tokenExpirationTime = 60 * 60 * 1000; // 1 hora em milissegundos
-  private secretKey = import.meta.env.VITE_TOKEN_SECRET || 'default-secret-key-change-in-production';
   private separator = '--'; // Usando separador diferente de ponto para evitar conflito com emails
 
   /**

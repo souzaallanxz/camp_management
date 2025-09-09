@@ -1,11 +1,14 @@
 import ContentSection from '../components/content-section'
 import { ProfileForm } from './profile-form'
+import { useTranslation } from '@/i18n'
 
 export default function SettingsProfile() {
+  const { t } = useTranslation()
+  
   return (
     <ContentSection
-      title='Perfil'
-      desc='Esta informação é usada para identificar o seu perfil na plataforma.'
+      title={t('profile.title')}
+      desc={t('profile.personalInfo')}
     >
       <ProfileForm />
     </ContentSection>

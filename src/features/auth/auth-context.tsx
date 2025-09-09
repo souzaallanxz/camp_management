@@ -76,6 +76,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleSignIn = useCallback(async (credentials: SignInCredentials) => {
     try {
+      // Clear team cache before signing in to ensure fresh data
+      const { teamService } = await import('../teams/services/team-service')
+      teamService.clearTeamCache()
+      
       const { session } = await signIn(credentials)
       setUser(session.user)
       
@@ -99,6 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleSignUp = useCallback(async (credentials: SignUpCredentials) => {
     try {
+      // Clear team cache before signing up to ensure fresh data
+      const { teamService } = await import('../teams/services/team-service')
+      teamService.clearTeamCache()
+      
       const response = await signUp(credentials)
       setUser(response.session.user)
       
@@ -127,8 +135,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signOut()
       setUser(null)
       
-      // Remove token from localStorage
+      // Remove token and team data from localStorage
       localStorage.removeItem('token')
+      localStorage.removeItem('team_id')
+      localStorage.removeItem('teamId')
+      
+      // Clear team cache to prevent stale data
+      const { teamService } = await import('../teams/services/team-service')
+      teamService.clearTeamCache()
     } catch (error) {
       toast({
         variant: 'destructive',

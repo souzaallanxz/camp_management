@@ -34,18 +34,31 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       setShowOnboarding(false);
       setIsLoading(false);
       localStorage.removeItem('teamId');
+      localStorage.removeItem('team_id');
+      // Clear team cache when user is not authenticated
+      teamService.clearTeamCache();
       return;
     }
 
     try {
       setIsLoading(true);
+      
+      // Clear cache if user's team_id doesn't match cached team
+      const userTeamId = user.team_id;
+      const cachedTeamId = localStorage.getItem('teamId') || localStorage.getItem('team_id');
+      if (userTeamId && cachedTeamId && userTeamId !== cachedTeamId) {
+        teamService.clearTeamCache();
+      }
+      
       const team = await teamService.getCurrentUserTeam();
 
       setTeam(team);
       if (team && team.id) {
         localStorage.setItem('teamId', team.id);
+        localStorage.setItem('team_id', team.id);
       } else {
         localStorage.removeItem('teamId');
+        localStorage.removeItem('team_id');
       }
       const shouldShowOnboarding = !team;
       setShowOnboarding(shouldShowOnboarding);
@@ -53,6 +66,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       setTeam(null);
       setShowOnboarding(true);
       localStorage.removeItem('teamId');
+      localStorage.removeItem('team_id');
+      teamService.clearTeamCache();
       toast({
         variant: 'destructive',
         title: 'Error',

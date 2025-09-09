@@ -1,4 +1,4 @@
-import { HTMLAttributes, useState } from 'react'
+import { HTMLAttributes, useState, useMemo } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,30 +18,32 @@ import { PasswordInput } from '@/components/password-input'
 import { useAuth } from '../../auth-context'
 import { toast } from '@/hooks/use-toast'
 import { useCurrentTeam } from '@/features/teams/hooks/use-current-team'
+import { useTranslation } from '@/i18n'
 
 type UserAuthFormProps = HTMLAttributes<HTMLDivElement>
 
-const formSchema = z.object({
-  email: z
-    .string()
-    .min(1, { message: 'Por favor, digite seu e-mail' })
-    .email({ message: 'E-mail inválido' }),
-  password: z
-    .string()
-    .min(1, {
-      message: 'Por favor, digite sua senha',
-    })
-    .min(7, {
-      message: 'A senha deve ter pelo menos 7 caracteres',
-    }),
-})
-
 export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
+  const { t } = useTranslation()
   const { signIn, refetchUser } = useAuth()
   const { mutate: refetchTeam } = useCurrentTeam()
   const navigate = useNavigate()
   const search = useSearch({ from: '/(auth)/sign-in' })
   const [isLoading, setIsLoading] = useState(false)
+
+  const formSchema = useMemo(() => z.object({
+    email: z
+      .string()
+      .min(1, { message: t('validation.required') })
+      .email({ message: t('validation.email') }),
+    password: z
+      .string()
+      .min(1, {
+        message: t('validation.required'),
+      })
+      .min(7, {
+        message: t('auth.passwordTooShort'),
+      }),
+  }), [t])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -61,8 +63,8 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'Erro',
-        description: error instanceof Error ? error.message : 'Falha ao entrar. Por favor, verifique suas credenciais e tente novamente.',
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('auth.invalidCredentials'),
       })
     } finally {
       setIsLoading(false)
@@ -79,7 +81,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               name='email'
               render={({ field }) => (
                 <FormItem className='space-y-1'>
-                  <FormLabel>E-mail</FormLabel>
+                  <FormLabel>{t('auth.email')}</FormLabel>
                   <FormControl>
                     <Input placeholder='nome@exemplo.com' {...field} />
                   </FormControl>
@@ -93,12 +95,12 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               render={({ field }) => (
                 <FormItem className='space-y-1'>
                   <div className='flex items-center justify-between'>
-                    <FormLabel>Senha</FormLabel>
+                    <FormLabel>{t('auth.password')}</FormLabel>
                     <Link
                       to='/forgot-password'
                       className='text-sm font-medium text-muted-foreground hover:opacity-75'
                     >
-                      Esqueceu a senha?
+                      {t('auth.forgotPassword')}
                     </Link>
                   </div>
                   <FormControl>
@@ -109,7 +111,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               )}
             />
             <Button className='mt-2' disabled={isLoading}>
-              Entrar
+              {t('auth.signIn')}
             </Button>
 
             <div className='relative my-2'>
@@ -118,7 +120,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               </div>
               <div className='relative flex justify-center text-xs uppercase'>
                 <span className='bg-background px-2 text-muted-foreground'>
-                  Não tem uma conta?
+                  {t('auth.dontHaveAccount')}
                 </span>
               </div>
             </div>
@@ -129,7 +131,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               type='button'
               onClick={() => navigate({ to: '/sign-up' })}
             >
-              Criar conta
+              {t('auth.createAccount')}
             </Button>
           </div>
         </form>

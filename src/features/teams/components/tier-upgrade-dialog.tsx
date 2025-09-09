@@ -1,147 +1,153 @@
-import { useState } from 'react'
-import * as DialogPrimitive from '@radix-ui/react-dialog'
+import React from 'react'
 import {
+  Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
-import { teamService } from '../services/team-service'
-import { useCurrentTeam } from '../hooks/use-current-team'
-import { Check, AlertTriangle, Star } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useLemonSqueezyCheckout } from '../hooks/use-lemon-squeezy-checkout'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { IconCrown, IconCheck, IconX } from '@tabler/icons-react'
 
-interface Props {
+interface TierUpgradeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function TierUpgradeDialog({ open, onOpenChange }: Props) {
-  const [isLoading, setIsLoading] = useState(false)
-  const { data: team, mutate } = useCurrentTeam()
-  const isPremium = team?.tier === 'premium'
-  
-  const { initiateCheckout, isLoading: isCheckoutLoading } = useLemonSqueezyCheckout({
-    onSuccess: () => onOpenChange(false),
-    onError: () => setIsLoading(false)
-  })
+const tiers = [
+  {
+    name: 'Free',
+    price: '€0',
+    description: 'Plano básico para começar',
+    features: [
+      'Até 50 campistas',
+      'Gestão básica de staff',
+      'Relatórios básicos',
+      'Suporte por email'
+    ],
+    limitations: [
+      'Sem integrações avançadas',
+      'Relatórios limitados',
+      'Sem funcionalidades premium'
+    ]
+  },
+  {
+    name: 'Pro',
+    price: '€29',
+    description: 'Ideal para campos de tamanho médio',
+    features: [
+      'Até 200 campistas',
+      'Gestão completa de staff',
+      'Relatórios avançados',
+      'Integrações com webhooks',
+      'Suporte prioritário',
+      'Funcionalidades premium'
+    ],
+    limitations: []
+  },
+  {
+    name: 'Enterprise',
+    price: '€99',
+    description: 'Para campos grandes e organizações',
+    features: [
+      'Campistas ilimitados',
+      'Gestão avançada de staff',
+      'Relatórios personalizados',
+      'Integrações completas',
+      'Suporte dedicado',
+      'Funcionalidades enterprise',
+      'API personalizada'
+    ],
+    limitations: []
+  }
+]
 
-  const handleTierChange = async () => {
-    if (!team) {
-      toast('No team found', {
-        description: 'Please try again.',
-      })
-      return
-    }
-
-    try {
-      setIsLoading(true)
-      
-      if (isPremium) {
-        // Handle downgrade - direct API call
-        const promise = teamService.updateTeam(team.id, {
-          tier: 'free'
-        })
-
-        await toast.promise(promise, {
-          loading: 'A fazer downgrade...',
-          success: () => {
-            mutate()
-            onOpenChange(false)
-            setTimeout(() => {
-              window.location.reload()
-            }, 1000)
-            return 'Plano alterado para Free com sucesso!'
-          },
-          error: (err) => {
-            return err instanceof Error 
-              ? err.message 
-              : 'Erro ao fazer downgrade. Por favor tente novamente.'
-          }
-        })
-            } else {
-        // Handle upgrade - redirect to Lemon Squeezy checkout
-        await initiateCheckout(team)
-      }
-    } finally {
-      setIsLoading(false)
-    }
+export function TierUpgradeDialog({ open, onOpenChange }: TierUpgradeDialogProps) {
+  const handleUpgrade = (tier: string) => {
+    // TODO: Implement upgrade logic
+    console.log(`Upgrading to ${tier} tier`)
+    onOpenChange(false)
   }
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80" />
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              {isPremium ? (
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-              ) : (
-                <Star className="h-5 w-5 text-primary animate-pulse" />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <IconCrown className="h-5 w-5 text-yellow-500" />
+            Upgrade do Plano
+          </DialogTitle>
+          <DialogDescription>
+            Escolha o plano que melhor se adapta às suas necessidades. 
+            Todos os planos incluem atualizações gratuitas e suporte.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+          {tiers.map((tier, index) => (
+            <Card key={tier.name} className={`relative ${index === 1 ? 'border-primary shadow-lg scale-105' : ''}`}>
+              {index === 1 && (
+                <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground">
+                  Recomendado
+                </Badge>
               )}
-              <DialogTitle className="text-xl font-semibold tracking-tight">
-                {isPremium ? 'Tem a certeza?' : 'Desbloqueie Todo o Potencial'}
-              </DialogTitle>
-            </div>
-            <DialogDescription className="text-base">
-              {isPremium 
-                ? 'Ao fazer downgrade, perderá acesso a recursos premium imediatamente'
-                : 'Será redirecionado para o pagamento seguro. Acesso ilimitado a todas as funcionalidades premium por apenas €19/mês'
-              }
-            </DialogDescription>
-          </DialogHeader>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  {tier.name}
+                  <span className="text-2xl font-bold">{tier.price}</span>
+                </CardTitle>
+                <CardDescription>{tier.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm text-muted-foreground">Incluído:</h4>
+                  <ul className="space-y-1">
+                    {tier.features.map((feature, featureIndex) => (
+                      <li key={featureIndex} className="flex items-center gap-2 text-sm">
+                        <IconCheck className="h-4 w-4 text-green-500" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-          <div className="grid gap-4 py-4">
-            {isPremium ? (
-              <Alert variant="destructive">
-                <AlertDescription className="text-sm">
-                  Perderá acesso ao Snack Bar, carregamento de cartões e métricas avançadas.
-                  Esta ação não pode ser desfeita.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <ul className="space-y-2">
-                <li className="flex items-center gap-2 text-sm">
-                  <Check className="h-4 w-4 text-primary" />
-                  <span>Gestão completa do Snack Bar</span>
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <Check className="h-4 w-4 text-primary" />
-                  <span>Carregamento de cartões para campistas</span>
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <Check className="h-4 w-4 text-primary" />
-                  <span>Métricas e relatórios financeiros</span>
-                </li>
-              </ul>
-            )}
+                {tier.limitations.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm text-muted-foreground">Limitações:</h4>
+                    <ul className="space-y-1">
+                      {tier.limitations.map((limitation, limitationIndex) => (
+                        <li key={limitationIndex} className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <IconX className="h-4 w-4 text-red-500" />
+                          {limitation}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-            <div className="flex justify-end gap-4 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleTierChange}
-                disabled={isLoading || isCheckoutLoading}
-                className="min-w-[120px]"
-                variant={isPremium ? 'destructive' : 'default'}
-              >
-                {(isLoading || isCheckoutLoading)
-                  ? (isPremium ? 'A fazer downgrade...' : 'Redirecionando para pagamento...') 
-                  : (isPremium ? 'Sim, fazer downgrade' : 'Proceder ao Pagamento')
-                }
-              </Button>
-            </div>
+                <Button 
+                  className="w-full" 
+                  variant={index === 1 ? "default" : "outline"}
+                  onClick={() => handleUpgrade(tier.name)}
+                >
+                  {index === 0 ? 'Plano Atual' : `Upgrade para ${tier.name}`}
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="mt-6 p-4 bg-muted rounded-lg">
+          <h4 className="font-medium mb-2">Perguntas Frequentes</h4>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p><strong>Posso mudar de plano a qualquer momento?</strong> Sim, pode fazer upgrade ou downgrade a qualquer momento.</p>
+            <p><strong>Há período de teste?</strong> Oferecemos 14 dias de teste gratuito para todos os planos pagos.</p>
+            <p><strong>Como funciona o suporte?</strong> O suporte varia conforme o plano, desde email até suporte dedicado.</p>
           </div>
-        </DialogContent>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 } 

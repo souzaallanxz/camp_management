@@ -68,11 +68,7 @@ export const sidebarData: SidebarData = {
           url: '/snack-bar',
           icon: IconIceCream,
         },
-        {
-          title: 'Integrações',
-          url: '/integrations',
-          icon: IconWebhook,
-        },
+
       ],
     },
     {
@@ -101,6 +97,11 @@ export const sidebarData: SidebarData = {
               title: 'Aparência',
               url: '/settings/appearance',
               icon: IconPalette,
+            },
+            {
+              title: 'Integrações',
+              url: '/settings/integrations',
+              icon: IconWebhook,
             },
           ],
         },
@@ -136,7 +137,7 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
 
     const items: NavItem[] = []
 
-    // Se for cashier, só mostra Dashboard e Snack Bar
+    // Se for cashier, mostra Dashboard, Campistas, Staff e Snack Bar
     if (user?.role === 'cashier') {
       items.push({
         title: 'Dashboard',
@@ -148,6 +149,13 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
           title: 'Campistas',
           url: '/campers',
           icon: IconTent,
+        })
+      }
+      if (permissions.staff?.viewList) {
+        items.push({
+          title: 'Staff',
+          url: '/staff',
+          icon: IconUsersGroup,
         })
       }
       if (permissions.snackBar.access) {
@@ -200,11 +208,7 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
           icon: IconIceCream,
         })
       }
-      items.push({
-        title: 'Integrações',
-        url: '/integrations',
-        icon: IconWebhook,
-      })
+
     }
 
     return items
@@ -249,6 +253,11 @@ export function useSidebarData(): SidebarData & { isLoading: boolean } {
                 title: 'Aparência',
                 url: '/settings/appearance',
                 icon: IconPalette,
+              },
+              {
+                title: 'Integrações',
+                url: '/settings/integrations',
+                icon: IconWebhook,
               }
             ],
           },

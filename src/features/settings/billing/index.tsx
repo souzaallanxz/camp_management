@@ -1,59 +1,55 @@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Check } from 'lucide-react'
-import { useState } from 'react'
+import { Check, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { useTeamData } from '@/features/teams/hooks/use-team-data'
-import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
-import { TestWebhook } from './test-webhook'
-import { LemonSqueezyDebug } from './lemon-squeezy-debug'
-import { SignatureDebug } from './signature-debug'
-import { CorsDebug } from './cors-debug'
-import { WebhookDebug } from './webhook-debug'
 import { toast } from 'sonner'
+import { billingService } from '../services/billing-service'
 
 export default function SettingsBilling() {
-  const { teams } = useTeamData()
-  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const { teams, refetch } = useTeamData()
   const currentTeam = teams[0]
   const isPremium = currentTeam?.tier === 'premium'
   const [isLoading, setIsLoading] = useState(false)
 
-  // Função para abrir overlay Lemon Squeezy
+  // Check for success/cancel parameters in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const success = urlParams.get('success')
+    const canceled = urlParams.get('canceled')
+    const sessionId = urlParams.get('session_id')
+
+    if (success && sessionId) {
+      toast.success('Pagamento realizado com sucesso! O seu plano foi atualizado.')
+      // Refresh team data to get updated tier
+      refetch()
+      // Clean URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname)
+    } else if (canceled) {
+      toast.info('Pagamento cancelado. Pode tentar novamente quando quiser.')
+      // Clean URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [refetch])
+
   const handleUpgrade = async () => {
     try {
       setIsLoading(true)
-      toast.loading('A preparar pagamento...')
-      const token = localStorage.getItem('token')
       
-      // Use the buildApiUrl function to get the correct backend URL
-      const { buildApiUrl } = await import('@/services/api')
-      const apiUrl = buildApiUrl('/lemon-squeezy/checkout')
+      // Create checkout session
+      const { url } = await billingService.createCheckoutSession()
       
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ planType: 'premium', returnUrl: window.location.origin + '/settings/billing' }),
-      })
-      const data = await res.json()
-      toast.dismiss()
-      if (!res.ok || !data.url) {
-        toast.error('Erro ao criar checkout', { description: data.error || 'Erro desconhecido' })
-        return
+      if (url) {
+        // Open Stripe checkout in new tab
+        window.open(url, '_blank')
+        toast.info('Redirecionando para o pagamento...')
+      } else {
+        throw new Error('No checkout URL received')
       }
-      
-      // eslint-disable-next-line no-console
-      console.log('Checkout URL received:', data.url)
-      
-      // Sempre abrir em nova janela (overlay desabilitado)
-      toast.success('Abrindo checkout em nova janela...')
-      window.open(data.url, '_blank')
-    } catch (err) {
-      toast.dismiss()
-      toast.error('Erro ao criar checkout', { description: err instanceof Error ? err.message : 'Erro desconhecido' })
+    } catch (error) {
+      console.error('Error creating checkout session:', error)
+      toast.error('Erro ao iniciar o processo de pagamento. Tente novamente.')
     } finally {
       setIsLoading(false)
     }
@@ -102,7 +98,7 @@ export default function SettingsBilling() {
               <Button 
                 variant="outline" 
                 className="w-full"
-                onClick={() => setShowUpgradeDialog(true)}
+                onClick={handleUpgrade}
               >
                 Fazer Downgrade
               </Button>
@@ -158,7 +154,14 @@ export default function SettingsBilling() {
                 onClick={handleUpgrade}
                 disabled={isLoading}
               >
-                {isLoading ? 'A preparar...' : 'Fazer Upgrade - €19/mês'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    A processar...
+                  </>
+                ) : (
+                  'Fazer Upgrade - €19/mês'
+                )}
               </Button>
             ) : (
               <Button variant="outline" className="w-full" disabled>
@@ -169,11 +172,6 @@ export default function SettingsBilling() {
         </Card>
       </div>
 
-      <TierUpgradeDialog
-        open={showUpgradeDialog}
-        onOpenChange={setShowUpgradeDialog}
-      />
-      
     </div>
   )
 } 

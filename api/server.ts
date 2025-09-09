@@ -4,12 +4,21 @@ import dotenv from 'dotenv'
 import { Resend } from 'resend'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import bodyParser from 'body-parser'
+import Stripe from 'stripe'
 
 // Load environment variables
 dotenv.config()
 
 const app = express()
+
+// Configure express JSON parser - BEFORE CORS
+app.use(express.json({ 
+  limit: '10mb'
+}))
+app.use(express.urlencoded({ 
+  extended: true,
+  limit: '10mb'
+}))
 
 // Enable CORS
 app.use(cors({
@@ -18,16 +27,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-team-id']
 }))
-
-// Capturar corpo RAW do webhook Lemon Squeezy antes do express.json()
-app.post('/api/webhooks/lemon-squeezy', bodyParser.json({
-  verify: (req, res, buf) => {
-    (req as any).rawBody = buf.toString('utf8')
-  }
-}))
-
-// Parse JSON request bodies (para o resto da app)
-app.use(express.json())
 
 // Health check endpoint for Render
 app.get('/api/health', (req: Request, res: Response) => {
@@ -38,11 +37,43 @@ app.get('/api/health', (req: Request, res: Response) => {
   })
 })
 
+
+
+
+
 // Initialize Neon database connection
 const sql = neon(process.env.DATABASE_URL!)
 
 // Initialize Resend
 const resend = new Resend(process.env.VITE_RESEND_API_KEY)
+
+// Initialize Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2025-08-27.basil',
+})
+
+// Encryption functions for sensitive data
+function encrypt(text: string): string {
+  const algorithm = 'aes-256-cbc'
+  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-key-change-in-production', 'salt', 32)
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipheriv(algorithm, key, iv)
+  let encrypted = cipher.update(text, 'utf8', 'hex')
+  encrypted += cipher.final('hex')
+  return iv.toString('hex') + ':' + encrypted
+}
+
+function decrypt(encryptedText: string): string {
+  const algorithm = 'aes-256-cbc'
+  const key = crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default-key-change-in-production', 'salt', 32)
+  const textParts = encryptedText.split(':')
+  const iv = Buffer.from(textParts.shift()!, 'hex')
+  const encryptedData = textParts.join(':')
+  const decipher = crypto.createDecipheriv(algorithm, key, iv)
+  let decrypted = decipher.update(encryptedData, 'hex', 'utf8')
+  decrypted += decipher.final('utf8')
+  return decrypted
+}
 
 // Sign in route
 app.post('/api/auth/sign-in', (async (req: Request, res: Response) => {
@@ -310,7 +341,7 @@ app.get('/api/auth/profile', (async (req: Request, res: Response) => {
 
     // Find user by token (which is the user ID)
     const userResult = await sql`
-      SELECT id, email, first_name, last_name, team_id, role, created_at, updated_at
+      SELECT id, email, first_name, last_name, team_id, role, language, created_at, updated_at
       FROM public.users
       WHERE id = ${token}::uuid
     `
@@ -328,9 +359,10 @@ app.get('/api/auth/profile', (async (req: Request, res: Response) => {
       user: {
         id: user.id,
         email: user.email,
-        name: fullName || null,
+        name: fullName,
         team_id: user.team_id,
-        role: user.role
+        role: user.role,
+        language: user.language
       }
     })
   } catch (error) {
@@ -351,11 +383,11 @@ app.put('/api/auth/profile', (async (req: Request, res: Response) => {
     }
 
     const token = authHeader.split(' ')[1]
-    const { name, language, theme } = req.body
+    const { firstName, lastName, language, theme } = req.body
 
     // Find user by token (which is the user ID)
     const userResult = await sql`
-      SELECT id, first_name, last_name
+      SELECT id, first_name, last_name, email, team_id, role, language
       FROM public.users
       WHERE id = ${token}::uuid
     `
@@ -367,13 +399,11 @@ app.put('/api/auth/profile', (async (req: Request, res: Response) => {
     }
 
     // Update user profile
-    // For now, we'll update the first_name field with the full name
-    // In the future, you might want to add separate fields for language and theme preferences
     const updateResult = await sql`
       UPDATE public.users
-      SET first_name = ${name}, updated_at = NOW()
+      SET first_name = ${firstName}, last_name = ${lastName}, language = ${language}, updated_at = NOW()
       WHERE id = ${token}::uuid
-      RETURNING id, email, first_name, last_name, team_id, role
+      RETURNING id, email, first_name, last_name, team_id, role, language
     `
 
     const updatedUser = updateResult[0]
@@ -389,9 +419,10 @@ app.put('/api/auth/profile', (async (req: Request, res: Response) => {
       user: {
         id: updatedUser.id,
         email: updatedUser.email,
-        name: fullName || null,
+        name: fullName,
         team_id: updatedUser.team_id,
-        role: updatedUser.role
+        role: updatedUser.role,
+        language: updatedUser.language
       }
     })
   } catch (error) {
@@ -609,7 +640,7 @@ app.put('/api/teams/:id', (async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid tier value. Must be "free" or "premium"' })
     }
 
-    // For now, we'll focus on tier updates (the main use case for Lemon Squeezy)
+    // For now, we'll focus on tier updates
     if (tier === undefined) {
       return res.status(400).json({ error: 'Tier field is required' })
     }
@@ -791,6 +822,7 @@ app.get('/api/dashboard/camp-payments', (async (req: Request, res: Response) => 
     const now = new Date();
     const currentYear = now.getFullYear();
     
+    // Buscar dados de pagamentos por acampamento (tabela payments)
     const camps = await sql`
       SELECT 
         c.id as camp_id,
@@ -799,22 +831,341 @@ app.get('/api/dashboard/camp-payments', (async (req: Request, res: Response) => 
         COUNT(DISTINCT r.id) as total_registrations
       FROM camps c
       LEFT JOIN registrations r ON c.id = r.camp_id
-      LEFT JOIN payments p ON r.id = p.registration_id
+      LEFT JOIN payments p ON r.id = p.registration_id AND p.payment_status = 'confirmed'
       WHERE c.team_id = ${teamId}
       GROUP BY c.id, c.name
       ORDER BY c.start_date ASC
     `;
+    
     const result = camps.map(camp => ({
       campId: camp.camp_id,
       campName: camp.camp_name,
       totalPayments: Number(camp.total_payments) || 0,
       totalRegistrations: Number(camp.total_registrations) || 0
     }));
+    
     res.json(result);
-  } catch {
+  } catch (error) {
+    console.error('Error fetching camp payments:', error);
     res.status(500).json({ error: 'Erro ao buscar pagamentos por acampamento.' });
   }
 }) as RequestHandler)
+
+// Debug endpoint to check snackbar_balance data
+app.get('/api/debug/snackbar-data', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    // Check all snackbar_balance records for this team
+    const allSnackbarData = await sql`
+      SELECT 
+        sb.*,
+        r.name as registration_name,
+        c.name as camp_name,
+        c.team_id
+      FROM snackbar_balance sb
+      LEFT JOIN registrations r ON sb.registration_id = r.id
+      LEFT JOIN camps c ON r.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY sb.created_at DESC
+    `;
+    
+    // Check total snackbar amounts by camp
+    const campTotals = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COUNT(sb.id) as snackbar_count,
+        COALESCE(SUM(sb.amount), 0) as total_amount,
+        COALESCE(SUM(CASE WHEN sb.payment_status = 'confirmed' THEN sb.amount ELSE 0 END), 0) as confirmed_amount
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+      ORDER BY c.start_date ASC
+    `;
+    
+    res.json({
+      allSnackbarData,
+      campTotals,
+      debug: {
+        teamId,
+        totalRecords: allSnackbarData.length,
+        campsWithSnackbar: campTotals.filter(c => c.snackbar_count > 0).length
+      }
+    });
+  } catch (error) {
+    console.error('Error in debug snackbar data:', error);
+    res.status(500).json({ error: 'Erro ao buscar dados de debug.' });
+  }
+}) as any)
+
+// Get snackbar data per camp for analytics
+app.get('/api/dashboard/camp-snackbar', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    
+    // Buscar dados de snackbar por acampamento incluindo valores liquidados
+    // Primeiro, buscar total de snackbar por acampamento
+    const snackbarData = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(sb.amount::numeric), 0) as total_snackbar,
+        COUNT(sb.id) as snackbar_count
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id AND sb.payment_status = 'confirmed'
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+    `;
+    
+    // Depois, buscar total de transações liquidadas por acampamento (campers + staff)
+    const liquidatedData = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(sbt.amount::numeric), 0) as total_liquidated,
+        COUNT(sbt.id) as liquidated_count
+      FROM camps c
+      LEFT JOIN (
+        -- Transações liquidadas de campers
+        SELECT 
+          r.camp_id,
+          sbt.amount,
+          sbt.id
+        FROM snack_bar_transactions sbt
+        JOIN campers ca ON sbt.camper_id = ca.id
+        JOIN registrations r ON ca.registration_id = r.id
+        WHERE sbt.is_liquidated = true
+        
+        UNION ALL
+        
+        -- Transações liquidadas de staff
+        SELECT 
+          s.camp_id,
+          sbt.amount,
+          sbt.id
+        FROM snack_bar_transactions sbt
+        JOIN staff s ON sbt.staff_id = s.id
+        WHERE sbt.is_liquidated = true
+      ) sbt ON c.id = sbt.camp_id
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+    `;
+    
+    // Combinar os dados
+    const camps = snackbarData.map(snackbar => {
+      const liquidated = liquidatedData.find(l => l.camp_id === snackbar.camp_id);
+      return {
+        ...snackbar,
+        total_liquidated: liquidated ? liquidated.total_liquidated : 0,
+        liquidated_count: liquidated ? liquidated.liquidated_count : 0
+      };
+    });
+    
+    const result = camps.map(camp => ({
+      campId: camp.camp_id,
+      campName: camp.camp_name,
+      totalSnackbar: Number(camp.total_snackbar) || 0,
+      totalLiquidated: Number(camp.total_liquidated) || 0
+    }));
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching camp snackbar data:', error);
+    res.status(500).json({ error: 'Erro ao buscar dados de snackbar por acampamento.' });
+  }
+}) as any)
+
+// Debug endpoint to check liquidated transactions
+app.get('/api/debug/liquidated-transactions', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    // Check all liquidated transactions (campers + staff)
+    const liquidatedTransactions = await sql`
+      SELECT 
+        sbt.*,
+        ca.name as camper_name,
+        s.name as staff_name,
+        c.name as camp_name,
+        CASE 
+          WHEN sbt.camper_id IS NOT NULL THEN 'camper'
+          WHEN sbt.staff_id IS NOT NULL THEN 'staff'
+          ELSE 'unknown'
+        END as transaction_type
+      FROM snack_bar_transactions sbt
+      LEFT JOIN campers ca ON sbt.camper_id = ca.id
+      LEFT JOIN registrations r ON ca.registration_id = r.id
+      LEFT JOIN staff s ON sbt.staff_id = s.id
+      LEFT JOIN camps c ON COALESCE(r.camp_id, s.camp_id) = c.id
+      WHERE sbt.is_liquidated = true 
+        AND c.team_id = ${teamId}
+      ORDER BY sbt.created_at DESC
+    `;
+    
+    // Check total liquidated by camp (campers + staff)
+    const liquidatedByCamp = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(sbt.amount::numeric), 0) as total_liquidated,
+        COUNT(sbt.id) as liquidated_count
+      FROM camps c
+      LEFT JOIN (
+        -- Transações liquidadas de campers
+        SELECT 
+          r.camp_id,
+          sbt.amount,
+          sbt.id
+        FROM snack_bar_transactions sbt
+        JOIN campers ca ON sbt.camper_id = ca.id
+        JOIN registrations r ON ca.registration_id = r.id
+        WHERE sbt.is_liquidated = true
+        
+        UNION ALL
+        
+        -- Transações liquidadas de staff
+        SELECT 
+          s.camp_id,
+          sbt.amount,
+          sbt.id
+        FROM snack_bar_transactions sbt
+        JOIN staff s ON sbt.staff_id = s.id
+        WHERE sbt.is_liquidated = true
+      ) sbt ON c.id = sbt.camp_id
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+      ORDER BY c.start_date ASC
+    `;
+    
+    res.json({
+      liquidatedTransactions,
+      liquidatedByCamp
+    });
+  } catch (error) {
+    console.error('Error fetching liquidated transactions:', error);
+    res.status(500).json({ error: 'Error fetching liquidated transactions' });
+  }
+}) as any)
+
+// Debug endpoint to compare with direct database query
+app.get('/api/debug/snackbar-simple', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    // Simple query similar to what user ran directly - only confirmed payments
+    const result = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(CASE WHEN sb.payment_status = 'confirmed' THEN sb.amount::numeric ELSE 0 END), 0) as total_snackbar
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+      ORDER BY c.name
+    `;
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error in simple snackbar debug:', error);
+    res.status(500).json({ error: 'Error fetching simple snackbar data' });
+  }
+}) as any)
+
+// Debug endpoint to check raw snackbar data
+app.get('/api/debug/snackbar-raw', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const rawData = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        r.id as registration_id,
+        r.name as registration_name,
+        sb.id as snackbar_id,
+        sb.amount,
+        sb.payment_status,
+        sb.created_at
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id
+      WHERE c.team_id = ${teamId}
+      ORDER BY c.name, r.name, sb.created_at
+    `;
+    
+    res.json(rawData);
+  } catch (error) {
+    console.error('Error fetching raw snackbar data:', error);
+    res.status(500).json({ error: 'Error fetching raw snackbar data' });
+  }
+}) as any)
+
+// Debug endpoint to check aggregated snackbar data
+app.get('/api/debug/snackbar-aggregated', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const camps = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(sb.amount::numeric), 0) as total_snackbar,
+        COUNT(sb.id) as snackbar_count,
+        STRING_AGG(DISTINCT sb.payment_status, ', ') as payment_statuses,
+        STRING_AGG(DISTINCT sb.amount::text, ', ') as amounts
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id AND sb.payment_status = 'confirmed'
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+      ORDER BY c.start_date ASC
+    `;
+    
+    
+    res.json(camps);
+  } catch (error) {
+    console.error('Error fetching aggregated snackbar data:', error);
+    res.status(500).json({ error: 'Error fetching aggregated snackbar data' });
+  }
+}) as any)
+
+// Temporary endpoint to list teams for debugging
+app.get('/api/debug/teams', (async (req: Request, res: Response) => {
+  try {
+    const teams = await sql`
+      SELECT id, name, created_at
+      FROM teams
+      ORDER BY created_at DESC
+      LIMIT 10
+    `;
+    
+    res.json(teams);
+  } catch (error) {
+    console.error('Error fetching teams:', error);
+    res.status(500).json({ error: 'Error fetching teams' });
+  }
+}) as any)
 
 app.get('/api/dashboard/recent-registrations', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req)
@@ -1181,7 +1532,6 @@ app.get('/api/campers', (async (req: Request, res: Response) => {
 
     res.json(processedCampers);
   } catch (error) {
-    console.error('Error fetching campers:', error);
     res.status(500).json({ error: 'Erro ao buscar campistas.', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 }) as RequestHandler)
@@ -1922,9 +2272,6 @@ app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
   try {
     const { registration_id, amount, payment_method, phone_number, request_id } = req.body;
     
-    // Debug log
-    console.log('Snackbar balance request:', { registration_id, amount, payment_method, phone_number, request_id });
-    
     if (!registration_id || !amount || !payment_method) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -2171,10 +2518,11 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       const totalLoaded = Number(balanceResult[0]?.total_loaded || 0);
       const totalSpent = Number(spentResult[0]?.total_spent || 0);
       const totalLiquidated = Number(liquidatedResult[0]?.total_liquidated || 0);
-      const currentBalance = totalLoaded - totalSpent - totalLiquidated;
+      const currentBalance = Number((totalLoaded - totalSpent - totalLiquidated).toFixed(2));
       const paymentStatus = balanceResult[0]?.payment_status || 'confirmed';
       
-      if (currentBalance < amount) {
+      // Use a more precise comparison for floating point numbers
+      if (currentBalance < Number(amount.toFixed(2))) {
         return res.status(400).json({ error: 'Insufficient balance' });
       }
       
@@ -2220,9 +2568,10 @@ app.post('/api/snackbar-transactions', (async (req: Request, res: Response) => {
       `;
       
       const totalSpent = Number(spentResult[0]?.total_spent || 0);
-      const currentBalance = totalDeposit - totalSpent;
+      const currentBalance = Number((totalDeposit - totalSpent).toFixed(2));
       
-      if (currentBalance < amount) {
+      // Use a more precise comparison for floating point numbers
+      if (currentBalance < Number(amount.toFixed(2))) {
         return res.status(400).json({ error: 'Insufficient balance' });
       }
       
@@ -2254,7 +2603,7 @@ app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Re
     return res.status(401).json({ error: 'Missing x-team-id header' });
   }
   try {
-    const { amount, payment_method, phone_number, description } = req.body;
+    const { amount, payment_method, phone_number, description, request_id } = req.body;
 
     if (!amount) {
       return res.status(400).json({ error: 'Amount is required' });
@@ -2267,6 +2616,9 @@ app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Re
     const now = new Date().toISOString();
 
     // Create payment in the payments table with NULL registration_id
+    // Determinar payment_status baseado no método de pagamento
+    const paymentStatus = payment_method === 'MB Way' ? 'not confirmed' : 'confirmed';
+    
     const result = await sql`
       INSERT INTO payments (
         registration_id,
@@ -2276,6 +2628,7 @@ app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Re
         payment_status,
         phone_number,
         description,
+        request_id,
         created_at,
         updated_at
       ) VALUES (
@@ -2283,9 +2636,10 @@ app.post('/api/snackbar-transactions/independent', (async (req: Request, res: Re
         ${now},
         ${payment_method},
         ${amount},
-        'confirmed',
+        ${paymentStatus},
         ${phone_number || null},
         ${description || null},
+        ${request_id || null},
         ${now},
         ${now}
       ) RETURNING *
@@ -2363,10 +2717,8 @@ app.post('/api/snackbar-balance/:camperId/liquidate', (async (req: Request, res:
       return res.status(400).json({ error: 'Camper has no balance to liquidate' });
     }
     
-    // Verificar se o payment_status é 'confirmed' para permitir liquidação
-    if (paymentStatus !== 'confirmed') {
-      return res.status(400).json({ error: 'Cannot liquidate balance that is not confirmed' });
-    }
+    // Para acampamentos que já acabaram, permitir liquidação mesmo com pagamentos não confirmados
+    // Apenas verificar se há saldo disponível
     
     // Get the registration_id for this camper
     const registrationResult = await sql`
@@ -2467,10 +2819,8 @@ app.post('/api/snackbar-balance/staff/:staffId/liquidate', (async (req: Request,
       return res.status(400).json({ error: 'Staff member has no balance to liquidate' });
     }
     
-    // Verificar se o payment_status é 'confirmed' para permitir liquidação
-    if (paymentStatus !== 'confirmed') {
-      return res.status(400).json({ error: 'Cannot liquidate balance that is not confirmed' });
-    }
+    // Para acampamentos que já acabaram, permitir liquidação mesmo com pagamentos não confirmados
+    // Apenas verificar se há saldo disponível
     
     // Create a transaction record with the total liquidated amount
     const now = new Date().toISOString();
@@ -3037,164 +3387,7 @@ app.delete('/api/webhooks/cleanup', (async (req: Request, res: Response) => {
   }
 }) as any)
 
-// ===== LEMON SQUEEZY WEBHOOKS =====
 
-// Função utilitária para validar assinatura do Lemon Squeezy
-function isValidLemonSqueezySignature(req: Request, secret: string): boolean {
-  const signature = req.headers['x-signature'] as string
-  if (!signature) {
-    return false
-  }
-  
-  // Usar sempre o corpo RAW se disponível
-  const rawBody = (req as any).rawBody || JSON.stringify(req.body)
-  
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(rawBody)
-    .digest('hex')
-  
-  return signature === expectedSignature
-}
-
-// Process Lemon Squeezy payment confirmations
-app.post('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
-  try {
-    // Validar assinatura do webhook
-    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    
-    if (secret) {
-      const isValid = isValidLemonSqueezySignature(req, secret)
-      
-      if (!isValid) {
-        // Temporariamente permitir webhooks com assinatura inválida para debug
-        // return res.status(401).json({ error: 'Invalid webhook signature' })
-      }
-    }
-    
-    const { meta, data } = req.body
-
-    if (!meta || !data) {
-      return res.status(400).json({ error: 'Invalid webhook payload' })
-    }
-
-    const eventName = meta.event_name
-    
-    // Handle subscription or order events
-    if (eventName === 'subscription_created' || eventName === 'order_created' || eventName === 'checkout_completed' || eventName === 'order_created') {
-      // O custom_data está no meta, não no data.attributes
-      const customData = meta.custom_data
-      
-      // Try to get teamId from different possible locations
-      let teamId = null
-      let planType = 'premium'
-      
-      if (meta.custom_data && meta.custom_data.teamId) {
-        teamId = meta.custom_data.teamId
-        planType = meta.custom_data.planType || 'premium'
-      } else if (customData && customData.teamId) {
-        teamId = customData.teamId
-        planType = customData.planType || 'premium'
-      } else if (data.attributes?.custom_data?.teamId) {
-        teamId = data.attributes.custom_data.teamId
-        planType = data.attributes.custom_data.planType || 'premium'
-      } else if (data.attributes?.custom?.teamId) {
-        teamId = data.attributes.custom.teamId
-        planType = data.attributes.custom.planType || 'premium'
-      }
-      
-      if (!teamId) {
-        return res.status(200).json({ message: 'Processed but no team ID found' })
-      }
-
-      try {
-        // Update team to premium tier
-        const result = await sql`
-          UPDATE teams 
-          SET tier = ${planType}, updated_at = NOW()
-          WHERE id = ${teamId}::uuid
-          RETURNING *
-        `
-
-        if (result.length > 0) {
-          // Store subscription data for future reference
-          const subscriptionData = {
-            team_id: teamId,
-            subscription_id: data.id,
-            variant_id: data.attributes?.variant_id || null,
-            status: data.attributes?.status || 'active',
-            event_name: eventName,
-            custom_data: meta.custom_data || customData || data.attributes?.custom_data || data.attributes?.custom
-          }
-          
-          await sql`
-            INSERT INTO lemon_squeezy_subscriptions (
-              team_id, 
-              subscription_id, 
-              variant_id,
-              status,
-              event_name,
-              custom_data,
-              created_at,
-              updated_at
-            ) VALUES (
-              ${teamId}::uuid, 
-              ${data.id}, 
-              ${data.attributes?.variant_id || null},
-              ${data.attributes?.status || 'active'},
-              ${eventName},
-              ${JSON.stringify(meta.custom_data || customData || data.attributes?.custom_data || data.attributes?.custom)},
-              NOW(),
-              NOW()
-            )
-            ON CONFLICT (team_id, subscription_id) DO UPDATE SET
-              status = EXCLUDED.status,
-              event_name = EXCLUDED.event_name,
-              custom_data = EXCLUDED.custom_data,
-              updated_at = NOW()
-          `
-          
-        } else {
-          // Team not found for upgrade
-        }
-      } catch {
-        // Don't fail the webhook response
-      }
-    }
-
-    // Handle subscription cancellation
-    if (eventName === 'subscription_cancelled') {
-      const customData = data.attributes?.custom_data
-      
-      if (customData && customData.teamId) {
-        const teamId = customData.teamId
-
-        try {
-          // Downgrade team to free tier
-          await sql`
-            UPDATE teams 
-            SET tier = 'free', updated_at = NOW()
-            WHERE id = ${teamId}::uuid
-          `
-
-          // Update subscription status
-          await sql`
-            UPDATE lemon_squeezy_subscriptions 
-            SET status = 'cancelled', updated_at = NOW()
-            WHERE team_id = ${teamId}::uuid AND subscription_id = ${data.id}
-          `
-
-        } catch {
-          // Database error processing subscription cancellation
-        }
-      }
-    }
-
-    return res.status(200).json({ message: 'Webhook processed successfully' })
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}) as any)
 
 // Recebe webhooks de inscrições
 app.post('/api/webhooks/registrations/:teamId', async (req: Request, res: Response) => {
@@ -3317,8 +3510,19 @@ app.get('/api/registrations/check-form-id/:formId', (async (req: Request, res: R
 // Recebe webhooks de pagamentos
 app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) => {
   try {
-    const { teamId } = req.params;
-    const { request_id, amount, phone_number, email, payment_method, payment_date, payment_status, payment_link, status } = req.query;
+    // Desestruturação correta dos parâmetros
+    const teamId = req.params.teamId;
+    // req.query é do tipo ParsedQs, então os valores podem ser string | string[] | undefined
+    // Para garantir que temos strings, vamos forçar o cast
+    const request_id = req.query.request_id as string | undefined;
+    const amount = req.query.amount as string | undefined;
+    const phone_number = req.query.phone_number as string | undefined;
+    const email = req.query.email as string | undefined;
+    const payment_method = req.query.payment_method as string | undefined;
+    const payment_date = req.query.payment_date as string | undefined;
+    const payment_status = req.query.payment_status as string | undefined;
+    const payment_link = req.query.payment_link as string | undefined;
+    const status = req.query.status as string | undefined;
 
     // Validação dos campos obrigatórios
     const errors: string[] = [];
@@ -3335,12 +3539,12 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
     }
 
     const now = new Date().toISOString();
-    let registration = null;
-    let result = null;
+    let registration: any = null;
+    let result: any = null;
 
     // Lógica baseada no tipo de request_id
     if (request_id) {
-      const requestIdStr = request_id as string;
+      const requestIdStr = request_id;
       
       if (requestIdStr.startsWith('R')) {
         // UPDATE na tabela payments - confirmar pagamento existente
@@ -3368,60 +3572,186 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
         `;
         registration = regResult[0];
         
-      } else if (requestIdStr.startsWith('S')) {
+      } else if (requestIdStr.startsWith('S') || requestIdStr.startsWith('SV')) {
         // UPDATE na tabela snackbar_balance - confirmar pagamento existente
-        // Considera tanto campers (registration_id) quanto staff (staff_id)
-        const snackbarUpdate = await sql`
-          UPDATE snackbar_balance 
-          SET payment_status = 'confirmed', updated_at = ${now}
-          WHERE request_id = ${request_id} AND (
-            -- Caso seja de camper, valida o registration_id
-            (registration_id IS NOT NULL AND registration_id IN (
-              SELECT r.id FROM registrations r
-              JOIN camps c ON r.camp_id = c.id
-              WHERE c.team_id = ${teamId}::uuid
-            ))
-            -- Caso seja de staff, valida o staff_id
-            OR (staff_id IS NOT NULL AND staff_id IN (
-              SELECT s.id FROM staff s
-              JOIN camps c ON s.camp_id = c.id
-              WHERE c.team_id = ${teamId}::uuid
-            ))
-          )
-          RETURNING *
-        `;
         
-        if (snackbarUpdate.length === 0) {
-          return res.status(404).json({ error: 'Snackbar payment not found or does not belong to your team' });
+        // Se for SV, tenta primeiro na payments (pagamento independente)
+        if (requestIdStr.startsWith('SV')) {
+          
+          const independentPaymentUpdate = await sql`
+            UPDATE payments 
+            SET payment_status = 'confirmed', updated_at = ${now}
+            WHERE request_id = ${request_id} AND registration_id IS NULL
+            RETURNING *
+          `;
+          
+          console.log('Independent payment update result:', independentPaymentUpdate.length);
+          
+          if (independentPaymentUpdate.length > 0) {
+            // Mock registration para pagamentos independentes
+            registration = {
+              id: independentPaymentUpdate[0].id,
+              name: 'Pagamento Independente',
+              email: 'independent@snackbar.com',
+              status: 'confirmed'
+            };
+            result = independentPaymentUpdate[0];
+          }
         }
         
-        result = snackbarUpdate[0];
+        // Se não encontrou pagamento independente, tenta na snackbar_balance
+        if (!result) {
+          const existingSnackbarPayments = await sql`
+            SELECT sb.*, r.name as camper_name, s.name as staff_name
+            FROM snackbar_balance sb
+            LEFT JOIN registrations r ON sb.registration_id = r.id
+            LEFT JOIN staff s ON sb.staff_id = s.id
+            LEFT JOIN camps c ON (r.camp_id = c.id OR s.camp_id = c.id)
+            WHERE c.team_id = ${teamId}::uuid
+            ORDER BY sb.created_at DESC
+            LIMIT 10
+          `;
+          
+          console.log('Existing snackbar payments for team:', existingSnackbarPayments);
+          
+          // Tenta match exato
+          let snackbarUpdate = await sql`
+            UPDATE snackbar_balance 
+            SET payment_status = 'confirmed', updated_at = ${now}
+            WHERE request_id = ${request_id} AND (
+              (registration_id IS NOT NULL AND registration_id IN (
+                SELECT r.id FROM registrations r
+                JOIN camps c ON r.camp_id = c.id
+                WHERE c.team_id = ${teamId}::uuid
+              ))
+              OR (staff_id IS NOT NULL AND staff_id IN (
+                SELECT s.id FROM staff s
+                JOIN camps c ON s.camp_id = c.id
+                WHERE c.team_id = ${teamId}::uuid
+              ))
+            )
+            RETURNING *
+          `;
+          
+          console.log('Snackbar update result (exact match):', snackbarUpdate.length);
         
-        // Buscar registration ou staff para resposta
-        if (result.registration_id) {
-          // É um camper
-          const regResult = await sql`
-            SELECT r.* FROM registrations r
-            WHERE r.id = ${result.registration_id}
-          `;
-          registration = regResult[0];
-        } else if (result.staff_id) {
-          // É um staff
-          const staffResult = await sql`
-            SELECT s.* FROM staff s
-            WHERE s.id = ${result.staff_id}
-          `;
-          // Criar um objeto similar ao registration para manter compatibilidade
-          registration = staffResult[0] ? {
-            id: staffResult[0].id,
-            name: staffResult[0].name,
-            email: staffResult[0].email,
-            status: 'confirmed'
-          } : null;
+          // Se não encontrou e for SV, tenta match parcial
+          if (snackbarUpdate.length === 0 && requestIdStr.startsWith('SV')) {
+            console.log('Trying partial match for SV format');
+            
+            snackbarUpdate = await sql`
+              UPDATE snackbar_balance 
+              SET payment_status = 'confirmed', updated_at = ${now}
+              WHERE payment_status = 'not confirmed' AND (
+                (registration_id IS NOT NULL AND registration_id IN (
+                  SELECT r.id FROM registrations r
+                  JOIN camps c ON r.camp_id = c.id
+                  WHERE c.team_id = ${teamId}::uuid
+                ))
+                OR (staff_id IS NOT NULL AND staff_id IN (
+                  SELECT s.id FROM staff s
+                  JOIN camps c ON s.camp_id = c.id
+                  WHERE c.team_id = ${teamId}::uuid
+                ))
+              )
+              ORDER BY created_at DESC
+              LIMIT 1
+              RETURNING *
+            `;
+            
+            console.log('Snackbar update result (partial match):', snackbarUpdate.length);
+            
+            // Se ainda não encontrou, tenta novamente na payments (independente)
+            if (snackbarUpdate.length === 0) {
+              console.log('Trying to find independent payment in payments table');
+              
+              const independentPaymentUpdate = await sql`
+                UPDATE payments 
+                SET payment_status = 'confirmed', updated_at = ${now}
+                WHERE request_id = ${request_id} AND registration_id IS NULL
+                RETURNING *
+              `;
+              
+              console.log('Independent payment update result:', independentPaymentUpdate.length);
+              
+              if (independentPaymentUpdate.length > 0) {
+                registration = {
+                  id: independentPaymentUpdate[0].id,
+                  name: 'Pagamento Independente',
+                  email: 'independent@snackbar.com',
+                  status: 'confirmed'
+                };
+                result = independentPaymentUpdate[0];
+              }
+            }
+          }
+          
+          if (snackbarUpdate.length === 0) {
+            // Busca pagamentos similares para debug
+            const similarRequestId = await sql`
+              SELECT sb.*, r.name as camper_name, s.name as staff_name
+              FROM snackbar_balance sb
+              LEFT JOIN registrations r ON sb.registration_id = r.id
+              LEFT JOIN staff s ON sb.staff_id = s.id
+              LEFT JOIN camps c ON (r.camp_id = c.id OR s.camp_id = c.id)
+              WHERE c.team_id = ${teamId}::uuid
+              AND sb.request_id LIKE 'S%'
+              AND sb.payment_status = 'not confirmed'
+              ORDER BY sb.created_at DESC
+              LIMIT 5
+            `;
+            
+            return res.status(404).json({ 
+              error: 'Snackbar payment not found or does not belong to your team',
+              debug: {
+                request_id,
+                teamId,
+                existingPayments: existingSnackbarPayments.map((p: any) => ({
+                  id: p.id,
+                  request_id: p.request_id,
+                  registration_id: p.registration_id,
+                  staff_id: p.staff_id,
+                  payment_status: p.payment_status
+                })),
+                similarRequestIds: similarRequestId.map((p: any) => ({
+                  id: p.id,
+                  request_id: p.request_id,
+                  registration_id: p.registration_id,
+                  staff_id: p.staff_id,
+                  payment_status: p.payment_status,
+                  camper_name: p.camper_name,
+                  staff_name: p.staff_name
+                }))
+              }
+            });
+          }
+          
+          result = snackbarUpdate[0];
+          
+          // Buscar registration ou staff para resposta
+          if (result.registration_id) {
+            const regResult = await sql`
+              SELECT r.* FROM registrations r
+              WHERE r.id = ${result.registration_id}
+            `;
+            registration = regResult[0];
+          } else if (result.staff_id) {
+            const staffResult = await sql`
+              SELECT s.* FROM staff s
+              WHERE s.id = ${result.staff_id}
+            `;
+            registration = staffResult[0] ? {
+              id: staffResult[0].id,
+              name: staffResult[0].name,
+              email: staffResult[0].email,
+              status: 'confirmed'
+            } : null;
+          }
         }
         
       } else {
         // INSERT na tabela payments - novo pagamento
+        console.log('Processing new payment with form_id');
         // Buscar registration por form_id (que vem no request_id)
         const regResult = await sql`
           SELECT r.*, c.price as camp_price FROM registrations r
@@ -3492,6 +3822,7 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
     `;
     const totalPaid = Number(totalPaidResult[0]?.total_paid || 0);
 
+    // Atenção ao uso de {}: garantir que não há undefined ou null em campos obrigatórios
     return res.status(200).json({
       success: true,
       message: 'Payment processed successfully',
@@ -3506,8 +3837,8 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
         amount: Number(amount),
         total_paid: totalPaid,
         status: updatedRegistration.status,
-        payment_method: result?.payment_method || 'MB Way',
-        payment_status: result?.payment_status || 'confirmed'
+        payment_method: result && result.payment_method ? result.payment_method : 'MB Way',
+        payment_status: result && result.payment_status ? result.payment_status : 'confirmed'
       }
     });
   } catch (error) {
@@ -3516,294 +3847,7 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
   }
 });
 
-// POST /api/lemon-squeezy/checkout
-app.post('/api/lemon-squeezy/checkout', async (req: Request, res: Response) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const token = authHeader.split(' ')[1];
-    // Buscar o usuário pelo token (id)
-    const userResult = await sql`SELECT team_id, first_name FROM public.users WHERE id = ${token}::uuid`;
-    const user = userResult[0];
-    if (!user || !user.team_id) {
-      return res.status(401).json({ error: 'User not found or no team associated' });
-    }
-    const { planType } = req.body;
-    // Chamar o serviço Lemon Squeezy (API)
-    const lemonApiKey = process.env.LEMON_SQUEEZY_API_KEY;
-    if (!lemonApiKey) {
-      return res.status(500).json({ error: 'Lemon Squeezy API key not configured' });
-    }
-    // IDs fixos do plano premium
-    const storeId = '181507';
-    const variantId = '883664';
-    const returnUrl = req.body.returnUrl || (process.env.NEXT_PUBLIC_APP_URL + '/settings/billing');
-    // Montar payload baseado na documentação oficial do Lemon Squeezy
-    const payload = {
-      data: {
-        type: 'checkouts',
-        attributes: {
-          checkout_options: {
-            embed: false, // false para desabilitar overlay - abrir em nova página
-            media: true,
-            logo: true,
-            desc: true,
-            discount: true,
-            subscription_preview: true
-          },
-          product_options: {
-            redirect_url: returnUrl // URL de redirecionamento após pagamento bem-sucedido
-          },
-          checkout_data: {
-            name: user.first_name || 'Campy User',
-            custom: {
-              teamId: user.team_id,
-              planType: planType || 'premium',
-              timestamp: new Date().toISOString(),
-            },
-          },
-          test_mode: process.env.NODE_ENV !== 'production',
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Expira em 24 horas
-        },
-        relationships: {
-          store: { data: { type: 'stores', id: storeId } },
-          variant: { data: { type: 'variants', id: variantId } },
-        },
-      },
-    };
-    
-    // Fazer request à API Lemon Squeezy
-    const response = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/vnd.api+json',
-        'Content-Type': 'application/vnd.api+json',
-        'Authorization': `Bearer ${lemonApiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(500).json({ error: 'Lemon Squeezy API error', details: errorText });
-    }
-    const data = await response.json();
-    return res.status(200).json({ url: data.data.attributes.url });
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
-// Test endpoint for Lemon Squeezy webhook signature validation
-app.post('/api/lemon-squeezy/test-signature', (async (req: Request, res: Response) => {
-  try {
-    
-    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    
-    
-    if (!secret) {
-      return res.status(400).json({ 
-        error: 'No webhook secret configured',
-        envVars: {
-          LEMON_SQUEEZY_WEBHOOK_SECRET: !!process.env.LEMON_SQUEEZY_WEBHOOK_SECRET,
-          NODE_ENV: process.env.NODE_ENV
-        }
-      })
-    }
-    
-    const isValid = isValidLemonSqueezySignature(req, secret)
-    
-    return res.status(200).json({ 
-      success: true,
-      signatureValid: isValid,
-      secretConfigured: !!secret,
-      secretLength: secret.length,
-      secretPreview: secret.substring(0, 10) + '...',
-      headers: req.headers,
-      body: req.body,
-      envVars: {
-        NODE_ENV: process.env.NODE_ENV
-      }
-    })
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}) as any)
-
-// Test endpoint with real webhook payload
-app.post('/api/lemon-squeezy/test-real-signature', (async (req: Request, res: Response) => {
-  try {
-    
-    
-    const secret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET
-    if (!secret) {
-      return res.status(400).json({ error: 'No webhook secret configured' })
-    }
-    
-    // Payload real do webhook que recebemos
-    const realPayload = {
-      "meta": {
-        "test_mode": true,
-        "event_name": "subscription_created",
-        "custom_data": {
-          "teamId": "e4333e4d-c348-4a8e-bf74-09a32194d6d5",
-          "planType": "premium",
-          "timestamp": "2025-07-03T14:38:46.307Z"
-        },
-        "webhook_id": "test-webhook-id"
-      },
-      "data": {
-        "id": "test-subscription-id",
-        "type": "subscriptions",
-        "attributes": {
-          "status": "active",
-          "variant_id": "883664"
-        }
-      }
-    }
-    
-    const signature = "a96de36c1478ad4ec6f54ef9067b6e34f835d2ad6226fbd28a9a16afb1f1bb30"
-    
-    // Testar diferentes métodos
-    const payload1 = JSON.stringify(realPayload)
-    const signature1 = crypto.createHmac('sha256', secret).update(payload1).digest('hex')
-    
-    const payload2 = JSON.stringify(realPayload).replace(/\s+/g, '')
-    const signature2 = crypto.createHmac('sha256', secret).update(payload2).digest('hex')
-    
-    const payload3 = JSON.stringify(realPayload, null, 0)
-    const signature3 = crypto.createHmac('sha256', secret).update(payload3).digest('hex')
-    
-    return res.status(200).json({
-      success: true,
-      realSignature: signature,
-      method1: {
-        payload: payload1.substring(0, 100) + '...',
-        signature: signature1,
-        matches: signature === signature1
-      },
-      method2: {
-        payload: payload2.substring(0, 100) + '...',
-        signature: signature2,
-        matches: signature === signature2
-      },
-      method3: {
-        payload: payload3.substring(0, 100) + '...',
-        signature: signature3,
-        matches: signature === signature3
-      },
-      secretPreview: secret.substring(0, 10) + '...'
-    })
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}) as any)
-
-// Test endpoint for Lemon Squeezy webhook accessibility
-app.get('/api/webhooks/lemon-squeezy', (async (req: Request, res: Response) => {
-  
-  
-  return res.status(200).json({ 
-    message: 'Lemon Squeezy webhook endpoint is accessible',
-    method: 'GET',
-    timestamp: new Date().toISOString(),
-    note: 'This endpoint only accepts POST requests from Lemon Squeezy'
-  })
-}) as any)
-
-// Test endpoint for Lemon Squeezy webhook
-app.get('/api/lemon-squeezy/test', (async (req: Request, res: Response) => {
-  try {
-    const teamId = req.query.teamId as string
-    if (!teamId) {
-      return res.status(400).json({ error: 'Team ID is required' })
-    }
-
-    // Simulate a webhook payload for testing
-    const testPayload = {
-      meta: {
-        event_name: 'checkout_completed'
-      },
-      data: {
-        id: 'test-subscription-id',
-        attributes: {
-          status: 'active',
-          variant_id: '883664',
-          custom_data: {
-            teamId: teamId,
-            planType: 'premium',
-            timestamp: new Date().toISOString()
-          }
-        }
-      }
-    }
-
-    
-
-    // Process the test webhook
-    const { meta, data } = testPayload
-    const eventName = meta.event_name
-    const customData = data.attributes?.custom_data
-
-    if (customData && customData.teamId) {
-      const planType = customData.planType || 'premium'
-
-      // Update team to premium tier
-      const result = await sql`
-        UPDATE teams 
-        SET tier = ${planType}, updated_at = NOW()
-        WHERE id = ${customData.teamId}::uuid
-        RETURNING *
-      `
-
-      if (result.length > 0) {
-        
-        
-        // Store subscription data
-        await sql`
-          INSERT INTO lemon_squeezy_subscriptions (
-            team_id, 
-            subscription_id, 
-            variant_id,
-            status,
-            event_name,
-            custom_data,
-            created_at,
-            updated_at
-          ) VALUES (
-            ${customData.teamId}::uuid, 
-            ${data.id}, 
-            ${data.attributes?.variant_id || null},
-            ${data.attributes?.status || 'active'},
-            ${eventName},
-            ${JSON.stringify(customData)},
-            NOW(),
-            NOW()
-          )
-          ON CONFLICT (team_id, subscription_id) DO UPDATE SET
-            status = EXCLUDED.status,
-            event_name = EXCLUDED.event_name,
-            custom_data = EXCLUDED.custom_data,
-            updated_at = NOW()
-        `
-        
-        return res.status(200).json({ 
-          success: true, 
-          message: 'Test webhook processed successfully',
-          teamId: customData.teamId,
-          planType: planType
-        })
-      } else {
-        return res.status(404).json({ error: 'Team not found' })
-      }
-    } else {
-      return res.status(400).json({ error: 'Invalid test payload' })
-    }
-  } catch (error) {
-    return res.status(500).json({ error: 'Internal server error' })
-  }
-}) as RequestHandler)
 
 // Endpoint to check current team tier
 app.get('/api/teams/:id/tier', (async (req: Request, res: Response) => {
@@ -4467,6 +4511,53 @@ app.get('/api/debug/schema', (async (req: Request, res: Response) => {
     console.error('Error checking schema:', error);
     res.status(500).json({ error: 'Error checking schema', details: error.message });
   }
+}) as any)
+
+// Debug endpoint to check user data
+app.get('/api/debug/user/:id', (async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const result = await sql`
+      SELECT id, email, first_name, last_name, team_id, role, language, created_at, updated_at
+      FROM public.users
+      WHERE id = ${id}::uuid
+    `
+    res.json(result[0] || { error: 'User not found' })
+  } catch (error) {
+    console.error('Error checking user data:', error)
+    res.status(500).json({ error: 'Error checking user data', details: error.message })
+  }
+}) as any);
+
+// Debug endpoint to check snackbar payments
+app.get('/api/debug/snackbar-payments/:teamId', (async (req: Request, res: Response) => {
+  try {
+    const { teamId } = req.params
+    const result = await sql`
+      SELECT 
+        sb.id,
+        sb.request_id,
+        sb.registration_id,
+        sb.staff_id,
+        sb.amount,
+        sb.payment_method,
+        sb.payment_status,
+        sb.created_at,
+        r.name as camper_name,
+        s.name as staff_name
+      FROM snackbar_balance sb
+      LEFT JOIN registrations r ON sb.registration_id = r.id
+      LEFT JOIN staff s ON sb.staff_id = s.id
+      LEFT JOIN camps c ON (r.camp_id = c.id OR s.camp_id = c.id)
+      WHERE c.team_id = ${teamId}::uuid
+      ORDER BY sb.created_at DESC
+      LIMIT 20
+    `
+    res.json(result)
+  } catch (error) {
+    console.error('Error checking snackbar payments:', error)
+    res.status(500).json({ error: 'Error checking snackbar payments', details: error.message })
+  }
 }) as any);
 
 // Get snackbar balance records for a specific camper
@@ -4513,6 +4604,379 @@ app.get('/api/snackbar-balance/camper/:camperId', (async (req: Request, res: Res
     res.status(500).json({ error: 'Error fetching snackbar balance records' });
   }
 }) as any);
+
+// MBWay Integration Endpoints
+
+// Get MBWay integration for current team
+app.get('/api/integrations/mbway', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const result = await sql`
+      SELECT id, mbway_key, is_active, created_at, updated_at
+      FROM mbway_integrations 
+      WHERE team_id = ${teamId}::uuid
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'MBWay integration not found' })
+    }
+
+    // Decrypt the mbway_key before sending to frontend
+    const integration = result[0]
+    if (integration.mbway_key) {
+      try {
+        integration.mbway_key = decrypt(integration.mbway_key)
+      } catch {
+        return res.status(500).json({ error: 'Error decrypting integration data' })
+      }
+    }
+
+    res.json(integration)
+  } catch {
+    res.status(500).json({ error: 'Erro ao buscar integração MBWay.' })
+  }
+}) as any)
+
+// Create MBWay integration
+app.post('/api/integrations/mbway', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const { mbway_key, is_active } = req.body
+    if (!mbway_key) {
+      return res.status(400).json({ error: 'MBWay key is required' })
+    }
+
+    // Encrypt the mbway_key before storing in database
+    const encryptedKey = encrypt(mbway_key)
+
+    const result = await sql`
+      INSERT INTO mbway_integrations (team_id, mbway_key, is_active, created_at, updated_at)
+      VALUES (${teamId}::uuid, ${encryptedKey}, ${is_active}, NOW(), NOW())
+      RETURNING id, mbway_key, is_active, created_at, updated_at
+    `
+
+    // Decrypt the key before sending response
+    const integration = result[0]
+    if (integration.mbway_key) {
+      integration.mbway_key = decrypt(integration.mbway_key)
+    }
+
+    res.status(201).json(integration)
+  } catch {
+    res.status(500).json({ error: 'Erro ao criar integração MBWay.' })
+  }
+}) as any)
+
+// Update MBWay integration
+app.put('/api/integrations/mbway/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const { id } = req.params
+    const { mbway_key, is_active } = req.body
+
+    if (!mbway_key) {
+      return res.status(400).json({ error: 'MBWay key is required' })
+    }
+
+    // Encrypt the mbway_key before storing in database
+    const encryptedKey = encrypt(mbway_key)
+
+    const result = await sql`
+      UPDATE mbway_integrations 
+      SET mbway_key = ${encryptedKey}, is_active = ${is_active}, updated_at = NOW()
+      WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid
+      RETURNING id, mbway_key, is_active, created_at, updated_at
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'MBWay integration not found' })
+    }
+
+    // Decrypt the key before sending response
+    const integration = result[0]
+    if (integration.mbway_key) {
+      integration.mbway_key = decrypt(integration.mbway_key)
+    }
+
+    res.json(integration)
+  } catch {
+    res.status(500).json({ error: 'Erro ao atualizar integração MBWay.' })
+  }
+}) as any)
+
+// Delete MBWay integration
+app.delete('/api/integrations/mbway/:id', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const { id } = req.params
+
+    const result = await sql`
+      DELETE FROM mbway_integrations 
+      WHERE id = ${id}::uuid AND team_id = ${teamId}::uuid
+      RETURNING id
+    `
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'MBWay integration not found' })
+    }
+
+    res.status(200).json({ message: 'MBWay integration deleted successfully' })
+  } catch {
+    res.status(500).json({ error: 'Erro ao deletar integração MBWay.' })
+  }
+}) as any)
+
+// Test MBWay connection
+app.post('/api/integrations/mbway/test', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    // Get the MBWay key for this team
+    const integrationResult = await sql`
+      SELECT mbway_key FROM mbway_integrations 
+      WHERE team_id = ${teamId}::uuid AND is_active = true
+    `
+
+    if (integrationResult.length === 0) {
+      return res.status(400).json({ error: 'No active MBWay integration found' })
+    }
+
+    // Decrypt the mbway_key before using it
+    let mbwayKey: string
+    try {
+      mbwayKey = decrypt(integrationResult[0].mbway_key)
+    } catch (error) {
+      console.error('Error decrypting mbway_key for test:', error)
+      return res.status(500).json({ success: false, error: 'Error decrypting integration key' })
+    }
+
+    // Test the connection by making a minimal request to IfthenPay
+    const testResponse = await fetch('https://api.ifthenpay.com/spg/payment/mbway', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        mbWayKey: mbwayKey,
+        orderId: 'TEST' + Date.now(),
+        amount: '0.01',
+        mobileNumber: '351#999999999',
+        description: 'Test connection',
+      }),
+    })
+
+    const responseText = await testResponse.text()
+    let result
+    try {
+      result = JSON.parse(responseText)
+    } catch {
+      return res.status(200).json({ success: false, error: 'Invalid response from IfthenPay' })
+    }
+
+    // Check if the response indicates a valid key (even if it's a test payment)
+    const success = testResponse.ok && result.Success !== false
+
+    return res.status(200).json({ success })
+  } catch (error) {
+    console.error('Error testing MBWay connection:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+}) as any)
+
+// Stripe endpoints for subscription billing
+// Create checkout session for premium subscription
+app.post('/api/billing/create-checkout-session', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    // Get team information
+    const teamResult = await sql`
+      SELECT name, tier FROM teams WHERE id = ${teamId}::uuid
+    `
+    
+    if (teamResult.length === 0) {
+      return res.status(404).json({ error: 'Team not found' })
+    }
+
+    const team = teamResult[0]
+    
+    // Check if team is already premium
+    if (team.tier === 'premium') {
+      return res.status(400).json({ error: 'Team is already on premium plan' })
+    }
+
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: 'Plano Premium - Camp Management',
+              description: 'Acesso completo a todas as funcionalidades premium',
+            },
+            unit_amount: 1900, // €19.00 in cents
+            recurring: {
+              interval: 'month',
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173'}/settings/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173'}/settings/billing?canceled=true`,
+      metadata: {
+        team_id: teamId,
+        team_name: team.name,
+      },
+      customer_email: req.body.email || undefined,
+    })
+
+    return res.status(200).json({ 
+      sessionId: session.id,
+      url: session.url 
+    })
+  } catch (error) {
+    console.error('Error creating checkout session:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Stripe webhook endpoint
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), (async (req: Request, res: Response) => {
+  const sig = req.headers['stripe-signature'] as string
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
+
+  if (!endpointSecret) {
+    console.error('Stripe webhook secret not configured')
+    return res.status(500).json({ error: 'Webhook secret not configured' })
+  }
+
+  let event: Stripe.Event
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err)
+    return res.status(400).json({ error: 'Invalid signature' })
+  }
+
+  try {
+    // Handle the event
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        
+        if (session.mode === 'subscription' && session.metadata?.team_id) {
+          const teamId = session.metadata.team_id
+          
+          // Update team tier to premium
+          await sql`
+            UPDATE teams 
+            SET tier = 'premium', updated_at = NOW()
+            WHERE id = ${teamId}::uuid
+          `
+          
+          console.log(`Team ${teamId} upgraded to premium plan`)
+        }
+        break
+      }
+      
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription
+        
+        // Find team by subscription metadata or customer
+        if (subscription.metadata?.team_id) {
+          const teamId = subscription.metadata.team_id
+          
+          // Downgrade team to free
+          await sql`
+            UPDATE teams 
+            SET tier = 'free', updated_at = NOW()
+            WHERE id = ${teamId}::uuid
+          `
+          
+          console.log(`Team ${teamId} downgraded to free plan`)
+        }
+        break
+      }
+      
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        
+        if (invoice.subscription && typeof invoice.subscription === 'string' && invoice.metadata?.team_id) {
+          const teamId = invoice.metadata.team_id
+          
+          // Optionally downgrade team or send notification
+          console.log(`Payment failed for team ${teamId}`)
+          
+          // You could implement logic here to:
+          // 1. Send email notification
+          // 2. Set a grace period
+          // 3. Downgrade after multiple failures
+        }
+        break
+      }
+      
+      default:
+        console.log(`Unhandled event type ${event.type}`)
+    }
+
+    return res.status(200).json({ received: true })
+  } catch (error) {
+    console.error('Error processing webhook:', error)
+    return res.status(500).json({ error: 'Webhook processing failed' })
+  }
+}) as any)
+
+// Get subscription status for a team
+app.get('/api/billing/subscription-status', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    const teamResult = await sql`
+      SELECT tier, updated_at FROM teams WHERE id = ${teamId}::uuid
+    `
+    
+    if (teamResult.length === 0) {
+      return res.status(404).json({ error: 'Team not found' })
+    }
+
+    const team = teamResult[0]
+    
+    return res.status(200).json({
+      tier: team.tier,
+      isPremium: team.tier === 'premium',
+      lastUpdated: team.updated_at
+    })
+  } catch (error) {
+    console.error('Error getting subscription status:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
 
 // Start the server
 const PORT = process.env.PORT || 3001;

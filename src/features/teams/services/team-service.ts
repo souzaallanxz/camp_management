@@ -39,8 +39,13 @@ export const teamService = {
       return null
     }
 
-    // Check if we have valid cached data
-    if (teamCache && (Date.now() - teamCache.timestamp) < CACHE_DURATION) {
+    // Get current user's team_id from localStorage to validate cache
+    const currentUserTeamId = localStorage.getItem('team_id') || localStorage.getItem('teamId')
+    
+    // Check if we have valid cached data and if it matches current user's team
+    if (teamCache && 
+        (Date.now() - teamCache.timestamp) < CACHE_DURATION &&
+        teamCache.data?.id === currentUserTeamId) {
       return teamCache.data
     }
 
@@ -60,6 +65,13 @@ export const teamService = {
       }
 
       const teamData = await response.json()
+      
+      // Validate that the returned team matches the user's team_id
+      if (currentUserTeamId && teamData?.id !== currentUserTeamId) {
+        console.warn('Team ID mismatch: cached team does not match user team_id')
+        teamCache = null
+        return null
+      }
       
       // Update cache
       teamCache = { data: teamData, timestamp: Date.now() }

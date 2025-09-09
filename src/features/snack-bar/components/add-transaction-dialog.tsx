@@ -29,6 +29,8 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { snackBarService } from '../services/snack-bar-service'
+import { MBWayService } from '@/features/registrations/services/mbway-service'
+import { useMBWayIntegration } from '@/features/registrations/hooks/use-mbway-integration'
 
 const independentTransactionSchema = z.object({
   amount: z.string()
@@ -38,6 +40,14 @@ const independentTransactionSchema = z.object({
   payment_method: z.enum(['MB Way', 'Transferência Bancária', 'Dinheiro', 'Multibanco']),
   phone_number: z.string().optional(),
   description: z.string().optional(),
+}).refine((data) => {
+  if (data.payment_method === 'MB Way') {
+    return data.phone_number && data.phone_number.trim().length > 0
+  }
+  return true
+}, {
+  message: 'Número de telefone é obrigatório para pagamentos MB Way',
+  path: ['phone_number']
 })
 
 type IndependentTransaction = z.infer<typeof independentTransactionSchema>
@@ -55,12 +65,13 @@ export function AddTransactionDialog({
 }: AddTransactionDialogProps) {
   const queryClient = useQueryClient()
   const [loading, setLoading] = useState(false)
+  const { isActive: mbwayActive, loading: mbwayLoading } = useMBWayIntegration()
 
   const form = useForm<IndependentTransaction>({
     resolver: zodResolver(independentTransactionSchema),
     defaultValues: {
       amount: '',
-      payment_method: 'MB Way',
+      payment_method: 'Transferência Bancária',
       phone_number: '',
       description: '',
     },
@@ -68,14 +79,43 @@ export function AddTransactionDialog({
 
   const mutation = useMutation({
     mutationFn: async (data: IndependentTransaction) => {
+      // Gerar request_id no formato SV + ano+mês+dia+hora+minuto (máximo 15 dígitos)
+      const now = new Date()
+      const year = now.getFullYear().toString().slice(-2) // Últimos 2 dígitos do ano
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const day = String(now.getDate()).padStart(2, '0')
+      const hour = String(now.getHours()).padStart(2, '0')
+      const minute = String(now.getMinutes()).padStart(2, '0')
+      const requestId = `SV${year}${month}${day}${hour}${minute}`.slice(0, 15)
+
       const payload = {
         amount: Number(data.amount),
         payment_method: data.payment_method,
         phone_number: data.phone_number || null,
         description: data.description || null,
+        request_id: requestId,
       }
 
-      return await snackBarService.createIndependentPayment(payload)
+      // Primeiro salvar o pagamento na base de dados
+      const result = await snackBarService.createIndependentPayment(payload)
+
+      // Se o método de pagamento for MB Way, fazer a chamada da API
+      if (data.payment_method === 'MB Way' && data.phone_number) {
+        try {
+          await MBWayService.requestPayment({
+            mobileNumber: data.phone_number,
+            amount: Number(data.amount),
+            description: data.description || 'Pagamento Independente',
+            orderId: requestId,
+          })
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+          toast.error(`Erro MB Way: ${errorMessage}`)
+          // Não interromper o fluxo, apenas mostrar o erro
+        }
+      }
+
+      return result
     },
     onSuccess: () => {
       toast.success('Pagamento criado com sucesso!')
@@ -150,14 +190,16 @@ export function AddTransactionDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Método de Pagamento</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={mbwayLoading}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione um método de pagamento" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="MB Way">MB Way</SelectItem>
+                      {mbwayActive && (
+                        <SelectItem value="MB Way">MB Way</SelectItem>
+                      )}
                       <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
                       <SelectItem value="Dinheiro">Dinheiro</SelectItem>
                       <SelectItem value="Multibanco">Multibanco</SelectItem>

@@ -1,4 +1,4 @@
-import { env } from '@/env'
+import { api } from '@/lib/api-client'
 
 interface MBWayPaymentRequest {
   mobileNumber: string
@@ -24,15 +24,25 @@ export class MBWayService {
     // Ensure orderId is a string and has max 15 chars
     const formattedOrderId = String(data.orderId).slice(0, 15)
 
-    // Corrigir acesso à variável de ambiente
-    const mbWayKey =
-      (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_MBWAY_KEY) ||
-      (typeof process !== 'undefined' && process.env && process.env.VITE_MBWAY_KEY) ||
-      (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_IFTHENPAY_MBWAY_KEY) ||
-      (typeof process !== 'undefined' && process.env && process.env.VITE_IFTHENPAY_MBWAY_KEY)
+    // Get MBWay key from integration settings
+    let mbWayKey: string
+    try {
+      const integrationResponse = await api.get('/integrations/mbway')
+      if (!integrationResponse.data?.mbway_key || !integrationResponse.data?.is_active) {
+        throw new Error('MBWay integration not configured or not active')
+      }
+      mbWayKey = integrationResponse.data.mbway_key
+    } catch (error) {
+      // Fallback to environment variable if integration not found
+      mbWayKey =
+        (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_MBWAY_KEY) ||
+        (typeof process !== 'undefined' && process.env && process.env.VITE_MBWAY_KEY) ||
+        (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_IFTHENPAY_MBWAY_KEY) ||
+        (typeof process !== 'undefined' && process.env && process.env.VITE_IFTHENPAY_MBWAY_KEY)
 
-    if (!mbWayKey) {
-      throw new Error('MB WAY key não configurada nas variáveis de ambiente.')
+      if (!mbWayKey) {
+        throw new Error('MB WAY key não configurada. Configure a integração MBWay nas definições.')
+      }
     }
 
     const response = await fetch('https://api.ifthenpay.com/spg/payment/mbway', {

@@ -14,10 +14,12 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Overview } from './components/overview'
 import { RecentSales } from './components/recent-sales'
+import { Analytics } from './components/analytics'
 import { useDashboardMetrics } from './hooks/use-dashboard-metrics'
+import { useAnalyticsAvailability } from './hooks/use-analytics-availability'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TierUpgradeDialog } from '@/features/teams/components/tier-upgrade-dialog'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from './components/empty-state'
@@ -81,8 +83,41 @@ function MetricCard({
 
 export default function Dashboard() {
   const { totalPayments, totalRegistrations, totalSnackbar, totalCampers, isLoading, error } = useDashboardMetrics()
+  const { hasAnalyticsData, isLoading: isLoadingAnalytics } = useAnalyticsAvailability()
   const permissions = useTeamPermissions()
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+
+  // Verificar se o usuário está tentando acessar analytics sem dados suficientes
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const tabParam = urlParams.get('tab')
+    
+    if (tabParam === 'analytics' && !hasAnalyticsData && !isLoadingAnalytics) {
+      // Redirecionar para overview se tentar acessar analytics sem dados
+      setActiveTab('overview')
+      // Atualizar URL sem recarregar a página
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('tab')
+      window.history.replaceState({}, '', newUrl.toString())
+    } else if (tabParam === 'analytics' && hasAnalyticsData) {
+      setActiveTab('analytics')
+    }
+  }, [hasAnalyticsData, isLoadingAnalytics])
+
+  // Função para lidar com mudança de tab
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    
+    // Atualizar URL
+    const newUrl = new URL(window.location.href)
+    if (value === 'overview') {
+      newUrl.searchParams.delete('tab')
+    } else {
+      newUrl.searchParams.set('tab', value)
+    }
+    window.history.replaceState({}, '', newUrl.toString())
+  }
 
   // Se ainda está carregando as permissões, não mostrar o conteúdo
   if (permissions.isLoading) {
@@ -146,17 +181,19 @@ export default function Dashboard() {
 
         <Tabs
           orientation='vertical'
-          defaultValue='overview'
+          value={activeTab}
+          onValueChange={handleTabChange}
           className='space-y-4'
         >
           <div className='w-full overflow-x-auto pb-2'>
             <TabsList>
               <TabsTrigger value='overview'>Overview</TabsTrigger>
-              <TabsTrigger value='analytics' disabled>
+              <TabsTrigger 
+                value='analytics'
+                disabled={!hasAnalyticsData || isLoadingAnalytics}
+                title={!hasAnalyticsData ? 'Analytics disponível apenas quando há acampamentos e inscrições configurados' : undefined}
+              >
                 Analytics
-              </TabsTrigger>
-              <TabsTrigger value='reports' disabled>
-                Relatórios
               </TabsTrigger>
             </TabsList>
           </div>
@@ -279,6 +316,17 @@ export default function Dashboard() {
                 </Card>
               )}
             </div>
+          </TabsContent>
+          <TabsContent value='analytics' className='space-y-4'>
+            {hasAnalyticsData ? (
+              <Analytics isLoading={isLoading} />
+            ) : (
+              <EmptyState
+                variant="card"
+                title="Analytics Indisponível"
+                description="Para aceder aos analytics, é necessário ter acampamentos configurados e inscrições registadas."
+              />
+            )}
           </TabsContent>
         </Tabs>
       </Main>

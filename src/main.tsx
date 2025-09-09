@@ -12,7 +12,9 @@ import { useAuthStore } from '@/stores/authStore'
 import { handleServerError } from '@/utils/handle-server-error'
 import { toast } from '@/hooks/use-toast'
 import { ThemeProvider } from './context/theme-context'
+import { LanguageProvider } from './i18n/providers/LanguageProvider'
 import './index.css'
+import './i18n'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 
@@ -96,7 +98,9 @@ if (!rootElement.innerHTML) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider defaultTheme='light' storageKey='vite-ui-theme'>
-          <RouterProvider router={router} />
+          <LanguageProvider>
+            <RouterProvider router={router} />
+          </LanguageProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </StrictMode>
