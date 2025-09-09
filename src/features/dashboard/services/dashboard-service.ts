@@ -152,11 +152,6 @@ export const dashboardService = {
       const paymentsData = await paymentsResponse.json();
       const snackbarData = await snackbarResponse.json();
       
-      console.log('DEBUG - Dashboard service data:', {
-        paymentsData,
-        snackbarData
-      });
-      
       // Mapear os dados para o formato esperado
       if (Array.isArray(paymentsData)) {
         return paymentsData.map((camp, index) => {

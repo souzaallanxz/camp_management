@@ -5,6 +5,7 @@ import { Resend } from 'resend'
 import { neon } from '@neondatabase/serverless'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import Stripe from 'stripe'
 
 // Load environment variables
 dotenv.config()
@@ -49,6 +50,11 @@ const sql = neon(process.env.DATABASE_URL!)
 
 // Initialize Resend
 const resend = new Resend(process.env.VITE_RESEND_API_KEY)
+
+// Initialize Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2025-08-27.basil',
+})
 
 // Encryption functions for sensitive data
 function encrypt(text: string): string {
@@ -957,18 +963,12 @@ app.get('/api/dashboard/camp-snackbar', (async (req: Request, res: Response) => 
       };
     });
     
-    console.log('DEBUG - Snackbar data:', snackbarData);
-    console.log('DEBUG - Liquidated data:', liquidatedData);
-    console.log('DEBUG - Combined camps data:', camps);
-    
     const result = camps.map(camp => ({
       campId: camp.camp_id,
       campName: camp.camp_name,
       totalSnackbar: Number(camp.total_snackbar) || 0,
       totalLiquidated: Number(camp.total_liquidated) || 0
     }));
-    
-    console.log('DEBUG - Final processed result:', result);
     
     res.json(result);
   } catch (error) {
@@ -1040,11 +1040,6 @@ app.get('/api/debug/liquidated-transactions', (async (req: Request, res: Respons
       GROUP BY c.id, c.name
       ORDER BY c.start_date ASC
     `;
-    
-    console.log('DEBUG - Liquidated transactions:', {
-      liquidatedTransactions,
-      liquidatedByCamp
-    });
     
     res.json({
       liquidatedTransactions,
@@ -1138,7 +1133,6 @@ app.get('/api/debug/snackbar-aggregated', (async (req: Request, res: Response) =
       ORDER BY c.start_date ASC
     `;
     
-    console.log('Debug - Raw camps data:', camps);
     
     res.json(camps);
   } catch (error) {
@@ -2268,9 +2262,6 @@ app.post('/api/snackbar-balance', (async (req: Request, res: Response) => {
   }
   try {
     const { registration_id, amount, payment_method, phone_number, request_id } = req.body;
-    
-    // Debug log
-    console.log('Snackbar balance request:', { registration_id, amount, payment_method, phone_number, request_id });
     
     if (!registration_id || !amount || !payment_method) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -3524,15 +3515,6 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
     const payment_link = req.query.payment_link as string | undefined;
     const status = req.query.status as string | undefined;
 
-    // Debug logging
-    console.log('Webhook received:', {
-      teamId,
-      request_id,
-      amount,
-      email,
-      phone_number
-    });
-
     // Validação dos campos obrigatórios
     const errors: string[] = [];
     if (!amount) errors.push('amount is required');
@@ -3555,11 +3537,8 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
     if (request_id) {
       const requestIdStr = request_id;
       
-      console.log('Processing request_id:', requestIdStr);
-      
       if (requestIdStr.startsWith('R')) {
         // UPDATE na tabela payments - confirmar pagamento existente
-        console.log('Processing R-type payment');
         const paymentUpdate = await sql`
           UPDATE payments 
           SET payment_status = 'confirmed', updated_at = ${now}
@@ -3570,8 +3549,6 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
           )
           RETURNING *
         `;
-        
-        console.log('Payment update result:', paymentUpdate.length);
         
         if (paymentUpdate.length === 0) {
           return res.status(404).json({ error: 'Payment not found or does not belong to your team' });
@@ -3588,11 +3565,9 @@ app.get('/api/webhooks/payments/:teamId', async (req: Request, res: Response) =>
         
       } else if (requestIdStr.startsWith('S') || requestIdStr.startsWith('SV')) {
         // UPDATE na tabela snackbar_balance - confirmar pagamento existente
-        console.log('Processing S-type or SV-type snackbar payment');
         
         // Se for SV, tenta primeiro na payments (pagamento independente)
         if (requestIdStr.startsWith('SV')) {
-          console.log('Trying to find SV payment in payments table first');
           
           const independentPaymentUpdate = await sql`
             UPDATE payments 
@@ -4811,6 +4786,186 @@ app.post('/api/integrations/mbway/test', (async (req: Request, res: Response) =>
   } catch (error) {
     console.error('Error testing MBWay connection:', error)
     return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+}) as any)
+
+// Stripe endpoints for subscription billing
+// Create checkout session for premium subscription
+app.post('/api/billing/create-checkout-session', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    // Get team information
+    const teamResult = await sql`
+      SELECT name, tier FROM teams WHERE id = ${teamId}::uuid
+    `
+    
+    if (teamResult.length === 0) {
+      return res.status(404).json({ error: 'Team not found' })
+    }
+
+    const team = teamResult[0]
+    
+    // Check if team is already premium
+    if (team.tier === 'premium') {
+      return res.status(400).json({ error: 'Team is already on premium plan' })
+    }
+
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'eur',
+            product_data: {
+              name: 'Plano Premium - Camp Management',
+              description: 'Acesso completo a todas as funcionalidades premium',
+            },
+            unit_amount: 1900, // €19.00 in cents
+            recurring: {
+              interval: 'month',
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173'}/settings/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:5173'}/settings/billing?canceled=true`,
+      metadata: {
+        team_id: teamId,
+        team_name: team.name,
+      },
+      customer_email: req.body.email || undefined,
+    })
+
+    return res.status(200).json({ 
+      sessionId: session.id,
+      url: session.url 
+    })
+  } catch (error) {
+    console.error('Error creating checkout session:', error)
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+}) as any)
+
+// Stripe webhook endpoint
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), (async (req: Request, res: Response) => {
+  const sig = req.headers['stripe-signature'] as string
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
+
+  if (!endpointSecret) {
+    console.error('Stripe webhook secret not configured')
+    return res.status(500).json({ error: 'Webhook secret not configured' })
+  }
+
+  let event: Stripe.Event
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err)
+    return res.status(400).json({ error: 'Invalid signature' })
+  }
+
+  try {
+    // Handle the event
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        
+        if (session.mode === 'subscription' && session.metadata?.team_id) {
+          const teamId = session.metadata.team_id
+          
+          // Update team tier to premium
+          await sql`
+            UPDATE teams 
+            SET tier = 'premium', updated_at = NOW()
+            WHERE id = ${teamId}::uuid
+          `
+          
+          console.log(`Team ${teamId} upgraded to premium plan`)
+        }
+        break
+      }
+      
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription
+        
+        // Find team by subscription metadata or customer
+        if (subscription.metadata?.team_id) {
+          const teamId = subscription.metadata.team_id
+          
+          // Downgrade team to free
+          await sql`
+            UPDATE teams 
+            SET tier = 'free', updated_at = NOW()
+            WHERE id = ${teamId}::uuid
+          `
+          
+          console.log(`Team ${teamId} downgraded to free plan`)
+        }
+        break
+      }
+      
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        
+        if (invoice.subscription && typeof invoice.subscription === 'string' && invoice.metadata?.team_id) {
+          const teamId = invoice.metadata.team_id
+          
+          // Optionally downgrade team or send notification
+          console.log(`Payment failed for team ${teamId}`)
+          
+          // You could implement logic here to:
+          // 1. Send email notification
+          // 2. Set a grace period
+          // 3. Downgrade after multiple failures
+        }
+        break
+      }
+      
+      default:
+        console.log(`Unhandled event type ${event.type}`)
+    }
+
+    return res.status(200).json({ received: true })
+  } catch (error) {
+    console.error('Error processing webhook:', error)
+    return res.status(500).json({ error: 'Webhook processing failed' })
+  }
+}) as any)
+
+// Get subscription status for a team
+app.get('/api/billing/subscription-status', (async (req: Request, res: Response) => {
+  try {
+    const teamId = getTeamId(req)
+    if (!teamId) {
+      return res.status(401).json({ error: 'Team ID is required' })
+    }
+
+    const teamResult = await sql`
+      SELECT tier, updated_at FROM teams WHERE id = ${teamId}::uuid
+    `
+    
+    if (teamResult.length === 0) {
+      return res.status(404).json({ error: 'Team not found' })
+    }
+
+    const team = teamResult[0]
+    
+    return res.status(200).json({
+      tier: team.tier,
+      isPremium: team.tier === 'premium',
+      lastUpdated: team.updated_at
+    })
+  } catch (error) {
+    console.error('Error getting subscription status:', error)
+    return res.status(500).json({ error: 'Internal server error' })
   }
 }) as any)
 

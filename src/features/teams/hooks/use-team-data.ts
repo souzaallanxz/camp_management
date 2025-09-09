@@ -47,7 +47,8 @@ export function useTeamData() {
   const result = useMemo(() => ({
     teams,
     isLoading,
-    mutate: fetchTeams
+    mutate: fetchTeams,
+    refetch: fetchTeams
   }), [teams, isLoading, fetchTeams])
 
   return result
