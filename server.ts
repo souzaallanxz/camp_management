@@ -807,6 +807,7 @@ app.get('/api/dashboard/camp-payments', (async (req: Request, res: Response) => 
     const now = new Date();
     const currentYear = now.getFullYear();
     
+    // Buscar dados de pagamentos por acampamento (tabela payments)
     const camps = await sql`
       SELECT 
         c.id as camp_id,
@@ -815,20 +816,351 @@ app.get('/api/dashboard/camp-payments', (async (req: Request, res: Response) => 
         COUNT(DISTINCT r.id) as total_registrations
       FROM camps c
       LEFT JOIN registrations r ON c.id = r.camp_id
-      LEFT JOIN payments p ON r.id = p.registration_id
+      LEFT JOIN payments p ON r.id = p.registration_id AND p.payment_status = 'confirmed'
       WHERE c.team_id = ${teamId}
       GROUP BY c.id, c.name
       ORDER BY c.start_date ASC
     `;
+    
     const result = camps.map(camp => ({
       campId: camp.camp_id,
       campName: camp.camp_name,
       totalPayments: Number(camp.total_payments) || 0,
       totalRegistrations: Number(camp.total_registrations) || 0
     }));
+    
     res.json(result);
-  } catch {
+  } catch (error) {
+    console.error('Error fetching camp payments:', error);
     res.status(500).json({ error: 'Erro ao buscar pagamentos por acampamento.' });
+  }
+}) as any)
+
+// Debug endpoint to check snackbar_balance data
+app.get('/api/debug/snackbar-data', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    // Check all snackbar_balance records for this team
+    const allSnackbarData = await sql`
+      SELECT 
+        sb.*,
+        r.name as registration_name,
+        c.name as camp_name,
+        c.team_id
+      FROM snackbar_balance sb
+      LEFT JOIN registrations r ON sb.registration_id = r.id
+      LEFT JOIN camps c ON r.camp_id = c.id
+      WHERE c.team_id = ${teamId}
+      ORDER BY sb.created_at DESC
+    `;
+    
+    // Check total snackbar amounts by camp
+    const campTotals = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COUNT(sb.id) as snackbar_count,
+        COALESCE(SUM(sb.amount), 0) as total_amount,
+        COALESCE(SUM(CASE WHEN sb.payment_status = 'confirmed' THEN sb.amount ELSE 0 END), 0) as confirmed_amount
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+      ORDER BY c.start_date ASC
+    `;
+    
+    res.json({
+      allSnackbarData,
+      campTotals,
+      debug: {
+        teamId,
+        totalRecords: allSnackbarData.length,
+        campsWithSnackbar: campTotals.filter(c => c.snackbar_count > 0).length
+      }
+    });
+  } catch (error) {
+    console.error('Error in debug snackbar data:', error);
+    res.status(500).json({ error: 'Erro ao buscar dados de debug.' });
+  }
+}) as any)
+
+// Get snackbar data per camp for analytics
+app.get('/api/dashboard/camp-snackbar', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    
+    // Buscar dados de snackbar por acampamento incluindo valores liquidados
+    // Primeiro, buscar total de snackbar por acampamento
+    const snackbarData = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(sb.amount::numeric), 0) as total_snackbar,
+        COUNT(sb.id) as snackbar_count
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id AND sb.payment_status = 'confirmed'
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+    `;
+    
+    // Depois, buscar total de transações liquidadas por acampamento (campers + staff)
+    const liquidatedData = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(sbt.amount::numeric), 0) as total_liquidated,
+        COUNT(sbt.id) as liquidated_count
+      FROM camps c
+      LEFT JOIN (
+        -- Transações liquidadas de campers
+        SELECT 
+          r.camp_id,
+          sbt.amount,
+          sbt.id
+        FROM snack_bar_transactions sbt
+        JOIN campers ca ON sbt.camper_id = ca.id
+        JOIN registrations r ON ca.registration_id = r.id
+        WHERE sbt.is_liquidated = true
+        
+        UNION ALL
+        
+        -- Transações liquidadas de staff
+        SELECT 
+          s.camp_id,
+          sbt.amount,
+          sbt.id
+        FROM snack_bar_transactions sbt
+        JOIN staff s ON sbt.staff_id = s.id
+        WHERE sbt.is_liquidated = true
+      ) sbt ON c.id = sbt.camp_id
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+    `;
+    
+    // Combinar os dados
+    const camps = snackbarData.map(snackbar => {
+      const liquidated = liquidatedData.find(l => l.camp_id === snackbar.camp_id);
+      return {
+        ...snackbar,
+        total_liquidated: liquidated ? liquidated.total_liquidated : 0,
+        liquidated_count: liquidated ? liquidated.liquidated_count : 0
+      };
+    });
+    
+    console.log('DEBUG - Snackbar data:', snackbarData);
+    console.log('DEBUG - Liquidated data:', liquidatedData);
+    console.log('DEBUG - Combined camps data:', camps);
+    
+    const result = camps.map(camp => ({
+      campId: camp.camp_id,
+      campName: camp.camp_name,
+      totalSnackbar: Number(camp.total_snackbar) || 0,
+      totalLiquidated: Number(camp.total_liquidated) || 0
+    }));
+    
+    console.log('DEBUG - Final processed result:', result);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching camp snackbar data:', error);
+    res.status(500).json({ error: 'Erro ao buscar dados de snackbar por acampamento.' });
+  }
+}) as any)
+
+// Debug endpoint to check liquidated transactions
+app.get('/api/debug/liquidated-transactions', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    // Check all liquidated transactions (campers + staff)
+    const liquidatedTransactions = await sql`
+      SELECT 
+        sbt.*,
+        ca.name as camper_name,
+        s.name as staff_name,
+        c.name as camp_name,
+        CASE 
+          WHEN sbt.camper_id IS NOT NULL THEN 'camper'
+          WHEN sbt.staff_id IS NOT NULL THEN 'staff'
+          ELSE 'unknown'
+        END as transaction_type
+      FROM snack_bar_transactions sbt
+      LEFT JOIN campers ca ON sbt.camper_id = ca.id
+      LEFT JOIN registrations r ON ca.registration_id = r.id
+      LEFT JOIN staff s ON sbt.staff_id = s.id
+      LEFT JOIN camps c ON COALESCE(r.camp_id, s.camp_id) = c.id
+      WHERE sbt.is_liquidated = true 
+        AND c.team_id = ${teamId}
+      ORDER BY sbt.created_at DESC
+    `;
+    
+    // Check total liquidated by camp (campers + staff)
+    const liquidatedByCamp = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(sbt.amount::numeric), 0) as total_liquidated,
+        COUNT(sbt.id) as liquidated_count
+      FROM camps c
+      LEFT JOIN (
+        -- Transações liquidadas de campers
+        SELECT 
+          r.camp_id,
+          sbt.amount,
+          sbt.id
+        FROM snack_bar_transactions sbt
+        JOIN campers ca ON sbt.camper_id = ca.id
+        JOIN registrations r ON ca.registration_id = r.id
+        WHERE sbt.is_liquidated = true
+        
+        UNION ALL
+        
+        -- Transações liquidadas de staff
+        SELECT 
+          s.camp_id,
+          sbt.amount,
+          sbt.id
+        FROM snack_bar_transactions sbt
+        JOIN staff s ON sbt.staff_id = s.id
+        WHERE sbt.is_liquidated = true
+      ) sbt ON c.id = sbt.camp_id
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+      ORDER BY c.start_date ASC
+    `;
+    
+    console.log('DEBUG - Liquidated transactions:', {
+      liquidatedTransactions,
+      liquidatedByCamp
+    });
+    
+    res.json({
+      liquidatedTransactions,
+      liquidatedByCamp
+    });
+  } catch (error) {
+    console.error('Error fetching liquidated transactions:', error);
+    res.status(500).json({ error: 'Error fetching liquidated transactions' });
+  }
+}) as any)
+
+// Debug endpoint to compare with direct database query
+app.get('/api/debug/snackbar-simple', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    // Simple query similar to what user ran directly - only confirmed payments
+    const result = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(CASE WHEN sb.payment_status = 'confirmed' THEN sb.amount::numeric ELSE 0 END), 0) as total_snackbar
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+      ORDER BY c.name
+    `;
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error in simple snackbar debug:', error);
+    res.status(500).json({ error: 'Error fetching simple snackbar data' });
+  }
+}) as any)
+
+// Debug endpoint to check raw snackbar data
+app.get('/api/debug/snackbar-raw', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const rawData = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        r.id as registration_id,
+        r.name as registration_name,
+        sb.id as snackbar_id,
+        sb.amount,
+        sb.payment_status,
+        sb.created_at
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id
+      WHERE c.team_id = ${teamId}
+      ORDER BY c.name, r.name, sb.created_at
+    `;
+    
+    res.json(rawData);
+  } catch (error) {
+    console.error('Error fetching raw snackbar data:', error);
+    res.status(500).json({ error: 'Error fetching raw snackbar data' });
+  }
+}) as any)
+
+// Debug endpoint to check aggregated snackbar data
+app.get('/api/debug/snackbar-aggregated', (async (req: Request, res: Response) => {
+  const teamId = getTeamId(req)
+  if (!teamId) {
+    return res.status(401).json({ error: 'Missing x-team-id header' })
+  }
+  try {
+    const camps = await sql`
+      SELECT 
+        c.id as camp_id,
+        c.name as camp_name,
+        COALESCE(SUM(sb.amount::numeric), 0) as total_snackbar,
+        COUNT(sb.id) as snackbar_count,
+        STRING_AGG(DISTINCT sb.payment_status, ', ') as payment_statuses,
+        STRING_AGG(DISTINCT sb.amount::text, ', ') as amounts
+      FROM camps c
+      LEFT JOIN registrations r ON c.id = r.camp_id
+      LEFT JOIN snackbar_balance sb ON r.id = sb.registration_id AND sb.payment_status = 'confirmed'
+      WHERE c.team_id = ${teamId}
+      GROUP BY c.id, c.name
+      ORDER BY c.start_date ASC
+    `;
+    
+    console.log('Debug - Raw camps data:', camps);
+    
+    res.json(camps);
+  } catch (error) {
+    console.error('Error fetching aggregated snackbar data:', error);
+    res.status(500).json({ error: 'Error fetching aggregated snackbar data' });
+  }
+}) as any)
+
+// Temporary endpoint to list teams for debugging
+app.get('/api/debug/teams', (async (req: Request, res: Response) => {
+  try {
+    const teams = await sql`
+      SELECT id, name, created_at
+      FROM teams
+      ORDER BY created_at DESC
+      LIMIT 10
+    `;
+    
+    res.json(teams);
+  } catch (error) {
+    console.error('Error fetching teams:', error);
+    res.status(500).json({ error: 'Error fetching teams' });
   }
 }) as any)
 

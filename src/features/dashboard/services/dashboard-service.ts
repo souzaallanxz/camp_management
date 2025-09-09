@@ -16,6 +16,8 @@ export interface CampPaymentsData {
   campName: string
   totalPayments: number
   totalRegistrations: number
+  totalSnackbar: number
+  totalLiquidated?: number
 }
 
 export interface RecentRegistration {
@@ -128,26 +130,56 @@ export const dashboardService = {
   async getCampPayments(): Promise<CampPaymentsData[]> {
     try {
       const headers = { ...getTeamIdHeader() };
-      const url = `${API_BASE_URL}/dashboard/camp-payments`;      
-      const response = await fetch(url, { 
+      
+      // Buscar dados de pagamentos por acampamento
+      const paymentsUrl = `${API_BASE_URL}/dashboard/camp-payments`;
+      const paymentsResponse = await fetch(paymentsUrl, { 
         headers,
         credentials: 'include'
       });
       
-      if (!response.ok) {
+      // Buscar dados de snackbar por acampamento
+      const snackbarUrl = `${API_BASE_URL}/dashboard/camp-snackbar`;
+      const snackbarResponse = await fetch(snackbarUrl, { 
+        headers,
+        credentials: 'include'
+      });
+      
+      if (!paymentsResponse.ok || !snackbarResponse.ok) {
         return [];
       }
       
-      const data = await response.json();
+      const paymentsData = await paymentsResponse.json();
+      const snackbarData = await snackbarResponse.json();
+      
+      console.log('DEBUG - Dashboard service data:', {
+        paymentsData,
+        snackbarData
+      });
       
       // Mapear os dados para o formato esperado
-      if (Array.isArray(data)) {
-        return data.map((camp, index) => ({
-          campId: camp.id || camp.campId || String(index),
-          campName: camp.name || camp.campName || 'Acampamento',
-          totalPayments: parseFloat(camp.total || camp.total_payments || camp.totalPayments || '0'),
-          totalRegistrations: parseInt(camp.registrations || camp.total_registrations || camp.totalRegistrations || '0')
-        }));
+      if (Array.isArray(paymentsData)) {
+        return paymentsData.map((camp, index) => {
+          const campId = camp.id || camp.campId || String(index);
+          const campName = camp.name || camp.campName || 'Acampamento';
+          
+          // Total de inscrições da tabela payments
+          const totalPayments = parseFloat(camp.total || camp.total_payments || camp.totalPayments || '0');
+          
+          // Total de snackbar da tabela snackbar_balance
+          const snackbarCamp = snackbarData.find((s: any) => s.campId === campId);
+          const totalSnackbar = snackbarCamp ? parseFloat(snackbarCamp.totalSnackbar || '0') : 0;
+          const totalLiquidated = snackbarCamp ? parseFloat(snackbarCamp.totalLiquidated || '0') : 0;
+          
+          return {
+            campId,
+            campName,
+            totalPayments,
+            totalRegistrations: parseInt(camp.registrations || camp.total_registrations || camp.totalRegistrations || '0'),
+            totalSnackbar,
+            totalLiquidated
+          };
+        });
       }
       
       return [];
