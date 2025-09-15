@@ -209,7 +209,7 @@ app.post('/api/auth/forgot-password', (async (req: Request, res: Response) => {
 
     // Send email
     const result = await resend.emails.send({
-      from: 'Campy <noreply@infolio.pt>',
+      from: 'Campy <noreply@campy.pt>',
       to: email,
       subject: 'Recuperação de Senha - Campy',
       html: `
@@ -1762,7 +1762,7 @@ app.post('/api/users', (async (req: Request, res: Response) => {
     // Enviar email de convite
     const setupLink = `${process.env.NEXT_PUBLIC_APP_URL}/setup-password?userId=${result[0].id}&token=${inviteToken}&email=${encodeURIComponent(email)}`;
     await resend.emails.send({
-      from: 'Campy <noreply@infolio.pt>',
+      from: 'Campy <noreply@campy.pt>',
       to: email,
       subject: 'Convite para a plataforma Campy',
       html: `

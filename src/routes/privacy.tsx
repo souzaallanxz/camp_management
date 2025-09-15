@@ -34,7 +34,7 @@ function PrivacyPage() {
             <p>
               <strong>Campy</strong><br />
               Morada: Rua Mariano Pina, Porto Salvo<br />
-              Email: hello@infolio.pt
+              Email: noreply@campy.pt
             </p>
           </section>
 
@@ -165,7 +165,7 @@ function PrivacyPage() {
             <h2 className="text-xl font-semibold mb-3">13. Contacto</h2>
             <p>
               Para exercer os seus direitos ou esclarecer dúvidas sobre esta política, 
-              contacte-nos através de: <a href="mailto:hello@infolio.pt" className="text-primary hover:underline">hello@infolio.pt</a>
+              contacte-nos através de: <a href="mailto:noreply@campy.pt" className="text-primary hover:underline">noreply@campy.pt</a>
             </p>
             <p className="mt-2">
               Também pode contactar a autoridade de controlo portuguesa (CNPD) se considerar 

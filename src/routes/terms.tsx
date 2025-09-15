@@ -41,7 +41,7 @@ function TermsPage() {
             <p className="mt-1">
               <strong>Campy</strong><br />
               Morada: Rua Mariano Pina, Porto Salvo<br />
-              Email de contacto: hello@infolio.pt
+              Email de contacto: noreply@campy.pt
             </p>
           </section>
 
@@ -139,7 +139,7 @@ function TermsPage() {
             <h2 className="text-xl font-semibold mb-3">12. Contacto</h2>
             <p>
               Para quaisquer questões relacionadas com estes Termos, poderá contactar-nos 
-              através de: <a href="mailto:hello@infolio.pt" className="text-primary hover:underline">hello@infolio.pt</a>
+              através de: <a href="mailto:noreply@campy.pt" className="text-primary hover:underline">noreply@campy.pt</a>
             </p>
           </section>
         </div>

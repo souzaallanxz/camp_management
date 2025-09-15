@@ -36,7 +36,7 @@ export const emailService = {
     subject,
     html,
     text,
-    from = 'recuperacao@infolio.pt',
+    from = 'noreply@campy.pt',
   }: SendEmailParams): Promise<EmailResult> {
     try {
       // Em ambiente de demonstração, use fallback local
