@@ -3,16 +3,16 @@ export const API_URLS = {
   // URL base da API
   BASE: import.meta.env.DEV 
     ? import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-    : 'https://campy.pt/api',
+    : 'https://camp-management-1.onrender.com/api',
   
   // URLs específicas
   HEALTH: import.meta.env.DEV 
     ? 'http://localhost:3001/api/health'
-    : 'https://campy.pt/api/health',
+    : 'https://camp-management-1.onrender.com/api/health',
     
   EMAIL: import.meta.env.DEV 
     ? 'http://localhost:3001/api/send-email'
-    : 'https://campy.pt/api/send-email',
+    : 'https://camp-management-1.onrender.com/api/send-email',
 } as const
 
 // Helper para construir URLs da API

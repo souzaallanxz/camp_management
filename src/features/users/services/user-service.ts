@@ -3,7 +3,7 @@ import { User } from '../data/schema'
 // Use environment variable for API URL
 const API_BASE_URL = import.meta.env.DEV 
   ? import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-  : 'https://campy.pt/api'
+  : 'https://camp-management-1.onrender.com/api'
 
 function getTeamIdHeader() {
   const teamId = localStorage.getItem('teamId');

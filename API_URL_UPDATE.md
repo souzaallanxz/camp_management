@@ -4,7 +4,7 @@
 
 O frontend está configurado para usar:
 - **Desenvolvimento**: `http://localhost:3001/api`
-- **Produção**: `https://campy.pt/api`
+- **Produção**: `https://camp-management-1.onrender.com/api`
 
 ## 🔧 Como Atualizar para Sua URL Real
 
@@ -17,7 +17,7 @@ O frontend está configurado para usar:
 
 **Opção A: Atualização Manual (Mais Fácil)**
 
-✅ **CONCLUÍDO**: Todas as configurações já foram atualizadas para usar `https://campy.pt`
+✅ **CONCLUÍDO**: Todas as configurações já foram atualizadas para usar `https://camp-management-1.onrender.com`
 
 - `src/lib/api-config.ts` (linha 8)
 - `src/services/api.ts` (linha 5)

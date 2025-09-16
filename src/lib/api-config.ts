@@ -6,7 +6,7 @@ export const API_CONFIG = {
   baseUrl: (() => {
     // If we're not on localhost, use production URL
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-      return 'https://campy.pt/api'
+      return 'https://camp-management-1.onrender.com/api'
     }
     
     // Development mode (localhost)
