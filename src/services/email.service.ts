@@ -21,7 +21,7 @@ interface EmailResult {
 // URL completa da API proxy para o Resend
 const EMAIL_API_URL = import.meta.env.DEV 
   ? 'http://localhost:3001/api/send-email'
-  : 'https://camp-management-1.onrender.com/api/send-email';
+  : 'https://api.campy.pt/api/send-email';
 const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY || 'demokey';
 
 // Verifica se estamos em modo de demonstração
