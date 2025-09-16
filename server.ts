@@ -3037,7 +3037,7 @@ async function createHookdeckConnection(type: 'registrations' | 'payments', team
   }
 
   // Forçar o uso da URL do Render para garantir que funcione
-  const baseUrl = 'https://camp-management-1.onrender.com'
+  const baseUrl = 'https://campy.pt'
   const webhookUrl = `${baseUrl}/api/webhooks/${type}/${teamId}`
 
   // 1. Criar Destination
