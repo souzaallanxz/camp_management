@@ -200,7 +200,7 @@ app.post('/api/auth/forgot-password', (async (req: Request, res: Response) => {
     `
 
     // Generate reset link
-    const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`
+    const resetLink = `${(process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`
 
     // Check if Resend API key is configured
     if (!process.env.VITE_RESEND_API_KEY) {

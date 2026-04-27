@@ -7,10 +7,10 @@ const envSchema = z.object({
 });
 
 const getEnv = () => {
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env;
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env;
   }
-  return import.meta.env;
+  return process.env;
 };
 
 export const env = envSchema.parse(getEnv()); 

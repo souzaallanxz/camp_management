@@ -10,256 +10,223 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 
-// Import Routes
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedSnackBarRouteImport } from './routes/_authenticated/snack-bar'
+import { Route as AuthenticatedCampsRouteImport } from './routes/_authenticated/camps'
+import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
+import { Route as authSetupPasswordRouteImport } from './routes/(auth)/setup-password'
+import { Route as authOtpRouteImport } from './routes/(auth)/otp'
+import { Route as AuthenticatedStaffIndexRouteImport } from './routes/_authenticated/staff/index'
+import { Route as AuthenticatedSnackBarIndexRouteImport } from './routes/_authenticated/snack-bar/index'
+import { Route as AuthenticatedRegistrationsIndexRouteImport } from './routes/_authenticated/registrations/index'
+import { Route as AuthenticatedCampersIndexRouteImport } from './routes/_authenticated/campers/index'
+import { Route as AuthenticatedCampersDebugRouteImport } from './routes/_authenticated/campers/debug'
 
-import { Route as rootRoute } from './routes/__root'
-import { Route as TermsImport } from './routes/terms'
-import { Route as PrivacyImport } from './routes/privacy'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
-import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedSnackBarImport } from './routes/_authenticated/snack-bar'
-import { Route as AuthenticatedCampsImport } from './routes/_authenticated/camps'
-import { Route as authSignInImport } from './routes/(auth)/sign-in'
-import { Route as authSetupPasswordImport } from './routes/(auth)/setup-password'
-import { Route as authOtpImport } from './routes/(auth)/otp'
-import { Route as auth500Import } from './routes/(auth)/500'
-import { Route as AuthenticatedStaffIndexImport } from './routes/_authenticated/staff/index'
-import { Route as AuthenticatedSnackBarIndexImport } from './routes/_authenticated/snack-bar/index'
-import { Route as AuthenticatedRegistrationsIndexImport } from './routes/_authenticated/registrations/index'
-import { Route as AuthenticatedCampersIndexImport } from './routes/_authenticated/campers/index'
-import { Route as AuthenticatedCampersDebugImport } from './routes/_authenticated/campers/debug'
-
-// Create Virtual Routes
-
-const errors503LazyImport = createFileRoute('/(errors)/503')()
-const errors500LazyImport = createFileRoute('/(errors)/500')()
-const errors404LazyImport = createFileRoute('/(errors)/404')()
-const errors403LazyImport = createFileRoute('/(errors)/403')()
-const errors401LazyImport = createFileRoute('/(errors)/401')()
-const authSignUpLazyImport = createFileRoute('/(auth)/sign-up')()
-const authSignIn2LazyImport = createFileRoute('/(auth)/sign-in-2')()
-const authResetPasswordLazyImport = createFileRoute('/(auth)/reset-password')()
-const authForgotPasswordLazyImport = createFileRoute(
+const errors503LazyRouteImport = createFileRoute('/(errors)/503')()
+const errors500LazyRouteImport = createFileRoute('/(errors)/500')()
+const errors404LazyRouteImport = createFileRoute('/(errors)/404')()
+const errors403LazyRouteImport = createFileRoute('/(errors)/403')()
+const errors401LazyRouteImport = createFileRoute('/(errors)/401')()
+const authSignUpLazyRouteImport = createFileRoute('/(auth)/sign-up')()
+const authSignIn2LazyRouteImport = createFileRoute('/(auth)/sign-in-2')()
+const authResetPasswordLazyRouteImport = createFileRoute(
+  '/(auth)/reset-password',
+)()
+const authForgotPasswordLazyRouteImport = createFileRoute(
   '/(auth)/forgot-password',
 )()
-const AuthenticatedSettingsRouteLazyImport = createFileRoute(
+const AuthenticatedSettingsRouteLazyRouteImport = createFileRoute(
   '/_authenticated/settings',
 )()
-const AuthenticatedUsersIndexLazyImport = createFileRoute(
+const AuthenticatedUsersIndexLazyRouteImport = createFileRoute(
   '/_authenticated/users/',
 )()
-const AuthenticatedTasksIndexLazyImport = createFileRoute(
+const AuthenticatedTasksIndexLazyRouteImport = createFileRoute(
   '/_authenticated/tasks/',
 )()
-const AuthenticatedSettingsIndexLazyImport = createFileRoute(
+const AuthenticatedSettingsIndexLazyRouteImport = createFileRoute(
   '/_authenticated/settings/',
 )()
-const AuthenticatedHelpCenterIndexLazyImport = createFileRoute(
+const AuthenticatedHelpCenterIndexLazyRouteImport = createFileRoute(
   '/_authenticated/help-center/',
 )()
-const AuthenticatedChatsIndexLazyImport = createFileRoute(
+const AuthenticatedChatsIndexLazyRouteImport = createFileRoute(
   '/_authenticated/chats/',
 )()
-const AuthenticatedAppsIndexLazyImport = createFileRoute(
+const AuthenticatedAppsIndexLazyRouteImport = createFileRoute(
   '/_authenticated/apps/',
 )()
-const AuthenticatedSettingsOrganizationLazyImport = createFileRoute(
+const AuthenticatedSettingsOrganizationLazyRouteImport = createFileRoute(
   '/_authenticated/settings/organization',
 )()
-const AuthenticatedSettingsNotificationsLazyImport = createFileRoute(
+const AuthenticatedSettingsNotificationsLazyRouteImport = createFileRoute(
   '/_authenticated/settings/notifications',
 )()
-const AuthenticatedSettingsIntegrationsLazyImport = createFileRoute(
+const AuthenticatedSettingsIntegrationsLazyRouteImport = createFileRoute(
   '/_authenticated/settings/integrations',
 )()
-const AuthenticatedSettingsDisplayLazyImport = createFileRoute(
+const AuthenticatedSettingsDisplayLazyRouteImport = createFileRoute(
   '/_authenticated/settings/display',
 )()
-const AuthenticatedSettingsBillingLazyImport = createFileRoute(
+const AuthenticatedSettingsBillingLazyRouteImport = createFileRoute(
   '/_authenticated/settings/billing',
 )()
-const AuthenticatedSettingsAppearanceLazyImport = createFileRoute(
+const AuthenticatedSettingsAppearanceLazyRouteImport = createFileRoute(
   '/_authenticated/settings/appearance',
 )()
-const AuthenticatedSettingsAccountLazyImport = createFileRoute(
+const AuthenticatedSettingsAccountLazyRouteImport = createFileRoute(
   '/_authenticated/settings/account',
 )()
 
-// Create/Update Routes
-
-const TermsRoute = TermsImport.update({
+const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const PrivacyRoute = PrivacyImport.update({
+const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AuthenticatedRouteRoute = AuthenticatedRouteImport.update({
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const errors503LazyRoute = errors503LazyImport
+const errors503LazyRoute = errors503LazyRouteImport
   .update({
     id: '/(errors)/503',
     path: '/503',
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() => import('./routes/(errors)/503.lazy').then((d) => d.Route))
-
-const errors500LazyRoute = errors500LazyImport
+const errors500LazyRoute = errors500LazyRouteImport
   .update({
     id: '/(errors)/500',
     path: '/500',
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() => import('./routes/(errors)/500.lazy').then((d) => d.Route))
-
-const errors404LazyRoute = errors404LazyImport
+const errors404LazyRoute = errors404LazyRouteImport
   .update({
     id: '/(errors)/404',
     path: '/404',
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() => import('./routes/(errors)/404.lazy').then((d) => d.Route))
-
-const errors403LazyRoute = errors403LazyImport
+const errors403LazyRoute = errors403LazyRouteImport
   .update({
     id: '/(errors)/403',
     path: '/403',
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() => import('./routes/(errors)/403.lazy').then((d) => d.Route))
-
-const errors401LazyRoute = errors401LazyImport
+const errors401LazyRoute = errors401LazyRouteImport
   .update({
     id: '/(errors)/401',
     path: '/401',
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() => import('./routes/(errors)/401.lazy').then((d) => d.Route))
-
-const authSignUpLazyRoute = authSignUpLazyImport
+const authSignUpLazyRoute = authSignUpLazyRouteImport
   .update({
     id: '/(auth)/sign-up',
     path: '/sign-up',
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() => import('./routes/(auth)/sign-up.lazy').then((d) => d.Route))
-
-const authSignIn2LazyRoute = authSignIn2LazyImport
+const authSignIn2LazyRoute = authSignIn2LazyRouteImport
   .update({
     id: '/(auth)/sign-in-2',
     path: '/sign-in-2',
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() => import('./routes/(auth)/sign-in-2.lazy').then((d) => d.Route))
-
-const authResetPasswordLazyRoute = authResetPasswordLazyImport
+const authResetPasswordLazyRoute = authResetPasswordLazyRouteImport
   .update({
     id: '/(auth)/reset-password',
     path: '/reset-password',
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() =>
     import('./routes/(auth)/reset-password.lazy').then((d) => d.Route),
   )
-
-const authForgotPasswordLazyRoute = authForgotPasswordLazyImport
+const authForgotPasswordLazyRoute = authForgotPasswordLazyRouteImport
   .update({
     id: '/(auth)/forgot-password',
     path: '/forgot-password',
-    getParentRoute: () => rootRoute,
+    getParentRoute: () => rootRouteImport,
   } as any)
   .lazy(() =>
     import('./routes/(auth)/forgot-password.lazy').then((d) => d.Route),
   )
-
 const AuthenticatedSettingsRouteLazyRoute =
-  AuthenticatedSettingsRouteLazyImport.update({
+  AuthenticatedSettingsRouteLazyRouteImport.update({
     id: '/settings',
     path: '/settings',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/settings/route.lazy').then((d) => d.Route),
   )
-
-const AuthenticatedSnackBarRoute = AuthenticatedSnackBarImport.update({
+const AuthenticatedSnackBarRoute = AuthenticatedSnackBarRouteImport.update({
   id: '/snack-bar',
   path: '/snack-bar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedCampsRoute = AuthenticatedCampsImport.update({
+const AuthenticatedCampsRoute = AuthenticatedCampsRouteImport.update({
   id: '/camps',
   path: '/camps',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const authSignInRoute = authSignInImport.update({
+const authSignInRoute = authSignInRouteImport.update({
   id: '/(auth)/sign-in',
   path: '/sign-in',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authSetupPasswordRoute = authSetupPasswordImport.update({
+const authSetupPasswordRoute = authSetupPasswordRouteImport.update({
   id: '/(auth)/setup-password',
   path: '/setup-password',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const authOtpRoute = authOtpImport.update({
+const authOtpRoute = authOtpRouteImport.update({
   id: '/(auth)/otp',
   path: '/otp',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const auth500Route = auth500Import.update({
-  id: '/(auth)/500',
-  path: '/500',
-  getParentRoute: () => rootRoute,
-} as any)
-
 const AuthenticatedUsersIndexLazyRoute =
-  AuthenticatedUsersIndexLazyImport.update({
+  AuthenticatedUsersIndexLazyRouteImport.update({
     id: '/users/',
     path: '/users/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/users/index.lazy').then((d) => d.Route),
   )
-
 const AuthenticatedTasksIndexLazyRoute =
-  AuthenticatedTasksIndexLazyImport.update({
+  AuthenticatedTasksIndexLazyRouteImport.update({
     id: '/tasks/',
     path: '/tasks/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/tasks/index.lazy').then((d) => d.Route),
   )
-
 const AuthenticatedSettingsIndexLazyRoute =
-  AuthenticatedSettingsIndexLazyImport.update({
+  AuthenticatedSettingsIndexLazyRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/settings/index.lazy').then((d) => d.Route),
   )
-
 const AuthenticatedHelpCenterIndexLazyRoute =
-  AuthenticatedHelpCenterIndexLazyImport.update({
+  AuthenticatedHelpCenterIndexLazyRouteImport.update({
     id: '/help-center/',
     path: '/help-center/',
     getParentRoute: () => AuthenticatedRouteRoute,
@@ -268,42 +235,35 @@ const AuthenticatedHelpCenterIndexLazyRoute =
       (d) => d.Route,
     ),
   )
-
 const AuthenticatedChatsIndexLazyRoute =
-  AuthenticatedChatsIndexLazyImport.update({
+  AuthenticatedChatsIndexLazyRouteImport.update({
     id: '/chats/',
     path: '/chats/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/chats/index.lazy').then((d) => d.Route),
   )
-
-const AuthenticatedAppsIndexLazyRoute = AuthenticatedAppsIndexLazyImport.update(
-  {
+const AuthenticatedAppsIndexLazyRoute =
+  AuthenticatedAppsIndexLazyRouteImport.update({
     id: '/apps/',
     path: '/apps/',
     getParentRoute: () => AuthenticatedRouteRoute,
-  } as any,
-).lazy(() =>
-  import('./routes/_authenticated/apps/index.lazy').then((d) => d.Route),
-)
-
-const AuthenticatedStaffIndexRoute = AuthenticatedStaffIndexImport.update({
+  } as any).lazy(() =>
+    import('./routes/_authenticated/apps/index.lazy').then((d) => d.Route),
+  )
+const AuthenticatedStaffIndexRoute = AuthenticatedStaffIndexRouteImport.update({
   id: '/staff/',
   path: '/staff/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-
-const AuthenticatedSnackBarIndexRoute = AuthenticatedSnackBarIndexImport.update(
-  {
+const AuthenticatedSnackBarIndexRoute =
+  AuthenticatedSnackBarIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedSnackBarRoute,
-  } as any,
-)
-
+  } as any)
 const AuthenticatedRegistrationsIndexRoute =
-  AuthenticatedRegistrationsIndexImport.update({
+  AuthenticatedRegistrationsIndexRouteImport.update({
     id: '/registrations/',
     path: '/registrations/',
     getParentRoute: () => AuthenticatedRouteRoute,
@@ -312,17 +272,16 @@ const AuthenticatedRegistrationsIndexRoute =
       (d) => d.Route,
     ),
   )
-
-const AuthenticatedCampersIndexRoute = AuthenticatedCampersIndexImport.update({
-  id: '/campers/',
-  path: '/campers/',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any).lazy(() =>
-  import('./routes/_authenticated/campers/index.lazy').then((d) => d.Route),
-)
-
+const AuthenticatedCampersIndexRoute =
+  AuthenticatedCampersIndexRouteImport.update({
+    id: '/campers/',
+    path: '/campers/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/campers/index.lazy').then((d) => d.Route),
+  )
 const AuthenticatedSettingsOrganizationLazyRoute =
-  AuthenticatedSettingsOrganizationLazyImport.update({
+  AuthenticatedSettingsOrganizationLazyRouteImport.update({
     id: '/organization',
     path: '/organization',
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
@@ -331,9 +290,8 @@ const AuthenticatedSettingsOrganizationLazyRoute =
       (d) => d.Route,
     ),
   )
-
 const AuthenticatedSettingsNotificationsLazyRoute =
-  AuthenticatedSettingsNotificationsLazyImport.update({
+  AuthenticatedSettingsNotificationsLazyRouteImport.update({
     id: '/notifications',
     path: '/notifications',
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
@@ -342,9 +300,8 @@ const AuthenticatedSettingsNotificationsLazyRoute =
       (d) => d.Route,
     ),
   )
-
 const AuthenticatedSettingsIntegrationsLazyRoute =
-  AuthenticatedSettingsIntegrationsLazyImport.update({
+  AuthenticatedSettingsIntegrationsLazyRouteImport.update({
     id: '/integrations',
     path: '/integrations',
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
@@ -353,9 +310,8 @@ const AuthenticatedSettingsIntegrationsLazyRoute =
       (d) => d.Route,
     ),
   )
-
 const AuthenticatedSettingsDisplayLazyRoute =
-  AuthenticatedSettingsDisplayLazyImport.update({
+  AuthenticatedSettingsDisplayLazyRouteImport.update({
     id: '/display',
     path: '/display',
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
@@ -364,9 +320,8 @@ const AuthenticatedSettingsDisplayLazyRoute =
       (d) => d.Route,
     ),
   )
-
 const AuthenticatedSettingsBillingLazyRoute =
-  AuthenticatedSettingsBillingLazyImport.update({
+  AuthenticatedSettingsBillingLazyRouteImport.update({
     id: '/billing',
     path: '/billing',
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
@@ -375,9 +330,8 @@ const AuthenticatedSettingsBillingLazyRoute =
       (d) => d.Route,
     ),
   )
-
 const AuthenticatedSettingsAppearanceLazyRoute =
-  AuthenticatedSettingsAppearanceLazyImport.update({
+  AuthenticatedSettingsAppearanceLazyRouteImport.update({
     id: '/appearance',
     path: '/appearance',
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
@@ -386,9 +340,8 @@ const AuthenticatedSettingsAppearanceLazyRoute =
       (d) => d.Route,
     ),
   )
-
 const AuthenticatedSettingsAccountLazyRoute =
-  AuthenticatedSettingsAccountLazyImport.update({
+  AuthenticatedSettingsAccountLazyRouteImport.update({
     id: '/account',
     path: '/account',
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
@@ -397,287 +350,524 @@ const AuthenticatedSettingsAccountLazyRoute =
       (d) => d.Route,
     ),
   )
+const AuthenticatedCampersDebugRoute =
+  AuthenticatedCampersDebugRouteImport.update({
+    id: '/campers/debug',
+    path: '/campers/debug',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
-const AuthenticatedCampersDebugRoute = AuthenticatedCampersDebugImport.update({
-  id: '/campers/debug',
-  path: '/campers/debug',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-
-// Populate the FileRoutesByPath interface
+export interface FileRoutesByFullPath {
+  '/': typeof AuthenticatedIndexRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
+  '/otp': typeof authOtpRoute
+  '/setup-password': typeof authSetupPasswordRoute
+  '/sign-in': typeof authSignInRoute
+  '/camps': typeof AuthenticatedCampsRoute
+  '/snack-bar': typeof AuthenticatedSnackBarRouteWithChildren
+  '/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
+  '/forgot-password': typeof authForgotPasswordLazyRoute
+  '/reset-password': typeof authResetPasswordLazyRoute
+  '/sign-in-2': typeof authSignIn2LazyRoute
+  '/sign-up': typeof authSignUpLazyRoute
+  '/401': typeof errors401LazyRoute
+  '/403': typeof errors403LazyRoute
+  '/404': typeof errors404LazyRoute
+  '/500': typeof errors500LazyRoute
+  '/503': typeof errors503LazyRoute
+  '/campers/debug': typeof AuthenticatedCampersDebugRoute
+  '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
+  '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
+  '/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
+  '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
+  '/settings/integrations': typeof AuthenticatedSettingsIntegrationsLazyRoute
+  '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
+  '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
+  '/campers/': typeof AuthenticatedCampersIndexRoute
+  '/registrations/': typeof AuthenticatedRegistrationsIndexRoute
+  '/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
+  '/staff/': typeof AuthenticatedStaffIndexRoute
+  '/apps/': typeof AuthenticatedAppsIndexLazyRoute
+  '/chats/': typeof AuthenticatedChatsIndexLazyRoute
+  '/help-center/': typeof AuthenticatedHelpCenterIndexLazyRoute
+  '/settings/': typeof AuthenticatedSettingsIndexLazyRoute
+  '/tasks/': typeof AuthenticatedTasksIndexLazyRoute
+  '/users/': typeof AuthenticatedUsersIndexLazyRoute
+}
+export interface FileRoutesByTo {
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
+  '/otp': typeof authOtpRoute
+  '/setup-password': typeof authSetupPasswordRoute
+  '/sign-in': typeof authSignInRoute
+  '/camps': typeof AuthenticatedCampsRoute
+  '/forgot-password': typeof authForgotPasswordLazyRoute
+  '/reset-password': typeof authResetPasswordLazyRoute
+  '/sign-in-2': typeof authSignIn2LazyRoute
+  '/sign-up': typeof authSignUpLazyRoute
+  '/401': typeof errors401LazyRoute
+  '/403': typeof errors403LazyRoute
+  '/404': typeof errors404LazyRoute
+  '/500': typeof errors500LazyRoute
+  '/503': typeof errors503LazyRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/campers/debug': typeof AuthenticatedCampersDebugRoute
+  '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
+  '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
+  '/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
+  '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
+  '/settings/integrations': typeof AuthenticatedSettingsIntegrationsLazyRoute
+  '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
+  '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
+  '/campers': typeof AuthenticatedCampersIndexRoute
+  '/registrations': typeof AuthenticatedRegistrationsIndexRoute
+  '/snack-bar': typeof AuthenticatedSnackBarIndexRoute
+  '/staff': typeof AuthenticatedStaffIndexRoute
+  '/apps': typeof AuthenticatedAppsIndexLazyRoute
+  '/chats': typeof AuthenticatedChatsIndexLazyRoute
+  '/help-center': typeof AuthenticatedHelpCenterIndexLazyRoute
+  '/settings': typeof AuthenticatedSettingsIndexLazyRoute
+  '/tasks': typeof AuthenticatedTasksIndexLazyRoute
+  '/users': typeof AuthenticatedUsersIndexLazyRoute
+}
+export interface FileRoutesById {
+  __root__: typeof rootRouteImport
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
+  '/(auth)/otp': typeof authOtpRoute
+  '/(auth)/setup-password': typeof authSetupPasswordRoute
+  '/(auth)/sign-in': typeof authSignInRoute
+  '/_authenticated/camps': typeof AuthenticatedCampsRoute
+  '/_authenticated/snack-bar': typeof AuthenticatedSnackBarRouteWithChildren
+  '/_authenticated/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
+  '/(auth)/forgot-password': typeof authForgotPasswordLazyRoute
+  '/(auth)/reset-password': typeof authResetPasswordLazyRoute
+  '/(auth)/sign-in-2': typeof authSignIn2LazyRoute
+  '/(auth)/sign-up': typeof authSignUpLazyRoute
+  '/(errors)/401': typeof errors401LazyRoute
+  '/(errors)/403': typeof errors403LazyRoute
+  '/(errors)/404': typeof errors404LazyRoute
+  '/(errors)/500': typeof errors500LazyRoute
+  '/(errors)/503': typeof errors503LazyRoute
+  '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/campers/debug': typeof AuthenticatedCampersDebugRoute
+  '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
+  '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
+  '/_authenticated/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
+  '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
+  '/_authenticated/settings/integrations': typeof AuthenticatedSettingsIntegrationsLazyRoute
+  '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
+  '/_authenticated/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
+  '/_authenticated/campers/': typeof AuthenticatedCampersIndexRoute
+  '/_authenticated/registrations/': typeof AuthenticatedRegistrationsIndexRoute
+  '/_authenticated/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
+  '/_authenticated/staff/': typeof AuthenticatedStaffIndexRoute
+  '/_authenticated/apps/': typeof AuthenticatedAppsIndexLazyRoute
+  '/_authenticated/chats/': typeof AuthenticatedChatsIndexLazyRoute
+  '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexLazyRoute
+  '/_authenticated/settings/': typeof AuthenticatedSettingsIndexLazyRoute
+  '/_authenticated/tasks/': typeof AuthenticatedTasksIndexLazyRoute
+  '/_authenticated/users/': typeof AuthenticatedUsersIndexLazyRoute
+}
+export interface FileRouteTypes {
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/'
+    | '/privacy'
+    | '/terms'
+    | '/otp'
+    | '/setup-password'
+    | '/sign-in'
+    | '/camps'
+    | '/snack-bar'
+    | '/settings'
+    | '/forgot-password'
+    | '/reset-password'
+    | '/sign-in-2'
+    | '/sign-up'
+    | '/401'
+    | '/403'
+    | '/404'
+    | '/500'
+    | '/503'
+    | '/campers/debug'
+    | '/settings/account'
+    | '/settings/appearance'
+    | '/settings/billing'
+    | '/settings/display'
+    | '/settings/integrations'
+    | '/settings/notifications'
+    | '/settings/organization'
+    | '/campers/'
+    | '/registrations/'
+    | '/snack-bar/'
+    | '/staff/'
+    | '/apps/'
+    | '/chats/'
+    | '/help-center/'
+    | '/settings/'
+    | '/tasks/'
+    | '/users/'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/privacy'
+    | '/terms'
+    | '/otp'
+    | '/setup-password'
+    | '/sign-in'
+    | '/camps'
+    | '/forgot-password'
+    | '/reset-password'
+    | '/sign-in-2'
+    | '/sign-up'
+    | '/401'
+    | '/403'
+    | '/404'
+    | '/500'
+    | '/503'
+    | '/'
+    | '/campers/debug'
+    | '/settings/account'
+    | '/settings/appearance'
+    | '/settings/billing'
+    | '/settings/display'
+    | '/settings/integrations'
+    | '/settings/notifications'
+    | '/settings/organization'
+    | '/campers'
+    | '/registrations'
+    | '/snack-bar'
+    | '/staff'
+    | '/apps'
+    | '/chats'
+    | '/help-center'
+    | '/settings'
+    | '/tasks'
+    | '/users'
+  id:
+    | '__root__'
+    | '/_authenticated'
+    | '/privacy'
+    | '/terms'
+    | '/(auth)/otp'
+    | '/(auth)/setup-password'
+    | '/(auth)/sign-in'
+    | '/_authenticated/camps'
+    | '/_authenticated/snack-bar'
+    | '/_authenticated/settings'
+    | '/(auth)/forgot-password'
+    | '/(auth)/reset-password'
+    | '/(auth)/sign-in-2'
+    | '/(auth)/sign-up'
+    | '/(errors)/401'
+    | '/(errors)/403'
+    | '/(errors)/404'
+    | '/(errors)/500'
+    | '/(errors)/503'
+    | '/_authenticated/'
+    | '/_authenticated/campers/debug'
+    | '/_authenticated/settings/account'
+    | '/_authenticated/settings/appearance'
+    | '/_authenticated/settings/billing'
+    | '/_authenticated/settings/display'
+    | '/_authenticated/settings/integrations'
+    | '/_authenticated/settings/notifications'
+    | '/_authenticated/settings/organization'
+    | '/_authenticated/campers/'
+    | '/_authenticated/registrations/'
+    | '/_authenticated/snack-bar/'
+    | '/_authenticated/staff/'
+    | '/_authenticated/apps/'
+    | '/_authenticated/chats/'
+    | '/_authenticated/help-center/'
+    | '/_authenticated/settings/'
+    | '/_authenticated/tasks/'
+    | '/_authenticated/users/'
+  fileRoutesById: FileRoutesById
+}
+export interface RootRouteChildren {
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
+  authOtpRoute: typeof authOtpRoute
+  authSetupPasswordRoute: typeof authSetupPasswordRoute
+  authSignInRoute: typeof authSignInRoute
+  authForgotPasswordLazyRoute: typeof authForgotPasswordLazyRoute
+  authResetPasswordLazyRoute: typeof authResetPasswordLazyRoute
+  authSignIn2LazyRoute: typeof authSignIn2LazyRoute
+  authSignUpLazyRoute: typeof authSignUpLazyRoute
+  errors401LazyRoute: typeof errors401LazyRoute
+  errors403LazyRoute: typeof errors403LazyRoute
+  errors404LazyRoute: typeof errors404LazyRoute
+  errors500LazyRoute: typeof errors500LazyRoute
+  errors503LazyRoute: typeof errors503LazyRoute
+}
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: ''
-      preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRoute
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/privacy': {
       id: '/privacy'
       path: '/privacy'
       fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyImport
-      parentRoute: typeof rootRoute
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/500': {
-      id: '/(auth)/500'
-      path: '/500'
-      fullPath: '/500'
-      preLoaderRoute: typeof auth500Import
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/otp': {
-      id: '/(auth)/otp'
-      path: '/otp'
-      fullPath: '/otp'
-      preLoaderRoute: typeof authOtpImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/setup-password': {
-      id: '/(auth)/setup-password'
-      path: '/setup-password'
-      fullPath: '/setup-password'
-      preLoaderRoute: typeof authSetupPasswordImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/sign-in': {
-      id: '/(auth)/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof authSignInImport
-      parentRoute: typeof rootRoute
-    }
-    '/_authenticated/camps': {
-      id: '/_authenticated/camps'
-      path: '/camps'
-      fullPath: '/camps'
-      preLoaderRoute: typeof AuthenticatedCampsImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/snack-bar': {
-      id: '/_authenticated/snack-bar'
-      path: '/snack-bar'
-      fullPath: '/snack-bar'
-      preLoaderRoute: typeof AuthenticatedSnackBarImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteLazyImport
-      parentRoute: typeof AuthenticatedRouteImport
-    }
-    '/(auth)/forgot-password': {
-      id: '/(auth)/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof authForgotPasswordLazyImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/reset-password': {
-      id: '/(auth)/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof authResetPasswordLazyImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/sign-in-2': {
-      id: '/(auth)/sign-in-2'
-      path: '/sign-in-2'
-      fullPath: '/sign-in-2'
-      preLoaderRoute: typeof authSignIn2LazyImport
-      parentRoute: typeof rootRoute
-    }
-    '/(auth)/sign-up': {
-      id: '/(auth)/sign-up'
-      path: '/sign-up'
-      fullPath: '/sign-up'
-      preLoaderRoute: typeof authSignUpLazyImport
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/401': {
-      id: '/(errors)/401'
-      path: '/401'
-      fullPath: '/401'
-      preLoaderRoute: typeof errors401LazyImport
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/403': {
-      id: '/(errors)/403'
-      path: '/403'
-      fullPath: '/403'
-      preLoaderRoute: typeof errors403LazyImport
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/404': {
-      id: '/(errors)/404'
-      path: '/404'
-      fullPath: '/404'
-      preLoaderRoute: typeof errors404LazyImport
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/500': {
-      id: '/(errors)/500'
-      path: '/500'
-      fullPath: '/500'
-      preLoaderRoute: typeof errors500LazyImport
-      parentRoute: typeof rootRoute
-    }
-    '/(errors)/503': {
-      id: '/(errors)/503'
-      path: '/503'
-      fullPath: '/503'
-      preLoaderRoute: typeof errors503LazyImport
-      parentRoute: typeof rootRoute
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
       id: '/_authenticated/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/campers/debug': {
-      id: '/_authenticated/campers/debug'
-      path: '/campers/debug'
-      fullPath: '/campers/debug'
-      preLoaderRoute: typeof AuthenticatedCampersDebugImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/(errors)/503': {
+      id: '/(errors)/503'
+      path: '/503'
+      fullPath: '/503'
+      preLoaderRoute: typeof errors503LazyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings/account': {
-      id: '/_authenticated/settings/account'
-      path: '/account'
-      fullPath: '/settings/account'
-      preLoaderRoute: typeof AuthenticatedSettingsAccountLazyImport
-      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    '/(errors)/500': {
+      id: '/(errors)/500'
+      path: '/500'
+      fullPath: '/500'
+      preLoaderRoute: typeof errors500LazyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings/appearance': {
-      id: '/_authenticated/settings/appearance'
-      path: '/appearance'
-      fullPath: '/settings/appearance'
-      preLoaderRoute: typeof AuthenticatedSettingsAppearanceLazyImport
-      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    '/(errors)/404': {
+      id: '/(errors)/404'
+      path: '/404'
+      fullPath: '/404'
+      preLoaderRoute: typeof errors404LazyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings/billing': {
-      id: '/_authenticated/settings/billing'
-      path: '/billing'
-      fullPath: '/settings/billing'
-      preLoaderRoute: typeof AuthenticatedSettingsBillingLazyImport
-      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    '/(errors)/403': {
+      id: '/(errors)/403'
+      path: '/403'
+      fullPath: '/403'
+      preLoaderRoute: typeof errors403LazyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings/display': {
-      id: '/_authenticated/settings/display'
-      path: '/display'
-      fullPath: '/settings/display'
-      preLoaderRoute: typeof AuthenticatedSettingsDisplayLazyImport
-      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    '/(errors)/401': {
+      id: '/(errors)/401'
+      path: '/401'
+      fullPath: '/401'
+      preLoaderRoute: typeof errors401LazyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings/integrations': {
-      id: '/_authenticated/settings/integrations'
-      path: '/integrations'
-      fullPath: '/settings/integrations'
-      preLoaderRoute: typeof AuthenticatedSettingsIntegrationsLazyImport
-      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    '/(auth)/sign-up': {
+      id: '/(auth)/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof authSignUpLazyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings/notifications': {
-      id: '/_authenticated/settings/notifications'
-      path: '/notifications'
-      fullPath: '/settings/notifications'
-      preLoaderRoute: typeof AuthenticatedSettingsNotificationsLazyImport
-      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    '/(auth)/sign-in-2': {
+      id: '/(auth)/sign-in-2'
+      path: '/sign-in-2'
+      fullPath: '/sign-in-2'
+      preLoaderRoute: typeof authSignIn2LazyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings/organization': {
-      id: '/_authenticated/settings/organization'
-      path: '/organization'
-      fullPath: '/settings/organization'
-      preLoaderRoute: typeof AuthenticatedSettingsOrganizationLazyImport
-      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    '/(auth)/reset-password': {
+      id: '/(auth)/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof authResetPasswordLazyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/campers/': {
-      id: '/_authenticated/campers/'
-      path: '/campers'
-      fullPath: '/campers'
-      preLoaderRoute: typeof AuthenticatedCampersIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/(auth)/forgot-password': {
+      id: '/(auth)/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof authForgotPasswordLazyRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/registrations/': {
-      id: '/_authenticated/registrations/'
-      path: '/registrations'
-      fullPath: '/registrations'
-      preLoaderRoute: typeof AuthenticatedRegistrationsIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteLazyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/snack-bar/': {
-      id: '/_authenticated/snack-bar/'
-      path: '/'
-      fullPath: '/snack-bar/'
-      preLoaderRoute: typeof AuthenticatedSnackBarIndexImport
-      parentRoute: typeof AuthenticatedSnackBarImport
+    '/_authenticated/snack-bar': {
+      id: '/_authenticated/snack-bar'
+      path: '/snack-bar'
+      fullPath: '/snack-bar'
+      preLoaderRoute: typeof AuthenticatedSnackBarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/staff/': {
-      id: '/_authenticated/staff/'
-      path: '/staff'
-      fullPath: '/staff'
-      preLoaderRoute: typeof AuthenticatedStaffIndexImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/_authenticated/camps': {
+      id: '/_authenticated/camps'
+      path: '/camps'
+      fullPath: '/camps'
+      preLoaderRoute: typeof AuthenticatedCampsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/apps/': {
-      id: '/_authenticated/apps/'
-      path: '/apps'
-      fullPath: '/apps'
-      preLoaderRoute: typeof AuthenticatedAppsIndexLazyImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/(auth)/sign-in': {
+      id: '/(auth)/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof authSignInRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/chats/': {
-      id: '/_authenticated/chats/'
-      path: '/chats'
-      fullPath: '/chats'
-      preLoaderRoute: typeof AuthenticatedChatsIndexLazyImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/(auth)/setup-password': {
+      id: '/(auth)/setup-password'
+      path: '/setup-password'
+      fullPath: '/setup-password'
+      preLoaderRoute: typeof authSetupPasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/help-center/': {
-      id: '/_authenticated/help-center/'
-      path: '/help-center'
-      fullPath: '/help-center'
-      preLoaderRoute: typeof AuthenticatedHelpCenterIndexLazyImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/(auth)/otp': {
+      id: '/(auth)/otp'
+      path: '/otp'
+      fullPath: '/otp'
+      preLoaderRoute: typeof authOtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/users/': {
+      id: '/_authenticated/users/'
+      path: '/users'
+      fullPath: '/users/'
+      preLoaderRoute: typeof AuthenticatedUsersIndexLazyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tasks/': {
+      id: '/_authenticated/tasks/'
+      path: '/tasks'
+      fullPath: '/tasks/'
+      preLoaderRoute: typeof AuthenticatedTasksIndexLazyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/settings/': {
       id: '/_authenticated/settings/'
       path: '/'
       fullPath: '/settings/'
-      preLoaderRoute: typeof AuthenticatedSettingsIndexLazyImport
-      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+      preLoaderRoute: typeof AuthenticatedSettingsIndexLazyRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyRoute
     }
-    '/_authenticated/tasks/': {
-      id: '/_authenticated/tasks/'
-      path: '/tasks'
-      fullPath: '/tasks'
-      preLoaderRoute: typeof AuthenticatedTasksIndexLazyImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/_authenticated/help-center/': {
+      id: '/_authenticated/help-center/'
+      path: '/help-center'
+      fullPath: '/help-center/'
+      preLoaderRoute: typeof AuthenticatedHelpCenterIndexLazyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/users/': {
-      id: '/_authenticated/users/'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof AuthenticatedUsersIndexLazyImport
-      parentRoute: typeof AuthenticatedRouteImport
+    '/_authenticated/chats/': {
+      id: '/_authenticated/chats/'
+      path: '/chats'
+      fullPath: '/chats/'
+      preLoaderRoute: typeof AuthenticatedChatsIndexLazyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/apps/': {
+      id: '/_authenticated/apps/'
+      path: '/apps'
+      fullPath: '/apps/'
+      preLoaderRoute: typeof AuthenticatedAppsIndexLazyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/staff/': {
+      id: '/_authenticated/staff/'
+      path: '/staff'
+      fullPath: '/staff/'
+      preLoaderRoute: typeof AuthenticatedStaffIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/snack-bar/': {
+      id: '/_authenticated/snack-bar/'
+      path: '/'
+      fullPath: '/snack-bar/'
+      preLoaderRoute: typeof AuthenticatedSnackBarIndexRouteImport
+      parentRoute: typeof AuthenticatedSnackBarRoute
+    }
+    '/_authenticated/registrations/': {
+      id: '/_authenticated/registrations/'
+      path: '/registrations'
+      fullPath: '/registrations/'
+      preLoaderRoute: typeof AuthenticatedRegistrationsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/campers/': {
+      id: '/_authenticated/campers/'
+      path: '/campers'
+      fullPath: '/campers/'
+      preLoaderRoute: typeof AuthenticatedCampersIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/settings/organization': {
+      id: '/_authenticated/settings/organization'
+      path: '/organization'
+      fullPath: '/settings/organization'
+      preLoaderRoute: typeof AuthenticatedSettingsOrganizationLazyRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyRoute
+    }
+    '/_authenticated/settings/notifications': {
+      id: '/_authenticated/settings/notifications'
+      path: '/notifications'
+      fullPath: '/settings/notifications'
+      preLoaderRoute: typeof AuthenticatedSettingsNotificationsLazyRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyRoute
+    }
+    '/_authenticated/settings/integrations': {
+      id: '/_authenticated/settings/integrations'
+      path: '/integrations'
+      fullPath: '/settings/integrations'
+      preLoaderRoute: typeof AuthenticatedSettingsIntegrationsLazyRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyRoute
+    }
+    '/_authenticated/settings/display': {
+      id: '/_authenticated/settings/display'
+      path: '/display'
+      fullPath: '/settings/display'
+      preLoaderRoute: typeof AuthenticatedSettingsDisplayLazyRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyRoute
+    }
+    '/_authenticated/settings/billing': {
+      id: '/_authenticated/settings/billing'
+      path: '/billing'
+      fullPath: '/settings/billing'
+      preLoaderRoute: typeof AuthenticatedSettingsBillingLazyRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyRoute
+    }
+    '/_authenticated/settings/appearance': {
+      id: '/_authenticated/settings/appearance'
+      path: '/appearance'
+      fullPath: '/settings/appearance'
+      preLoaderRoute: typeof AuthenticatedSettingsAppearanceLazyRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyRoute
+    }
+    '/_authenticated/settings/account': {
+      id: '/_authenticated/settings/account'
+      path: '/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof AuthenticatedSettingsAccountLazyRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyRoute
+    }
+    '/_authenticated/campers/debug': {
+      id: '/_authenticated/campers/debug'
+      path: '/campers/debug'
+      fullPath: '/campers/debug'
+      preLoaderRoute: typeof AuthenticatedCampersDebugRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
-
-// Create and export the route tree
 
 interface AuthenticatedSnackBarRouteChildren {
   AuthenticatedSnackBarIndexRoute: typeof AuthenticatedSnackBarIndexRoute
@@ -763,268 +953,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
-export interface FileRoutesByFullPath {
-  '': typeof AuthenticatedRouteRouteWithChildren
-  '/privacy': typeof PrivacyRoute
-  '/terms': typeof TermsRoute
-  '/500': typeof errors500LazyRoute
-  '/otp': typeof authOtpRoute
-  '/setup-password': typeof authSetupPasswordRoute
-  '/sign-in': typeof authSignInRoute
-  '/camps': typeof AuthenticatedCampsRoute
-  '/snack-bar': typeof AuthenticatedSnackBarRouteWithChildren
-  '/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
-  '/forgot-password': typeof authForgotPasswordLazyRoute
-  '/reset-password': typeof authResetPasswordLazyRoute
-  '/sign-in-2': typeof authSignIn2LazyRoute
-  '/sign-up': typeof authSignUpLazyRoute
-  '/401': typeof errors401LazyRoute
-  '/403': typeof errors403LazyRoute
-  '/404': typeof errors404LazyRoute
-  '/503': typeof errors503LazyRoute
-  '/': typeof AuthenticatedIndexRoute
-  '/campers/debug': typeof AuthenticatedCampersDebugRoute
-  '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
-  '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
-  '/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
-  '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
-  '/settings/integrations': typeof AuthenticatedSettingsIntegrationsLazyRoute
-  '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
-  '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
-  '/campers': typeof AuthenticatedCampersIndexRoute
-  '/registrations': typeof AuthenticatedRegistrationsIndexRoute
-  '/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
-  '/staff': typeof AuthenticatedStaffIndexRoute
-  '/apps': typeof AuthenticatedAppsIndexLazyRoute
-  '/chats': typeof AuthenticatedChatsIndexLazyRoute
-  '/help-center': typeof AuthenticatedHelpCenterIndexLazyRoute
-  '/settings/': typeof AuthenticatedSettingsIndexLazyRoute
-  '/tasks': typeof AuthenticatedTasksIndexLazyRoute
-  '/users': typeof AuthenticatedUsersIndexLazyRoute
-}
-
-export interface FileRoutesByTo {
-  '/privacy': typeof PrivacyRoute
-  '/terms': typeof TermsRoute
-  '/500': typeof errors500LazyRoute
-  '/otp': typeof authOtpRoute
-  '/setup-password': typeof authSetupPasswordRoute
-  '/sign-in': typeof authSignInRoute
-  '/camps': typeof AuthenticatedCampsRoute
-  '/forgot-password': typeof authForgotPasswordLazyRoute
-  '/reset-password': typeof authResetPasswordLazyRoute
-  '/sign-in-2': typeof authSignIn2LazyRoute
-  '/sign-up': typeof authSignUpLazyRoute
-  '/401': typeof errors401LazyRoute
-  '/403': typeof errors403LazyRoute
-  '/404': typeof errors404LazyRoute
-  '/503': typeof errors503LazyRoute
-  '/': typeof AuthenticatedIndexRoute
-  '/campers/debug': typeof AuthenticatedCampersDebugRoute
-  '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
-  '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
-  '/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
-  '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
-  '/settings/integrations': typeof AuthenticatedSettingsIntegrationsLazyRoute
-  '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
-  '/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
-  '/campers': typeof AuthenticatedCampersIndexRoute
-  '/registrations': typeof AuthenticatedRegistrationsIndexRoute
-  '/snack-bar': typeof AuthenticatedSnackBarIndexRoute
-  '/staff': typeof AuthenticatedStaffIndexRoute
-  '/apps': typeof AuthenticatedAppsIndexLazyRoute
-  '/chats': typeof AuthenticatedChatsIndexLazyRoute
-  '/help-center': typeof AuthenticatedHelpCenterIndexLazyRoute
-  '/settings': typeof AuthenticatedSettingsIndexLazyRoute
-  '/tasks': typeof AuthenticatedTasksIndexLazyRoute
-  '/users': typeof AuthenticatedUsersIndexLazyRoute
-}
-
-export interface FileRoutesById {
-  __root__: typeof rootRoute
-  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/privacy': typeof PrivacyRoute
-  '/terms': typeof TermsRoute
-  '/(auth)/500': typeof auth500Route
-  '/(auth)/otp': typeof authOtpRoute
-  '/(auth)/setup-password': typeof authSetupPasswordRoute
-  '/(auth)/sign-in': typeof authSignInRoute
-  '/_authenticated/camps': typeof AuthenticatedCampsRoute
-  '/_authenticated/snack-bar': typeof AuthenticatedSnackBarRouteWithChildren
-  '/_authenticated/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
-  '/(auth)/forgot-password': typeof authForgotPasswordLazyRoute
-  '/(auth)/reset-password': typeof authResetPasswordLazyRoute
-  '/(auth)/sign-in-2': typeof authSignIn2LazyRoute
-  '/(auth)/sign-up': typeof authSignUpLazyRoute
-  '/(errors)/401': typeof errors401LazyRoute
-  '/(errors)/403': typeof errors403LazyRoute
-  '/(errors)/404': typeof errors404LazyRoute
-  '/(errors)/500': typeof errors500LazyRoute
-  '/(errors)/503': typeof errors503LazyRoute
-  '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/campers/debug': typeof AuthenticatedCampersDebugRoute
-  '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
-  '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
-  '/_authenticated/settings/billing': typeof AuthenticatedSettingsBillingLazyRoute
-  '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
-  '/_authenticated/settings/integrations': typeof AuthenticatedSettingsIntegrationsLazyRoute
-  '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
-  '/_authenticated/settings/organization': typeof AuthenticatedSettingsOrganizationLazyRoute
-  '/_authenticated/campers/': typeof AuthenticatedCampersIndexRoute
-  '/_authenticated/registrations/': typeof AuthenticatedRegistrationsIndexRoute
-  '/_authenticated/snack-bar/': typeof AuthenticatedSnackBarIndexRoute
-  '/_authenticated/staff/': typeof AuthenticatedStaffIndexRoute
-  '/_authenticated/apps/': typeof AuthenticatedAppsIndexLazyRoute
-  '/_authenticated/chats/': typeof AuthenticatedChatsIndexLazyRoute
-  '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexLazyRoute
-  '/_authenticated/settings/': typeof AuthenticatedSettingsIndexLazyRoute
-  '/_authenticated/tasks/': typeof AuthenticatedTasksIndexLazyRoute
-  '/_authenticated/users/': typeof AuthenticatedUsersIndexLazyRoute
-}
-
-export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | ''
-    | '/privacy'
-    | '/terms'
-    | '/500'
-    | '/otp'
-    | '/setup-password'
-    | '/sign-in'
-    | '/camps'
-    | '/snack-bar'
-    | '/settings'
-    | '/forgot-password'
-    | '/reset-password'
-    | '/sign-in-2'
-    | '/sign-up'
-    | '/401'
-    | '/403'
-    | '/404'
-    | '/503'
-    | '/'
-    | '/campers/debug'
-    | '/settings/account'
-    | '/settings/appearance'
-    | '/settings/billing'
-    | '/settings/display'
-    | '/settings/integrations'
-    | '/settings/notifications'
-    | '/settings/organization'
-    | '/campers'
-    | '/registrations'
-    | '/snack-bar/'
-    | '/staff'
-    | '/apps'
-    | '/chats'
-    | '/help-center'
-    | '/settings/'
-    | '/tasks'
-    | '/users'
-  fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/privacy'
-    | '/terms'
-    | '/500'
-    | '/otp'
-    | '/setup-password'
-    | '/sign-in'
-    | '/camps'
-    | '/forgot-password'
-    | '/reset-password'
-    | '/sign-in-2'
-    | '/sign-up'
-    | '/401'
-    | '/403'
-    | '/404'
-    | '/503'
-    | '/'
-    | '/campers/debug'
-    | '/settings/account'
-    | '/settings/appearance'
-    | '/settings/billing'
-    | '/settings/display'
-    | '/settings/integrations'
-    | '/settings/notifications'
-    | '/settings/organization'
-    | '/campers'
-    | '/registrations'
-    | '/snack-bar'
-    | '/staff'
-    | '/apps'
-    | '/chats'
-    | '/help-center'
-    | '/settings'
-    | '/tasks'
-    | '/users'
-  id:
-    | '__root__'
-    | '/_authenticated'
-    | '/privacy'
-    | '/terms'
-    | '/(auth)/500'
-    | '/(auth)/otp'
-    | '/(auth)/setup-password'
-    | '/(auth)/sign-in'
-    | '/_authenticated/camps'
-    | '/_authenticated/snack-bar'
-    | '/_authenticated/settings'
-    | '/(auth)/forgot-password'
-    | '/(auth)/reset-password'
-    | '/(auth)/sign-in-2'
-    | '/(auth)/sign-up'
-    | '/(errors)/401'
-    | '/(errors)/403'
-    | '/(errors)/404'
-    | '/(errors)/500'
-    | '/(errors)/503'
-    | '/_authenticated/'
-    | '/_authenticated/campers/debug'
-    | '/_authenticated/settings/account'
-    | '/_authenticated/settings/appearance'
-    | '/_authenticated/settings/billing'
-    | '/_authenticated/settings/display'
-    | '/_authenticated/settings/integrations'
-    | '/_authenticated/settings/notifications'
-    | '/_authenticated/settings/organization'
-    | '/_authenticated/campers/'
-    | '/_authenticated/registrations/'
-    | '/_authenticated/snack-bar/'
-    | '/_authenticated/staff/'
-    | '/_authenticated/apps/'
-    | '/_authenticated/chats/'
-    | '/_authenticated/help-center/'
-    | '/_authenticated/settings/'
-    | '/_authenticated/tasks/'
-    | '/_authenticated/users/'
-  fileRoutesById: FileRoutesById
-}
-
-export interface RootRouteChildren {
-  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  PrivacyRoute: typeof PrivacyRoute
-  TermsRoute: typeof TermsRoute
-  auth500Route: typeof auth500Route
-  authOtpRoute: typeof authOtpRoute
-  authSetupPasswordRoute: typeof authSetupPasswordRoute
-  authSignInRoute: typeof authSignInRoute
-  authForgotPasswordLazyRoute: typeof authForgotPasswordLazyRoute
-  authResetPasswordLazyRoute: typeof authResetPasswordLazyRoute
-  authSignIn2LazyRoute: typeof authSignIn2LazyRoute
-  authSignUpLazyRoute: typeof authSignUpLazyRoute
-  errors401LazyRoute: typeof errors401LazyRoute
-  errors403LazyRoute: typeof errors403LazyRoute
-  errors404LazyRoute: typeof errors404LazyRoute
-  errors500LazyRoute: typeof errors500LazyRoute
-  errors503LazyRoute: typeof errors503LazyRoute
-}
-
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
-  auth500Route: auth500Route,
   authOtpRoute: authOtpRoute,
   authSetupPasswordRoute: authSetupPasswordRoute,
   authSignInRoute: authSignInRoute,
@@ -1038,199 +970,6 @@ const rootRouteChildren: RootRouteChildren = {
   errors500LazyRoute: errors500LazyRoute,
   errors503LazyRoute: errors503LazyRoute,
 }
-
-export const routeTree = rootRoute
+export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-/* ROUTE_MANIFEST_START
-{
-  "routes": {
-    "__root__": {
-      "filePath": "__root.tsx",
-      "children": [
-        "/_authenticated",
-        "/privacy",
-        "/terms",
-        "/(auth)/500",
-        "/(auth)/otp",
-        "/(auth)/setup-password",
-        "/(auth)/sign-in",
-        "/(auth)/forgot-password",
-        "/(auth)/reset-password",
-        "/(auth)/sign-in-2",
-        "/(auth)/sign-up",
-        "/(errors)/401",
-        "/(errors)/403",
-        "/(errors)/404",
-        "/(errors)/500",
-        "/(errors)/503"
-      ]
-    },
-    "/_authenticated": {
-      "filePath": "_authenticated/route.tsx",
-      "children": [
-        "/_authenticated/camps",
-        "/_authenticated/snack-bar",
-        "/_authenticated/settings",
-        "/_authenticated/",
-        "/_authenticated/campers/debug",
-        "/_authenticated/campers/",
-        "/_authenticated/registrations/",
-        "/_authenticated/staff/",
-        "/_authenticated/apps/",
-        "/_authenticated/chats/",
-        "/_authenticated/help-center/",
-        "/_authenticated/tasks/",
-        "/_authenticated/users/"
-      ]
-    },
-    "/privacy": {
-      "filePath": "privacy.tsx"
-    },
-    "/terms": {
-      "filePath": "terms.tsx"
-    },
-    "/(auth)/500": {
-      "filePath": "(auth)/500.tsx"
-    },
-    "/(auth)/otp": {
-      "filePath": "(auth)/otp.tsx"
-    },
-    "/(auth)/setup-password": {
-      "filePath": "(auth)/setup-password.tsx"
-    },
-    "/(auth)/sign-in": {
-      "filePath": "(auth)/sign-in.tsx"
-    },
-    "/_authenticated/camps": {
-      "filePath": "_authenticated/camps.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/snack-bar": {
-      "filePath": "_authenticated/snack-bar.tsx",
-      "parent": "/_authenticated",
-      "children": [
-        "/_authenticated/snack-bar/"
-      ]
-    },
-    "/_authenticated/settings": {
-      "filePath": "_authenticated/settings/route.lazy.tsx",
-      "parent": "/_authenticated",
-      "children": [
-        "/_authenticated/settings/account",
-        "/_authenticated/settings/appearance",
-        "/_authenticated/settings/billing",
-        "/_authenticated/settings/display",
-        "/_authenticated/settings/integrations",
-        "/_authenticated/settings/notifications",
-        "/_authenticated/settings/organization",
-        "/_authenticated/settings/"
-      ]
-    },
-    "/(auth)/forgot-password": {
-      "filePath": "(auth)/forgot-password.lazy.tsx"
-    },
-    "/(auth)/reset-password": {
-      "filePath": "(auth)/reset-password.lazy.tsx"
-    },
-    "/(auth)/sign-in-2": {
-      "filePath": "(auth)/sign-in-2.lazy.tsx"
-    },
-    "/(auth)/sign-up": {
-      "filePath": "(auth)/sign-up.lazy.tsx"
-    },
-    "/(errors)/401": {
-      "filePath": "(errors)/401.lazy.tsx"
-    },
-    "/(errors)/403": {
-      "filePath": "(errors)/403.lazy.tsx"
-    },
-    "/(errors)/404": {
-      "filePath": "(errors)/404.lazy.tsx"
-    },
-    "/(errors)/500": {
-      "filePath": "(errors)/500.lazy.tsx"
-    },
-    "/(errors)/503": {
-      "filePath": "(errors)/503.lazy.tsx"
-    },
-    "/_authenticated/": {
-      "filePath": "_authenticated/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/campers/debug": {
-      "filePath": "_authenticated/campers/debug.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/settings/account": {
-      "filePath": "_authenticated/settings/account.lazy.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/appearance": {
-      "filePath": "_authenticated/settings/appearance.lazy.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/billing": {
-      "filePath": "_authenticated/settings/billing.lazy.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/display": {
-      "filePath": "_authenticated/settings/display.lazy.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/integrations": {
-      "filePath": "_authenticated/settings/integrations.lazy.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/notifications": {
-      "filePath": "_authenticated/settings/notifications.lazy.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/settings/organization": {
-      "filePath": "_authenticated/settings/organization.lazy.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/campers/": {
-      "filePath": "_authenticated/campers/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/registrations/": {
-      "filePath": "_authenticated/registrations/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/snack-bar/": {
-      "filePath": "_authenticated/snack-bar/index.tsx",
-      "parent": "/_authenticated/snack-bar"
-    },
-    "/_authenticated/staff/": {
-      "filePath": "_authenticated/staff/index.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/apps/": {
-      "filePath": "_authenticated/apps/index.lazy.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/chats/": {
-      "filePath": "_authenticated/chats/index.lazy.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/help-center/": {
-      "filePath": "_authenticated/help-center/index.lazy.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/settings/": {
-      "filePath": "_authenticated/settings/index.lazy.tsx",
-      "parent": "/_authenticated/settings"
-    },
-    "/_authenticated/tasks/": {
-      "filePath": "_authenticated/tasks/index.lazy.tsx",
-      "parent": "/_authenticated"
-    },
-    "/_authenticated/users/": {
-      "filePath": "_authenticated/users/index.lazy.tsx",
-      "parent": "/_authenticated"
-    }
-  }
-}
-ROUTE_MANIFEST_END */
