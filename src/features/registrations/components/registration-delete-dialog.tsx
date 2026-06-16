@@ -31,18 +31,17 @@ export function RegistrationDeleteDialog({
 
   const handleDelete = async () => {
     try {
-      await registrationService.delete(registration.id)
+      await registrationService.deleteRegistration(registration.id)
       toast({
-        description: 'Registration deleted successfully.',
+        description: 'Inscrição eliminada com sucesso.',
       })
       onRegistrationDeleted()
       onOpenChange(false)
     } catch {
-      // Erro ao deletar registro
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to delete registration. Please try again.',
+        title: 'Erro',
+        description: 'Não foi possível eliminar a inscrição. Tente novamente.',
       })
     }
   }
@@ -51,19 +50,19 @@ export function RegistrationDeleteDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogTitle>Tem a certeza?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete the registration for {registration.name} and all
-            associated payments. This action cannot be undone.
+            Esta acção irá eliminar permanentemente a inscrição de {registration.name} e
+            todos os pagamentos associados. Esta acção não pode ser revertida.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
             className='bg-red-600 hover:bg-red-700'
           >
-            Delete
+            Eliminar
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

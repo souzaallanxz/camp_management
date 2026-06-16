@@ -6,12 +6,14 @@ import { Registration } from '../data/schema'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { IconDots, IconEye, IconUserCheck, IconCreditCard, IconCopy } from '@tabler/icons-react'
+import { IconDots, IconEye, IconUserCheck, IconCreditCard, IconCopy, IconTrash } from '@tabler/icons-react'
 import { RegistrationDetailsSheet } from './registration-details-dialog'
 import { RegistrationOnboardDialog } from './registration-onboard-dialog'
+import { RegistrationDeleteDialog } from './registration-delete-dialog'
 import { SnackbarBalanceDialog } from './snackbar-balance-dialog'
 import { paymentService } from '../services/payment-service'
 import { useToast } from '@/components/ui/use-toast'
+import { useTeamPermissions } from '@/features/teams/hooks/use-team-permissions'
 
 export interface RegistrationWithActions extends Registration {
   onRegistrationUpdated: () => void
@@ -70,6 +72,9 @@ export function Actions({ registration, onRegistrationUpdated }: ActionsProps) {
   const [showOnboardDialog, setShowOnboardDialog] = useState(false)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [showSnackbarBalanceDialog, setShowSnackbarBalanceDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const permissions = useTeamPermissions()
+  const canDelete = permissions.registrations.delete
 
   return (
     <>
@@ -97,6 +102,15 @@ export function Actions({ registration, onRegistrationUpdated }: ActionsProps) {
               Carregar cartão
             </DropdownMenuItem>
           )}
+          {canDelete && (
+            <DropdownMenuItem
+              onClick={() => setShowDeleteDialog(true)}
+              className="text-red-600 focus:text-red-600"
+            >
+              <IconTrash className="mr-2 h-4 w-4" />
+              Eliminar
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -120,6 +134,15 @@ export function Actions({ registration, onRegistrationUpdated }: ActionsProps) {
         registrationId={registration.id}
         onSuccess={onRegistrationUpdated}
       />
+
+      {canDelete && (
+        <RegistrationDeleteDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          registration={registration}
+          onRegistrationDeleted={onRegistrationUpdated}
+        />
+      )}
     </>
   )
 }

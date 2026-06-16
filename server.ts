@@ -2049,7 +2049,7 @@ app.put('/api/registrations/:id', (async (req: Request, res: Response) => {
   }
 }) as any);
 
-// Delete a registration
+// Delete a registration (cascade: snack_bar_transactions -> campers/payments/snackbar_balance -> registration)
 app.delete('/api/registrations/:id', (async (req: Request, res: Response) => {
   const teamId = getTeamId(req);
   if (!teamId) {
@@ -2057,15 +2057,27 @@ app.delete('/api/registrations/:id', (async (req: Request, res: Response) => {
   }
   try {
     const { id } = req.params;
-    // Only delete if registration belongs to a camp of the team
-    const result = await sql`
-      DELETE FROM registrations WHERE id = ${id} AND camp_id IN (SELECT id FROM camps WHERE team_id = ${teamId}) RETURNING *
+
+    const ownership = await sql`
+      SELECT r.id FROM registrations r
+      JOIN camps c ON r.camp_id = c.id
+      WHERE r.id = ${id} AND c.team_id = ${teamId}
     `;
-    if (!result[0]) {
+    if (!ownership[0]) {
       return res.status(404).json({ error: 'Registration not found or you do not have permission to delete it' });
     }
+
+    await sql.transaction([
+      sql`DELETE FROM snack_bar_transactions WHERE camper_id IN (SELECT id FROM campers WHERE registration_id = ${id})`,
+      sql`DELETE FROM snackbar_balance WHERE registration_id = ${id}`,
+      sql`DELETE FROM payments WHERE registration_id = ${id}`,
+      sql`DELETE FROM campers WHERE registration_id = ${id}`,
+      sql`DELETE FROM registrations WHERE id = ${id}`,
+    ]);
+
     res.status(204).end();
-  } catch {
+  } catch (err) {
+    console.error('Error deleting registration:', err);
     res.status(500).json({ error: 'Erro ao deletar inscrição.' });
   }
 }) as any);

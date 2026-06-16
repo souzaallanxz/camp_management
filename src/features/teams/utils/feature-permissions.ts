@@ -162,9 +162,19 @@ export function getFeaturePermissions(tier: TeamTier, userRole?: string): Featur
   if (userRole === 'cashier') {
     return CASHIER_ROLE_PERMISSIONS
   }
-  
-  // Caso contrário, usar permissões baseadas no tier
-  return tier === 'premium' ? PREMIUM_TIER_PERMISSIONS : FREE_TIER_PERMISSIONS
+
+  const base = tier === 'premium' ? PREMIUM_TIER_PERMISSIONS : FREE_TIER_PERMISSIONS
+
+  // Eliminar inscrições: apenas superadmin e admin
+  const canDeleteRegistrations = userRole === 'superadmin' || userRole === 'admin'
+
+  return {
+    ...base,
+    registrations: {
+      ...base.registrations,
+      delete: base.registrations.delete && canDeleteRegistrations,
+    },
+  }
 }
 
 export function hasFeatureAccess(tier: TeamTier, feature: keyof FeaturePermissions, userRole?: string): boolean {
